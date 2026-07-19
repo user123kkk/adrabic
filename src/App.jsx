@@ -607,6 +607,7 @@ function makeLetterQuestion(mode) {
     return {
       audio: false,
       speakText: target.base,
+      audioSrc: "/letters/" + target.key + ".mp3",
       badge,
       prompt: target.forms[pos],
       promptArabic: true,
@@ -627,6 +628,7 @@ function makeLetterQuestion(mode) {
   return {
     audio: true,
     speakText: target.base,
+    audioSrc: "/letters/" + target.key + ".mp3",
     badge,
     prompt: null,
     promptArabic: false,
