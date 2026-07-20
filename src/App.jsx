@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
+import { Analytics } from "@vercel/analytics/react";
 
 // ============================================================
 //  Arabisch-Schrift-Trainer
@@ -1283,6 +1284,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <ArabTrainerApp />
+      <Analytics />
     </ErrorBoundary>
   );
 }
