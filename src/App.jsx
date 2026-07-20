@@ -2070,6 +2070,27 @@ function ArabTrainerApp() {
         {screen === "start" && (
           <ChecklistSection C={C} done={checklistDone} onToggle={toggleCheck} onReset={resetChecklist} />
         )}
+
+        {screen === "start" && (
+          <div
+            style={{
+              background: C.panel,
+              border: `1px solid ${C.line}`,
+              borderRadius: 12,
+              padding: "14px 16px",
+              marginTop: 14,
+              fontSize: 13.5,
+              lineHeight: 1.55,
+              color: C.sub,
+              textAlign: "center",
+            }}
+          >
+            Fragen? Egal wie klein oder simpel sie dir vorkommen — schreib mir
+            gern auf TikTok{" "}
+            <span style={{ color: C.gold, fontWeight: 600 }}>@deinname</span>{" "}
+            oder kommentier einfach unter dem Video. Es gibt keine dummen Fragen.
+          </div>
+        )}
       </div>
 
       {/* Fast unsichtbarer Deko-Schrift-Zugang unten rechts. Bewusst KEIN
