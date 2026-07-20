@@ -756,7 +756,6 @@ const CHOICE_MODULES = {
     make: makeHarakatQuestion,
     modes: [
       { id: "read2syllable", audio: false, label: "Zeichen → Laut", sub: "Buchstabe mit Vokalzeichen wird gezeigt, du wählst die richtige Silbe." },
-      { id: "sound2read", audio: true, label: "Laut → Zeichen", sub: "Eine Silbe wird vorgelesen, du wählst das passende Vokalzeichen." },
     ],
   },
 };
