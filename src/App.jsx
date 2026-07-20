@@ -2087,7 +2087,7 @@ function ArabTrainerApp() {
           >
             Fragen? Egal wie klein oder simpel sie dir vorkommen — schreib mir
             gern auf TikTok{" "}
-            <span style={{ color: C.gold, fontWeight: 600 }}>@deinname</span>{" "}
+            <span style={{ color: C.gold, fontWeight: 600 }}>@adrabic</span>{" "}
             oder kommentier einfach unter dem Video. Es gibt keine dummen Fragen.
           </div>
         )}
