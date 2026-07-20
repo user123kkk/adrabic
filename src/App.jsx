@@ -591,14 +591,18 @@ function fmtTime(ms) {
 //      options: [{ label, correct, arabic }] }
 // ============================================================
 
+// Lām-Alif (لا) ist eine Ligatur, kein Grundbuchstabe -- keine eigene
+// Aufnahme vorhanden, deshalb im Buchstaben-Quiz aussen vor.
+const QUIZ_LETTERS = LETTERS.filter((l) => l.key !== "lamalif");
+
 function makeLetterQuestion(mode) {
-  const target = randOf(LETTERS);
+  const target = randOf(QUIZ_LETTERS);
   const posKeys = Object.keys(target.forms);
   const pos = randOf(posKeys);
   const badge = `Position: ${POS_LABEL[pos]}`;
 
   if (mode === "form2letter") {
-    const distractors = shuffle(LETTERS.filter((l) => l.key !== target.key)).slice(0, 3);
+    const distractors = shuffle(QUIZ_LETTERS.filter((l) => l.key !== target.key)).slice(0, 3);
     const options = shuffle([target, ...distractors]).map((l) => ({
       label: l.forms.isolated,
       correct: l.key === target.key,
@@ -616,7 +620,7 @@ function makeLetterQuestion(mode) {
     };
   }
   // sound2form
-  const others = shuffle(LETTERS.filter((l) => l.key !== target.key)).slice(0, 3);
+  const others = shuffle(QUIZ_LETTERS.filter((l) => l.key !== target.key)).slice(0, 3);
   const options = shuffle([
     { label: target.forms[pos], correct: true, arabic: true },
     ...others.map((l) => ({
