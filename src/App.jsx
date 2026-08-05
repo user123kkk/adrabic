@@ -860,15 +860,15 @@ const PRONUN_SHADDA = [
   { ar: "حَقّ", tr: "ḥaqq", hint: "Shadda auf ق → q verdoppelt: „ḥaq-q“." },
   { ar: "كُلّ", tr: "kull", hint: "Shadda auf ل → l verdoppelt: „kul-l“." },
   { ar: "أُمّ", tr: "umm", hint: "Shadda auf م → m verdoppelt: „um-m“." },
-  { ar: "جَنَّة", tr: "janna", hint: "Shadda auf ن → n verdoppelt: „jan-na“." },
+  { ar: "جَنَّة", tr: "janna", hint: "Shadda auf ن → n verdoppelt: „jan-na“. Endet auf ة: beim Anhalten „…ah“." },
   { ar: "عَدُوّ", tr: "ʿaduww", hint: "Shadda auf و → w verdoppelt: „ʿaduw-w“." },
   { ar: "مُحَمَّد", tr: "muḥammad", hint: "Shadda auf م → m verdoppelt: „muḥam-mad“." },
   { ar: "عَلَّمَ", tr: "ʿallama", hint: "Shadda auf ل → l verdoppelt: „ʿal-lama“." },
   { ar: "حُبّ", tr: "ḥubb", hint: "Shadda auf ب → b verdoppelt: „ḥub-b“." },
   { ar: "سِرّ", tr: "sirr", hint: "Shadda auf ر → r verdoppelt: „sir-r“." },
-  { ar: "مَرَّة", tr: "marra", hint: "Shadda auf ر → r verdoppelt: „mar-ra“." },
+  { ar: "مَرَّة", tr: "marra", hint: "Shadda auf ر → r verdoppelt: „mar-ra“. Endet auf ة: beim Anhalten „…ah“." },
   { ar: "ظَنَّ", tr: "ẓanna", hint: "Shadda auf ن → n verdoppelt: „ẓan-na“." },
-  { ar: "شِدَّة", tr: "shidda", hint: "Shadda auf د → d verdoppelt: „shid-da“." },
+  { ar: "شِدَّة", tr: "shidda", hint: "Shadda auf د → d verdoppelt: „shid-da“. Endet auf ة: beim Anhalten „…ah“." },
   { ar: "حَجّ", tr: "ḥajj", hint: "Shadda auf ج → j verdoppelt: „ḥaj-j“." },
   { ar: "جِدّ", tr: "jidd", hint: "Shadda auf د → d verdoppelt: „jid-d“." },
   { ar: "شَكّ", tr: "shakk", hint: "Shadda auf ك → k verdoppelt: „shak-k“." },
@@ -880,9 +880,9 @@ const PRONUN_SHADDA = [
   { ar: "طِبّ", tr: "ṭibb", hint: "Shadda auf ب → b verdoppelt: „ṭib-b“." },
   { ar: "فَنّ", tr: "fann", hint: "Shadda auf ن → n verdoppelt: „fan-n“." },
   { ar: "قِطّ", tr: "qiṭṭ", hint: "Shadda auf ط → ṭ verdoppelt: „qiṭ-ṭ“." },
-  { ar: "لَذَّة", tr: "ladhdha", hint: "Shadda auf ذ → dh verdoppelt: „ladh-dha“." },
+  { ar: "لَذَّة", tr: "ladhdha", hint: "Shadda auf ذ → dh verdoppelt: „ladh-dha“. Endet auf ة: beim Anhalten „…ah“." },
   { ar: "عِزّ", tr: "ʿizz", hint: "Shadda auf ز → z verdoppelt: „ʿiz-z“." },
-  { ar: "ذَرَّة", tr: "dharra", hint: "Shadda auf ر → r verdoppelt: „dhar-ra“." },
+  { ar: "ذَرَّة", tr: "dharra", hint: "Shadda auf ر → r verdoppelt: „dhar-ra“. Endet auf ة: beim Anhalten „…ah“." },
   { ar: "كَفّ", tr: "kaff", hint: "Shadda auf ف → f verdoppelt: „kaf-f“." },
   { ar: "رَدّ", tr: "radd", hint: "Shadda auf د → d verdoppelt: „rad-d“." },
 ];
@@ -907,7 +907,7 @@ const PRONUN_MADD = [
   { ar: "يَكُونُ", tr: "yakūnu", hint: "Waw nach Damma → langes „u“: yakūnu." },
   { ar: "صُور", tr: "ṣūr", hint: "Waw nach Damma → langes „u“: ṣūr." },
   { ar: "دُون", tr: "dūn", hint: "Waw nach Damma → langes „u“: dūn." },
-  { ar: "سُورَة", tr: "sūra", hint: "Waw nach Damma (سُو) → langes „u“: sūra." },
+  { ar: "سُورَة", tr: "sūra", hint: "Waw nach Damma (سُو) → langes „u“: sūra. Endet auf ة: beim Anhalten „…ah“." },
   { ar: "رَسُول", tr: "rasūl", hint: "Waw nach Damma → langes „u“: rasūl." },
   { ar: "عُود", tr: "ʿūd", hint: "Waw nach Damma → langes „u“: ʿūd." },
   { ar: "طُول", tr: "ṭūl", hint: "Waw nach Damma → langes „u“: ṭūl." },
@@ -921,6 +921,25 @@ const PRONUN_MADD = [
   { ar: "طَرِيق", tr: "ṭarīq", hint: "Ya nach Kasra → langes „i“: ṭarīq." },
   { ar: "كَرِيم", tr: "karīm", hint: "Ya nach Kasra → langes „i“: karīm." },
   { ar: "جَمِيل", tr: "jamīl", hint: "Ya nach Kasra → langes „i“: jamīl." },
+];
+
+// --- Tāʾ marbūṭa (ة): das ه mit den zwei Punkten des ت. Nur am Wortende.
+// Beim Anhalten wie "h", beim Weiterlesen wie "t" (Standard-Orthographie,
+// so auch in der Hafs-Lesung des Madinah-Mushaf). Beispiele bewusst OHNE
+// Shadda und OHNE Madd — beides kommt in der Reihenfolge erst danach dran.
+const PRONUN_TAMARBUTA = [
+  { ar: "سَنَة", tr: "sanah", hint: "Jahr. Anhalten: „sanah“ · Weiterlesen: „sanat…“ (z. B. sanatun)." },
+  { ar: "لُغَة", tr: "lughah", hint: "Sprache. Anhalten: „lughah“ · Weiterlesen: „lughat…“." },
+  { ar: "كَلِمَة", tr: "kalimah", hint: "Wort. Anhalten: „kalimah“ · Weiterlesen: „kalimat…“." },
+  { ar: "شَجَرَة", tr: "shajarah", hint: "Baum. Anhalten: „shajarah“ · Weiterlesen: „shajarat…“." },
+  { ar: "بَقَرَة", tr: "baqarah", hint: "Kuh. Anhalten: „baqarah“ · Weiterlesen: „baqarat…“ (wie in Sūrat al-Baqara)." },
+  { ar: "رَحْمَة", tr: "raḥmah", hint: "Barmherzigkeit. Anhalten: „raḥmah“ · Weiterlesen: „raḥmat…“." },
+  { ar: "نِعْمَة", tr: "niʿmah", hint: "Gunst, Gabe. Anhalten: „niʿmah“ · Weiterlesen: „niʿmat…“." },
+  { ar: "مَدْرَسَة", tr: "madrasah", hint: "Schule. Anhalten: „madrasah“ · Weiterlesen: „madrasat…“." },
+  { ar: "جُمْلَة", tr: "jumlah", hint: "Satz. Anhalten: „jumlah“ · Weiterlesen: „jumlat…“." },
+  { ar: "غُرْفَة", tr: "ghurfah", hint: "Zimmer. Anhalten: „ghurfah“ · Weiterlesen: „ghurfat…“." },
+  { ar: "قَرْيَة", tr: "qaryah", hint: "Dorf. Anhalten: „qaryah“ · Weiterlesen: „qaryat…“." },
+  { ar: "وَجْه", tr: "wajh", hint: "Gesicht. ACHTUNG: endet auf echtes ه (ohne Punkte) — immer „h“, wird NIE zu „t“." },
 ];
 
 const PRONUN_MODULES = {
@@ -941,6 +960,14 @@ const PRONUN_MODULES = {
         label: "Tanwin",
         rule: "Tanwin ist ein doppeltes Vokalzeichen am Wortende und klingt wie ein zusätzliches „n“: ٌ = -un, ٍ = -in, ً = -an. Bei ً steht meist ein stummes Alif (ـًا).",
         items: PRONUN_TANWIN,
+      },
+      // Ta marbuta VOR Shadda: in den Shadda-Beispielen kommen Woerter wie
+      // مَرَّة vor — deren Endung soll bis dahin schon erklaert sein.
+      {
+        id: "tamarbuta",
+        label: "Tāʾ marbūṭa (ة)",
+        rule: "Tāʾ marbūṭa (ة) = das ه mit den zwei Punkten des ت. Steht nur am Wortende (meist weibliche Wörter). Beim Anhalten liest du „h“ (سَنَة → sanah), beim Weiterlesen „t“ (سَنَةُ… → sanatu…).",
+        items: PRONUN_TAMARBUTA,
       },
       // Shadda zeigt jetzt die Ausspracheregel (Gemination), analog Sukun/Tanwin.
       {
@@ -980,8 +1007,8 @@ function getModule(id) {
 //  Lesehilfen — Simulator mit Lernkarten + Quiz je Thema
 //  Thema 1: Lam Shamsiya / Qamariya (Sonnen-/Mondbuchstaben)
 //  Thema 2: Waqf-Zeichen (Pausenzeichen im Mushaf)
-//  Fakten geprüft: Sonnen-/Mondbuchstaben (14+14). Waqf-Zeichen teils
-//  Madinah-Mushaf (König-Fahd-Komplex), teils indo-pakistanische Tradition. Wörter tragen die
+//  Fakten geprüft: Sonnen-/Mondbuchstaben (14+14); Waqf-Zeichen gegen die
+//  Zeichenerklärung des Madinah-Mushaf (König-Fahd-Komplex). Wörter tragen die
 //  echten Marker: Mondbuchstaben Sukun auf dem Lam (الْ), Sonnenbuchstaben
 //  Shadda auf dem Folgebuchstaben (الشّ), Lam stumm.
 // ============================================================
@@ -1027,9 +1054,12 @@ const LAM_EXPLAIN = {
   qamariya: "Mondbuchstabe → Lam Qamariya: das ل wird gesprochen (Sukun auf dem Lam: الْ).",
 };
 
-// Waqf-Zeichen. م لا ج صلى قلى ∴ س stehen im Madinah-Mushaf; ط ز ص ك
-// stammen aus der indo-pakistanischen Mushaf-Tradition (dort verbreitet,
-// im Madinah-Mushaf nicht verwendet). sign = Zeichen, name = Bezeichnung,
+// Waqf-Zeichen: exakt der Satz des Madinah-Mushaf (م لا ج قلى صلى ∴ س).
+// Quelle: Zeichenerklärung, die hinten in jedem Madinah-Mushaf (König-
+// Fahd-Komplex) abgedruckt ist. Zeichen anderer Drucktraditionen (ط ز ص ك,
+// indo-pakistanisch, System as-Saǧāwandīs) werden bewusst NICHT gelehrt —
+// sie kommen im Madinah-Mushaf, den die App anzeigt, nicht vor.
+// sign = Zeichen, name = Bezeichnung,
 // short = Kurzhandlung (Quiz-Option), long = Erklärung.
 const GUIDE_WAQF = [
   { sign: "م", name: "Waqf Lāzim", short: "Pflicht-Halt", long: "Du MUSST hier anhalten. Weiterlesen würde die Bedeutung verändern." },
@@ -1037,12 +1067,41 @@ const GUIDE_WAQF = [
   { sign: "ج", name: "Waqf Ǧāʾiz", short: "Halten erlaubt", long: "Frei: halten oder weiterlesen, beides gleichwertig." },
   { sign: "قلى", name: "al-Waqf awlā", short: "Besser halten", long: "Halten ist besser, weiterlesen ist aber erlaubt." },
   { sign: "صلى", name: "al-Waṣl awlā", short: "Besser weiter", long: "Weiterlesen ist besser, halten ist aber erlaubt." },
-  { sign: "ط", name: "Waqf Muṭlaq", short: "Empfohlener Halt", long: "Guter, empfohlener Halt — hier darfst du gut anhalten." },
-  { sign: "ز", name: "Waqf Muǧawwaz", short: "Halten erlaubt, weiter besser", long: "Halten ist erlaubt, aber weiterlesen ist besser." },
-  { sign: "ص", name: "Waqf Murakhkhaṣ", short: "Halten bei Bedarf", long: "Halten nur bei Bedarf (z. B. Atemnot) erlaubt, sonst weiterlesen." },
   { sign: "∴ ∴", name: "Muʿānaqa (Taʿānuq)", short: "Nur an EINER Stelle halten", long: "Zwei Dreier-Punktgruppen: Du hältst an EINEM der beiden Punkte — nicht an beiden." },
-  { sign: "س", name: "Saktah", short: "Kurze Pause ohne Atmen", long: "Kurze Atempause OHNE auszuatmen — kürzer als ein normaler Halt." },
-  { sign: "ك", name: "Kadhālika", short: "Wie das vorige Zeichen", long: "„Ebenso“: gleiche Bedeutung wie das zuletzt gezeigte Waqf-Zeichen davor." },
+  { sign: "س", name: "Saktah", short: "Kurze Pause ohne Atmen", long: "Kurze Atempause OHNE auszuatmen — kürzer als ein normaler Halt. Kommt im ganzen Quran nur an 4 Stellen vor: 18:1, 36:52, 75:27, 83:14." },
+];
+
+// ---- Daten fuer das Lesehilfen-Paket "Hamza & Wasl-Zeichen" ----
+// Hamza (ء) = Knacklaut (kurzer Stimm-Stopp wie im Deutschen "be·enden").
+// Traeger: allein auf der Linie (ء), auf/unter dem Alif (أ إ), auf Waw (ؤ),
+// auf einem punktlosen Ya-Zahn (ئ). Kommt am Anfang, in der Mitte und am
+// Ende von Woertern vor. Das Wasl-Zeichen (ٱ) dagegen gibt es NUR auf dem
+// Alif: beim Neuansetzen gesprochen, mitten im Satz stumm (Hafs-Lesung,
+// so auch im Madinah-Mushaf gedruckt — dessen Text die App anzeigt).
+const GUIDE_HAMZA = [
+  { ar: "ء", read: "Hamza", de: "der Knacklaut", note: "Ein kurzer Stimm-Stopp wie in „be·enden“. Hamza ist ein richtiger Buchstabe (Konsonant), kein Vokal — er trägt Harakat wie jeder andere Buchstabe." },
+  { ar: "أَ", read: "ʾa", de: "Hamza auf dem Alif (mit Fatha)", note: "Bei a und u sitzt das Hamza OBEN auf dem Alif: أَ = ʾa, أُ = ʾu. Beispiel: أَحَد = ʾaḥad (einer)." },
+  { ar: "إِ", read: "ʾi", de: "Hamza unter dem Alif (mit Kasra)", note: "Bei i sitzt das Hamza UNTEN am Alif: إِ = ʾi. Beispiel: إِسْلَام = ʾislām." },
+  { ar: "ؤ", read: "ʾ auf Waw", de: "Träger: Waw", note: "In der Wortmitte oder am Ende kann Hamza auf و sitzen: يُؤْمِنُ = yuʾminu (er glaubt)." },
+  { ar: "ئ", read: "ʾ auf Ya-Zahn", de: "Träger: punktloses Ya", note: "Oder auf einem Ya-Zahn ohne Punkte: سُئِلَ = suʾila (er wurde gefragt)." },
+  { ar: "شَيْء", read: "shayʾ", de: "Sache", note: "Hamza kann auch allein auf der Linie stehen (ء), oft am Wortende." },
+  { ar: "سَأَلَ", read: "saʾala", de: "er fragte", note: "MIT Knacklaut in der Mitte: sa-ʾa-la. Vergleiche mit der nächsten Karte!" },
+  { ar: "سَالَ", read: "sāla", de: "es floss", note: "OHNE Hamza — nur langes ā. Der einzige Unterschied zu سَأَلَ ist der Knacklaut." },
+  { ar: "ٱ", read: "Wasl-Zeichen", de: "Verbindungs-Alif", note: "Gibt es NUR auf dem Alif. Setzt du hier neu an, liest du es: ٱلْحَمْدُ = al-ḥamdu. Mitten im Satz ist es STUMM — kein Knacklaut." },
+  { ar: "وَٱلْحَمْدُ", read: "wal-ḥamdu", de: "„und das Lob“", note: "Das ٱ wird übersprungen: „wal-ḥamdu“ in einem Fluss — NICHT „wa-ʾal-ḥamdu“." },
+  { ar: "بِسْمِ ٱللَّهِ", read: "bismillāhi", de: "im Namen Allahs", note: "Auch hier: nach بِسْمِ wird das ٱ von ٱللَّه übersprungen — „bismillāh“ in einem Zug." },
+];
+
+// Quiz dazu: je 2 Lesungen zur Auswahl — mit/ohne Knacklaut bzw. ٱ stumm
+// oder gesprochen. Genau die Faelle, die beim echten Lesen verwirren.
+const HAMZA_QUIZ = [
+  { prompt: "سَأَلَ", question: "Wie liest du das?", options: [{ label: "saʾala — mit Knacklaut", correct: true }, { label: "sāla — ohne Knacklaut", correct: false }], explain: "أَ in der Mitte = Hamza → sa-ʾa-la (er fragte)." },
+  { prompt: "سَالَ", question: "Wie liest du das?", options: [{ label: "sāla — ohne Knacklaut", correct: true }, { label: "saʾala — mit Knacklaut", correct: false }], explain: "Nur Alif nach Fatha = langes ā, kein Hamza → sāla (es floss)." },
+  { prompt: "يُؤْمِنُ", question: "Wie liest du das?", options: [{ label: "yuʾminu — mit Knacklaut", correct: true }, { label: "yūminu — ohne Knacklaut", correct: false }], explain: "ؤ = Hamza auf Waw → yu-ʾmi-nu (er glaubt)." },
+  { prompt: "ٱلْحَمْدُ", question: "Du beginnst hier zu lesen. Wie?", options: [{ label: "al-ḥamdu — ٱ wird gelesen", correct: true }, { label: "l-ḥamdu — ٱ bleibt stumm", correct: false }], explain: "Beim Neuansetzen wird das Wasl-Alif gesprochen: al-ḥamdu." },
+  { prompt: "وَٱلْحَمْدُ", question: "Mitten im Lesen. Wie?", options: [{ label: "wal-ḥamdu — ٱ stumm, ein Fluss", correct: true }, { label: "wa-ʾal-ḥamdu — mit Knacklaut", correct: false }], explain: "Mitten im Satz ist das Wasl-Alif stumm: wal-ḥamdu." },
+  { prompt: "شَيْء", question: "Wie endet das Wort?", options: [{ label: "shayʾ — mit Knacklaut am Ende", correct: true }, { label: "shay — ohne", correct: false }], explain: "Das ء am Ende wird gesprochen: shayʾ (Sache)." },
+  { prompt: "سُئِلَ", question: "Wie liest du das?", options: [{ label: "suʾila — mit Knacklaut", correct: true }, { label: "suwila — ohne", correct: false }], explain: "ئ = Hamza auf punktlosem Ya-Zahn → su-ʾi-la (er wurde gefragt)." },
 ];
 
 const GUIDE_MODULES = {
@@ -1052,6 +1111,13 @@ const GUIDE_MODULES = {
     title: "Lesehilfen",
     subtitle: "Erst lernen, dann Quiz — mit Erklärungen",
     packs: [
+      {
+        id: "hamza",
+        label: "Hamza & Wasl-Zeichen",
+        topic: "hamza",
+        intro: "Hamza (ء) ist der Knacklaut — ein kurzer Stimm-Stopp wie in „be·enden“. Er sitzt allein (ء), auf/unter dem Alif (أ إ), auf Waw (ؤ) oder auf punktlosem Ya (ئ). Das Wasl-Zeichen (ٱ) gibt es nur auf dem Alif: beim Neuansetzen liest du es, mitten im Satz ist es stumm.",
+        data: GUIDE_HAMZA,
+      },
       {
         id: "lam",
         label: "Lam Shamsiya / Qamariya",
@@ -1063,7 +1129,7 @@ const GUIDE_MODULES = {
         id: "waqf",
         label: "Waqf-Zeichen",
         topic: "waqf",
-        intro: "Die kleinen Zeichen im Mushaf sagen, wo du anhalten musst, darfst oder nicht. Zeichen des Madinah-Mushaf; ط، ز، ص und ك kommen zusätzlich in Mushafs der indo-pakistanischen Tradition vor.",
+        intro: "Die kleinen Zeichen im Mushaf sagen, wo du anhalten musst, darfst oder nicht. Genau die Zeichen des Madinah-Mushaf — ihre Erklärung ist auch hinten in jedem Madinah-Mushaf abgedruckt.",
         data: GUIDE_WAQF,
       },
     ],
@@ -1119,10 +1185,12 @@ const CHECKLIST = [
   { id: "c03", cat: "harakat", text: "Ich kenne die drei Kurzvokale: Fatha (a), Kasra (i), Damma (u)" },
   { id: "c04", cat: "harakat", text: "Ich lese Wörter mit Sukūn im Qurʾān (z. B. قَدْ, لَمْ, قُلْ)" },
   { id: "c05", cat: "harakat", text: "Ich lese Wörter mit Tanwīn (رَجُلٌ, قَلْبٍ, شُكْرًا)" },
+  { id: "c18", cat: "harakat", text: "Ich lese Wörter mit Tāʾ marbūṭa (ة): beim Anhalten „h“, beim Weiterlesen „t“ (سَنَة, رَحْمَة)" },
   { id: "c06", cat: "harakat", text: "Ich lese Wörter mit Shadda im Qurʾān (z. B. إِنَّ, رَبّ, حَقّ)" },
   { id: "c07", cat: "harakat", text: "Ich lese Wörter mit Madd Aslī / natürlichem Madd (قَالَ, يَقُولُ, قِيلَ)" },
+  { id: "c19", cat: "lesehilfen", text: "Ich erkenne Hamza (ء أ إ ؤ ئ) und das Wasl-Zeichen (ٱ) und lese beide richtig (سَأَلَ, وَٱلْحَمْدُ)" },
   { id: "c08", cat: "lesehilfen", text: "Ich unterscheide Lam Shamsiya und Lam Qamariya (السَّمَاء vs. الْقَمَر)" },
-  { id: "c09", cat: "lesehilfen", text: "Ich erkenne die gängigen Waqf-Zeichen" },
+  { id: "c09", cat: "lesehilfen", text: "Ich erkenne die Waqf-Zeichen des Madinah-Mushaf" },
   { id: "c10", cat: "woerter", text: "Ich lese 5 einzelne Wörter aus Sūrat al-Mulk" },
   { id: "c11", cat: "woerter", text: "Ich lese 10 Wörter aus Sūrat al-Qalam" },
   { id: "c12", cat: "lesen", text: "Ich lese Sūrat al-Mulk, Ayah 1–5" },
@@ -3676,6 +3744,16 @@ function PronunciationScreen({ C, fontStack, items, rule, packLabel, onExit }) {
         </span>
       </div>
 
+      {/* Regel der Kategorie: immer sichtbar ueber der Karte — bisher stand
+          sie nur als Fallback-Hinweis und wurde nie angezeigt, weil jedes
+          Wort einen eigenen hint hat. Gerade bei Ta marbuta muss die Regel
+          VOR dem ersten Wort lesbar sein. */}
+      {rule && (
+        <div style={{ fontSize: 12.5, color: C.sub, lineHeight: 1.55, marginBottom: 14 }}>
+          {rule}
+        </div>
+      )}
+
       {/* Wort-Karte */}
       <div
         style={{
@@ -3764,6 +3842,16 @@ function PronunciationScreen({ C, fontStack, items, rule, packLabel, onExit }) {
 // =====================================================
 function buildGuideQuiz(pack) {
   const data = pack.data;
+  if (pack.topic === "hamza") {
+    return shuffle(
+      HAMZA_QUIZ.map((q) => ({
+        prompt: q.prompt,
+        question: q.question,
+        options: shuffle(q.options.map((o) => ({ ...o }))),
+        explain: q.explain,
+      }))
+    );
+  }
   if (pack.topic === "lam") {
     return shuffle(
       data.map((it) => ({
@@ -3924,6 +4012,13 @@ function GuideScreen({ C, fontStack, pack, onExit }) {
               <div style={{ color: C.sub, fontSize: 13.5, marginTop: 10, lineHeight: 1.55 }}>
                 {LAM_EXPLAIN[c.type]}
               </div>
+            </>
+          ) : pack.topic === "hamza" ? (
+            <>
+              {bigPrompt(c.ar)}
+              <div style={{ color: C.gold, fontSize: 18, fontWeight: 700 }}>{c.read}</div>
+              <div style={{ color: C.sub, fontSize: 14, marginTop: 2 }}>{c.de}</div>
+              <div style={{ color: C.sub, fontSize: 13.5, marginTop: 10, lineHeight: 1.55 }}>{c.note}</div>
             </>
           ) : (
             <>
@@ -4246,8 +4341,17 @@ function ResultScreen({
 // =====================================================
 //  Lesen-Checkliste (Selbst-Abhaken, ganz unten auf dem Startbildschirm)
 // =====================================================
+// Hinweis hinter dem kleinen ⓘ an jedem Checklisten-Punkt: abgehakt wird
+// erst nach Bestaetigung durch jemanden, der gut liest. Beim letzten Punkt
+// kommt der Tajwid-Satz dazu.
+const CHECK_INFO_BASE =
+  "Erst abhaken, wenn jemand, der gut liest (Lehrer, jemand aus der Moschee), dein Lesen angehört und bestätigt hat. Sag dabei ehrlich, dass du Tajwīd noch nicht gelernt hast — so rezitierst du erstmal.";
+const CHECK_INFO_LAST =
+  " Ist die ganze Liste geschafft, kannst du mit Tajwīd anfangen — aber nur mit Lehrer, allein ist das zu fehleranfällig.";
+
 function ChecklistSection({ C, done, onToggle, onReset }) {
   const total = CHECKLIST.length;
+  const [infoId, setInfoId] = useState(null);
   const doneCount = CHECKLIST.filter((i) => done[i.id]).length;
   const pct = total ? Math.round((doneCount / total) * 100) : 0;
 
@@ -4300,8 +4404,8 @@ function ChecklistSection({ C, done, onToggle, onReset }) {
           const isDone = !!done[item.id];
           const cat = CHECK_CATS[item.cat];
           return (
+            <React.Fragment key={item.id}>
             <button
-              key={item.id}
               type="button"
               role="checkbox"
               aria-checked={isDone}
@@ -4366,7 +4470,62 @@ function ChecklistSection({ C, done, onToggle, onReset }) {
               >
                 {cat.label}
               </span>
+
+              {/* Kleines ⓘ: oeffnet den Lehrer-Hinweis. span statt button,
+                  weil wir schon IN einem button sind (verschachtelte
+                  buttons sind ungueltiges HTML). */}
+              <span
+                role="button"
+                tabIndex={0}
+                aria-label="Hinweis anzeigen"
+                aria-expanded={infoId === item.id}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setInfoId(infoId === item.id ? null : item.id);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setInfoId(infoId === item.id ? null : item.id);
+                  }
+                }}
+                style={{
+                  flexShrink: 0,
+                  width: 20,
+                  height: 20,
+                  borderRadius: "50%",
+                  border: `1px solid ${infoId === item.id ? C.gold : C.line}`,
+                  color: infoId === item.id ? C.gold : C.sub,
+                  fontSize: 11,
+                  fontStyle: "italic",
+                  fontWeight: 700,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                }}
+              >
+                i
+              </span>
             </button>
+
+            {infoId === item.id && (
+              <div
+                style={{
+                  padding: "10px 14px 12px 48px",
+                  fontSize: 12.5,
+                  lineHeight: 1.55,
+                  color: C.sub,
+                  background: "rgba(217,178,95,0.06)",
+                  borderTop: `1px dashed ${C.line}`,
+                }}
+              >
+                {CHECK_INFO_BASE}
+                {item.id === "c17" ? CHECK_INFO_LAST : ""}
+              </div>
+            )}
+            </React.Fragment>
           );
         })}
       </div>
