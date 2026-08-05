@@ -206,17 +206,19 @@ const SIMILAR_GROUPS = [
 
 // ---- Daten fuer das Harakat-Modul ----
 // Saubere Kurz-Transliteration je Konsonant (fuer die Lese-Optionen).
-// Alif/Lam-Alif ausgelassen, da sie ohne Hamza kaum eine reine Haraka tragen.
+// Alle 27 Konsonanten; nur Alif/Lam-Alif ausgelassen (tragen ohne Hamza
+// kaum eine reine Haraka).
 // key = ASCII-Kennung fuer Dateinamen (z.B. ba_fatha.mp3), passend zu RAW.
 const HARAKAT_LETTERS = [
   { key: "ba", base: "ب", tr: "b" }, { key: "ta", base: "ت", tr: "t" }, { key: "tha", base: "ث", tr: "th" },
   { key: "jim", base: "ج", tr: "j" }, { key: "hah", base: "ح", tr: "ḥ" }, { key: "kha", base: "خ", tr: "kh" },
-  { key: "dal", base: "د", tr: "d" }, { key: "ra", base: "ر", tr: "r" }, { key: "sin", base: "س", tr: "s" },
-  { key: "shin", base: "ش", tr: "sh" }, { key: "sad", base: "ص", tr: "ṣ" }, { key: "tah", base: "ط", tr: "ṭ" },
-  { key: "ain", base: "ع", tr: "ʿ" }, { key: "fa", base: "ف", tr: "f" }, { key: "qaf", base: "ق", tr: "q" },
-  { key: "kaf", base: "ك", tr: "k" }, { key: "lam", base: "ل", tr: "l" }, { key: "mim", base: "م", tr: "m" },
-  { key: "nun", base: "ن", tr: "n" }, { key: "ha", base: "ه", tr: "h" }, { key: "waw", base: "و", tr: "w" },
-  { key: "ya", base: "ي", tr: "y" },
+  { key: "dal", base: "د", tr: "d" }, { key: "dhal", base: "ذ", tr: "dh" }, { key: "ra", base: "ر", tr: "r" },
+  { key: "zay", base: "ز", tr: "z" }, { key: "sin", base: "س", tr: "s" }, { key: "shin", base: "ش", tr: "sh" },
+  { key: "sad", base: "ص", tr: "ṣ" }, { key: "dad", base: "ض", tr: "ḍ" }, { key: "tah", base: "ط", tr: "ṭ" },
+  { key: "zah", base: "ظ", tr: "ẓ" }, { key: "ain", base: "ع", tr: "ʿ" }, { key: "ghain", base: "غ", tr: "gh" },
+  { key: "fa", base: "ف", tr: "f" }, { key: "qaf", base: "ق", tr: "q" }, { key: "kaf", base: "ك", tr: "k" },
+  { key: "lam", base: "ل", tr: "l" }, { key: "mim", base: "م", tr: "m" }, { key: "nun", base: "ن", tr: "n" },
+  { key: "ha", base: "ه", tr: "h" }, { key: "waw", base: "و", tr: "w" }, { key: "ya", base: "ي", tr: "y" },
 ];
 
 const HARAKAT = [
@@ -245,8 +247,7 @@ const HARAKAT = [
 //   1) Strukturell (Skript, deterministisch): jedes als Sukun/Shadda/
 //      Tanwin/Madd deklarierte Wort enthaelt tatsaechlich das behauptete
 //      Diakritikzeichen an der richtigen Stelle. 0 Abweichungen in
-//      PRONUN_SUKUN, PRONUN_TANWIN, PRONUN_SHADDA, PRONUN_MADD,
-//      WORDS_SUKUN, WORDS_SHADDA.
+//      PRONUN_SUKUN, PRONUN_TANWIN, PRONUN_SHADDA, PRONUN_MADD.
 //   2) WORDS_MULK (5) + WORDS_QALAM (10): einzeln gegen den echten
 //      Vers-Text von Sure 67/68 (Quran.com) abgeglichen — alle 15 exakt
 //      bestaetigt (bis auf Fallendungen, die in Vokabellisten ueblich
@@ -262,31 +263,6 @@ const HARAKAT = [
 //
 //  Jeder Vers = { ar, tr }. `de` kommt live dazu. Nur diese Arrays anfassen.
 // ============================================================
-
-// --- Woerter mit Sukun (vokalloser Konsonant, Zeichen: \u0652) ---
-const WORDS_SUKUN = [
-  { ar: "قُلْ", tr: "qul", de: "Sag!" },
-  { ar: "لَمْ", tr: "lam", de: "nicht (Vergangenheit)" },
-  { ar: "مِنْ", tr: "min", de: "von, aus" },
-  { ar: "عَنْ", tr: "ʿan", de: "über, von" },
-  { ar: "هَلْ", tr: "hal", de: "(Fragewort)" },
-  { ar: "كَمْ", tr: "kam", de: "wie viel" },
-  { ar: "قُمْ", tr: "qum", de: "Steh auf!" },
-  { ar: "يَوْم", tr: "yawm", de: "Tag" },
-  { ar: "نَحْنُ", tr: "naḥnu", de: "wir" },
-];
-
-// --- Woerter mit Shadda (verdoppelter Konsonant, Zeichen: \u0651) ---
-const WORDS_SHADDA = [
-  { ar: "رَبّ", tr: "rabb", de: "Herr" },
-  { ar: "إِنَّ", tr: "inna", de: "wahrlich / dass" },
-  { ar: "حَقّ", tr: "ḥaqq", de: "Wahrheit, Recht" },
-  { ar: "كُلّ", tr: "kull", de: "jedes, alle" },
-  { ar: "أُمّ", tr: "umm", de: "Mutter" },
-  { ar: "جَنَّة", tr: "janna", de: "Garten, Paradies" },
-  { ar: "عَدُوّ", tr: "ʿaduww", de: "Feind" },
-  { ar: "رَبَّنَا", tr: "rabbanā", de: "unser Herr" },
-];
 
 // --- 5 Woerter aus Surat al-Mulk (67) ---
 const WORDS_MULK = [
@@ -340,7 +316,7 @@ const QALAM_1_16 = tagAyat([
   { ar: "بِأَيِّكُمُ الْمَفْتُونُ", tr: "bi-ayyikumu l-maftūn"  },
   { ar: "إِنَّ رَبَّكَ هُوَ أَعْلَمُ بِمَن ضَلَّ عَن سَبِيلِهِ وَهُوَ أَعْلَمُ بِالْمُهْتَدِينَ", tr: "inna rabbaka huwa aʿlamu bi-man ḍalla ʿan sabīlih …"  },
   { ar: "فَلَا تُطِعِ الْمُكَذِّبِينَ", tr: "fa-lā tuṭiʿi l-mukadhdhibīn"  },
-  { ar: "وَدُّوا لَوْ تُدْهِنُ فَيُدْهِنُونَ", tr: "waddū law tudhinu fa-yudhinūn"  },
+  { ar: "وَدُّوا لَوْ تُدْهِنُ فَيُدْهِنُونَ", tr: "waddū law tud-hinu fa-yud-hinūn"  },
   { ar: "وَلَا تُطِعْ كُلَّ حَلَّافٍ مَّهِينٍ", tr: "wa-lā tuṭiʿ kulla ḥallāfin mahīn"  },
   { ar: "هَمَّازٍ مَّشَّاءٍ بِنَمِيمٍ", tr: "hammāzin mashshāʾin bi-namīm"  },
   { ar: "مَّنَّاعٍ لِّلْخَيْرِ مُعْتَدٍ أَثِيمٍ", tr: "mannāʿin li-l-khayri muʿtadin athīm"  },
@@ -599,7 +575,11 @@ const QUIZ_LETTERS = LETTERS.filter((l) => l.key !== "lamalif");
 function makeLetterQuestion(mode) {
   const target = randOf(QUIZ_LETTERS);
   const posKeys = Object.keys(target.forms);
-  const pos = randOf(posKeys);
+  // Im Modus Form→Buchstabe nie die isolierte Form abfragen: die Antwort-
+  // Optionen zeigen die isolierten Grundformen — die Frage stuende sonst
+  // identisch als richtige Antwort sichtbar da.
+  const askable = mode === "form2letter" ? posKeys.filter((p) => p !== "isolated") : posKeys;
+  const pos = randOf(askable.length ? askable : posKeys);
   const badge = `Position: ${POS_LABEL[pos]}`;
 
   if (mode === "form2letter") {
@@ -778,7 +758,10 @@ const READING_MODULES = {
   },
 };
 
-const MODULE_ORDER = ["letters", "similar", "harakat", "words", "ayat", "lesehilfen"];
+// Lesehilfen (Lam Shamsiya/Qamariya, Waqf) NACH "Woerter lesen" (dort
+// muss man schon ganze Woerter entziffern koennen), aber VOR den Versen
+// (beim Verse-Lesen braucht man Sonnen-/Mondbuchstaben und Waqf bereits).
+const MODULE_ORDER = ["letters", "similar", "harakat", "words", "lesehilfen", "ayat"];
 
 // ============================================================
 //  Wörter lesen (Aussprache-Check-Ablauf)
@@ -963,7 +946,7 @@ const PRONUN_MODULES = {
       {
         id: "shadda",
         label: "Shadda",
-        rule: "Shadda (ّ) verdoppelt den Buchstaben: kurz auf dem Laut verweilen und ihn verstärkt aussprechen.",
+        rule: "Shadda (ّ) verdoppelt den Buchstaben: kurz auf dem Laut verweilen und ihn verstärkt aussprechen. Begegnet dir dabei أ / إ / ء: das ist Hamza, ein kurzer Stimmabsatz (wie die kleine Pause in „be·enden“).",
         items: PRONUN_SHADDA,
       },
       {
@@ -997,8 +980,8 @@ function getModule(id) {
 //  Lesehilfen — Simulator mit Lernkarten + Quiz je Thema
 //  Thema 1: Lam Shamsiya / Qamariya (Sonnen-/Mondbuchstaben)
 //  Thema 2: Waqf-Zeichen (Pausenzeichen im Mushaf)
-//  Fakten geprüft: Sonnen-/Mondbuchstaben (14+14) und Waqf-Zeichen
-//  nach dem Madinah-Mushaf (König-Fahd-Komplex). Wörter tragen die
+//  Fakten geprüft: Sonnen-/Mondbuchstaben (14+14). Waqf-Zeichen teils
+//  Madinah-Mushaf (König-Fahd-Komplex), teils indo-pakistanische Tradition. Wörter tragen die
 //  echten Marker: Mondbuchstaben Sukun auf dem Lam (الْ), Sonnenbuchstaben
 //  Shadda auf dem Folgebuchstaben (الشّ), Lam stumm.
 // ============================================================
@@ -1044,7 +1027,9 @@ const LAM_EXPLAIN = {
   qamariya: "Mondbuchstabe → Lam Qamariya: das ل wird gesprochen (Sukun auf dem Lam: الْ).",
 };
 
-// Waqf-Zeichen (Madinah-Mushaf). sign = Zeichen, name = Bezeichnung,
+// Waqf-Zeichen. م لا ج صلى قلى ∴ س stehen im Madinah-Mushaf; ط ز ص ك
+// stammen aus der indo-pakistanischen Mushaf-Tradition (dort verbreitet,
+// im Madinah-Mushaf nicht verwendet). sign = Zeichen, name = Bezeichnung,
 // short = Kurzhandlung (Quiz-Option), long = Erklärung.
 const GUIDE_WAQF = [
   { sign: "م", name: "Waqf Lāzim", short: "Pflicht-Halt", long: "Du MUSST hier anhalten. Weiterlesen würde die Bedeutung verändern." },
@@ -1078,7 +1063,7 @@ const GUIDE_MODULES = {
         id: "waqf",
         label: "Waqf-Zeichen",
         topic: "waqf",
-        intro: "Die kleinen Zeichen im Mushaf sagen, wo du anhalten musst, darfst oder nicht. System des Madinah-Mushaf.",
+        intro: "Die kleinen Zeichen im Mushaf sagen, wo du anhalten musst, darfst oder nicht. Zeichen des Madinah-Mushaf; ط، ز، ص und ك kommen zusätzlich in Mushafs der indo-pakistanischen Tradition vor.",
         data: GUIDE_WAQF,
       },
     ],
@@ -1133,7 +1118,7 @@ const CHECKLIST = [
   { id: "c02", cat: "alphabet", text: "Ich unterscheide ähnlich aussehende Buchstaben (ب/ت/ث/ن/ي) im Mushaf" },
   { id: "c03", cat: "harakat", text: "Ich kenne die drei Kurzvokale: Fatha (a), Kasra (i), Damma (u)" },
   { id: "c04", cat: "harakat", text: "Ich lese Wörter mit Sukūn im Qurʾān (z. B. قَدْ, لَمْ, قُلْ)" },
-  { id: "c05", cat: "harakat", text: "Ich lese Wörter mit Tanwīn (رَجُلٌ, كِتَابٍ, شُكْرًا)" },
+  { id: "c05", cat: "harakat", text: "Ich lese Wörter mit Tanwīn (رَجُلٌ, قَلْبٍ, شُكْرًا)" },
   { id: "c06", cat: "harakat", text: "Ich lese Wörter mit Shadda im Qurʾān (z. B. إِنَّ, رَبّ, حَقّ)" },
   { id: "c07", cat: "harakat", text: "Ich lese Wörter mit Madd Aslī / natürlichem Madd (قَالَ, يَقُولُ, قِيلَ)" },
   { id: "c08", cat: "lesehilfen", text: "Ich unterscheide Lam Shamsiya und Lam Qamariya (السَّمَاء vs. الْقَمَر)" },
@@ -1210,7 +1195,16 @@ async function fetchAyah(surah, ayah) {
   const url = `https://quranenc.com/api/v1/translation/aya/${TRANS_KEY}/${surah}/${ayah}`;
   const clean = (s) => String(s).replace(/\s+/g, " ").trim();
   const doFetch = async () => {
-    const res = await fetch(url);
+    // Timeout: haengt der Request (z.B. Mobilfunk), soll nicht endlos
+    // "wird geladen…" stehen bleiben — nach 8s abbrechen, dann Retry.
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
+    let res;
+    try {
+      res = await fetch(url, { signal: ctrl.signal });
+    } finally {
+      clearTimeout(timer);
+    }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     // Antwort ist mal { result: {...} }, mal { result: [ {...} ] } —
@@ -1329,7 +1323,8 @@ function ArabTrainerApp() {
   const curMode = isChoice ? curMod.modes.find((m) => m.id === mode) : null;
   // "ayat" hat echte Rezitation -> eigener Rezitator-Picker statt TTS-Stimmenliste.
   const needsReciter = isReading && curMod.id === "ayat";
-  const needsVoice = (curMode && curMode.audio) || (isReading && curMod.id === "words");
+  // TTS-Stimme nur fuer die Laut-Modi der Auswahl-Module.
+  const needsVoice = !!(curMode && curMode.audio);
 
   // Auswahl-Modul-Zustand
   const [q, setQ] = useState(null);
@@ -1453,7 +1448,7 @@ function ArabTrainerApp() {
     [voices, voiceURI]
   );
 
-  function speak(text) {
+  function speak(text, handlers = {}) {
     const synth = synthRef.current;
     if (!synth || !text) return;
     synth.cancel();
@@ -1461,10 +1456,21 @@ function ArabTrainerApp() {
     if (selectedVoice) u.voice = selectedVoice;
     u.lang = selectedVoice ? selectedVoice.lang : "ar-SA";
     u.rate = 0.85;
-    u.onstart = () => setAudioPlaying(true);
-    u.onend = () => setAudioPlaying(false);
-    u.onerror = () => setAudioPlaying(false);
-    synth.speak(u);
+    u.onstart = () => {
+      setAudioPlaying(true);
+      if (handlers.onStart) handlers.onStart();
+    };
+    u.onend = () => {
+      setAudioPlaying(false);
+      if (handlers.onEnd) handlers.onEnd();
+    };
+    u.onerror = () => {
+      setAudioPlaying(false);
+      if (handlers.onEnd) handlers.onEnd();
+    };
+    // Kleiner Versatz nach cancel(): Chrome verschluckt sonst gelegentlich
+    // ein speak(), das direkt auf cancel() folgt.
+    setTimeout(() => synth.speak(u), 30);
   }
 
   // Spielt eine bestimmte Stimme sofort probehalber ab (unabhaengig vom
@@ -1486,11 +1492,11 @@ function ArabTrainerApp() {
 
   // Kern der Audio-Strategie: erst statische Datei (src), bei jedem Fehler
   // (nicht vorhanden, Netzwerk, Format) faellt es auf Browser-TTS zurueck.
-  function playFileOrTTS(src, fallbackText) {
+  function playFileOrTTS(src, fallbackText, ttsHandlers) {
     const audio = audioElRef.current;
     if (src && audio) {
       audio.pause();
-      audio.onerror = () => speak(fallbackText);
+      audio.onerror = () => speak(fallbackText, ttsHandlers);
       audio.src = src;
       // Tempo/Tonhoehe ERST nach dem src-Wechsel setzen — ein Ladevorgang
       // setzt playbackRate sonst wieder auf 1 zurueck. Zur Sicherheit erneut,
@@ -1504,9 +1510,9 @@ function ArabTrainerApp() {
       applyRate();
       audio.addEventListener("loadedmetadata", applyRate, { once: true });
       const p = audio.play();
-      if (p && p.catch) p.catch(() => speak(fallbackText));
+      if (p && p.catch) p.catch(() => speak(fallbackText, ttsHandlers));
     } else {
-      speak(fallbackText);
+      speak(fallbackText, ttsHandlers);
     }
   }
 
@@ -1520,16 +1526,16 @@ function ArabTrainerApp() {
   //   1) Vers -> echte Rezitation (everyayah)
   //   2) Wort -> statische Datei (falls WORD_AUDIO_ENABLED)
   //   3) TTS-Fallback
-  function playReadingAudio(item) {
+  function playReadingAudio(item, ttsHandlers) {
     if (item && item.surah && item.ayah) {
-      playFileOrTTS(ayahAudioUrl(reciterFolder, item.surah, item.ayah), item.ar);
+      playFileOrTTS(ayahAudioUrl(reciterFolder, item.surah, item.ayah), item.ar, ttsHandlers);
       return;
     }
     if (WORD_AUDIO_ENABLED) {
-      playFileOrTTS(wordAudioSrc(item), item.ar);
+      playFileOrTTS(wordAudioSrc(item), item.ar, ttsHandlers);
       return;
     }
-    speak(item.ar);
+    speak(item.ar, ttsHandlers);
   }
 
   // Beispielhoerprobe fuer den gewaehlten Rezitator (Sure 1, Ayah 1 —
@@ -1605,21 +1611,8 @@ function ArabTrainerApp() {
     const item = rQueue[rIdx];
     if (!audio || !item) return;
 
-    // Naechsten Vers im Hintergrund vorladen — per fetch() statt Audio-
-    // Element, weil iOS Safari das Vorladen von <audio> ohne Geste blockt,
-    // fetch() aber nicht. no-cors, weil everyayah.com evtl. kein CORS sendet;
-    // fuellt trotzdem den HTTP-Cache fuer den naechsten <audio src>-Zugriff.
-    const nextItem = rQueue[rIdx + 1];
-    if (nextItem && nextItem.surah && nextItem.ayah) {
-      const nextUrl = ayahAudioUrl(reciterFolder, nextItem.surah, nextItem.ayah);
-      if (preloadedUrlRef.current !== nextUrl) {
-        preloadedUrlRef.current = nextUrl;
-        fetch(nextUrl, { mode: "no-cors" }).catch(() => {});
-      }
-    }
-
     let done = false;
-    let safety = null;
+    let stall = null;
 
     const advance = () => {
       if (done) return;
@@ -1632,26 +1625,46 @@ function ArabTrainerApp() {
         setRIdx(next);
       }
     };
+    const clearStall = () => {
+      if (stall) {
+        clearTimeout(stall);
+        stall = null;
+      }
+    };
 
-    // 'ended' ist das eigentliche Signal. Der Sicherheits-Timer ist nur ein
-    // fester Deckel als Netz (nicht mehr an audio.duration gekoppelt — die
-    // ist bei manchen MP3s unzuverlaessig/Infinity und liess den Timer auf
-    // 30s hochschnellen, was wie ein Haenger wirkte).
+    // 'ended' (Datei) bzw. das TTS-Ende sind die eigentlichen Signale zum
+    // Weiterschalten. Der Watchdog greift NUR, wenn die Wiedergabe gar nicht
+    // erst startet (Netz haengt, Datei fehlt UND TTS stumm bleibt) — er
+    // deckelt NICHT mehr die Versdauer: der alte feste 18s-Deckel hat lange
+    // Verse (und generell alles bei Tempo 0,5×) mitten in der Rezitation
+    // abgeschnitten und uebersprungen.
     const onEnded = () => advance();
+    const onPlaying = () => clearStall();
     audio.addEventListener("ended", onEnded);
-    safety = setTimeout(advance, 18000);
+    audio.addEventListener("playing", onPlaying);
+    stall = setTimeout(advance, 20000);
+    const ttsHandlers = { onStart: clearStall, onEnd: advance };
 
     if (skipNextAutoPlayRef.current) {
       // Wurde gerade schon synchron im Tap gestartet (siehe onSpeak/onStartTap) —
       // nicht nochmal abspielen, nur Listener oben zaehlen.
       skipNextAutoPlayRef.current = false;
     } else {
-      playReadingAudio(item);
+      // Nach einer Pause denselben Vers an der Pausenstelle FORTSETZEN,
+      // statt ihn von vorn zu starten (src neu setzen wuerde zuruecksetzen).
+      const url = item.surah && item.ayah ? ayahAudioUrl(reciterFolder, item.surah, item.ayah) : null;
+      if (url && audio.src === url && !audio.ended && audio.currentTime > 0) {
+        const p = audio.play();
+        if (p && p.catch) p.catch(() => playReadingAudio(item, ttsHandlers));
+      } else {
+        playReadingAudio(item, ttsHandlers);
+      }
     }
 
     return () => {
       audio.removeEventListener("ended", onEnded);
-      if (safety) clearTimeout(safety);
+      audio.removeEventListener("playing", onPlaying);
+      clearStall();
     };
     // playReadingAudio je Render neu erzeugt -> bewusst nicht in den Deps
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1667,6 +1680,27 @@ function ArabTrainerApp() {
       a.playbackRate = rate;
     }
   }, [rate]);
+
+  // Naechsten Vers vorladen — in BEIDEN Lese-Modi (Karteikarte + Lesever-
+  // folgung): Audio per fetch() (fuellt den HTTP-Cache; <audio>-Preload
+  // blockt iOS Safari ohne Geste; no-cors, weil everyayah evtl. kein CORS
+  // sendet) und die Uebersetzung in den localStorage-Cache. Beim Weiter-
+  // schalten steht dann praktisch nie mehr "wird geladen…".
+  useEffect(() => {
+    if (screen !== "play" || !isReading) return;
+    const nextItem = rQueue[rIdx + 1];
+    if (!nextItem || !nextItem.surah || !nextItem.ayah) return;
+    const nextUrl = ayahAudioUrl(reciterFolder, nextItem.surah, nextItem.ayah);
+    if (preloadedUrlRef.current !== nextUrl) {
+      preloadedUrlRef.current = nextUrl;
+      fetch(nextUrl, { mode: "no-cors" }).catch(() => {});
+    }
+    if (!transCacheGet(nextItem.surah, nextItem.ayah)) {
+      fetchAyah(nextItem.surah, nextItem.ayah)
+        .then((v) => transCacheSet(nextItem.surah, nextItem.ayah, v))
+        .catch(() => {});
+    }
+  }, [screen, isReading, rQueue, rIdx, reciterFolder]);
 
   function selectModule(id) {
     const m = getModule(id);
@@ -1844,10 +1878,13 @@ function ArabTrainerApp() {
     red: "#c9584f",
   };
 
-  // Lese-Schrift: Standard ist jetzt die echte Mushaf-Schrift (KFGQPC Hafs
-  // Uthmanic Script). Kein Umschalter mehr — das war die richtige Wahl,
-  // wenn das Ziel echte Mushaf-Vorbereitung ist. Amiri bleibt nur als
-  // unsichtbarer Fallback in der Kette, falls das CDN mal nicht laedt.
+  // Lese-Schrift: Standard ist die echte Mushaf-Schrift (KFGQPC Hafs
+  // Uthmanic Script). Zuerst wird eine LOKALE Kopie versucht
+  // (public/fonts/UthmanicHafs1Ver18.woff2 — die Datei einmal vom CDN
+  // herunterladen und dort ablegen), erst danach das CDN. Faellt beides
+  // aus, greifen die System-Schriften aus fontStack. (Amiri wird NICHT
+  // aktiv geladen — der Name in fontStack wirkt nur auf Geraeten, die
+  // Amiri installiert haben.)
   useEffect(() => {
     const ID = "mushaf-font-face";
     if (document.getElementById(ID)) return;
@@ -1856,7 +1893,8 @@ function ArabTrainerApp() {
     style.textContent = `
       @font-face {
         font-family: 'UthmanicHafs';
-        src: url('https://verses.quran.foundation/fonts/quran/hafs/uthmanic_hafs/UthmanicHafs1Ver18.woff2') format('woff2'),
+        src: url('/fonts/UthmanicHafs1Ver18.woff2') format('woff2'),
+             url('https://verses.quran.foundation/fonts/quran/hafs/uthmanic_hafs/UthmanicHafs1Ver18.woff2') format('woff2'),
              url('https://verses.quran.foundation/fonts/quran/hafs/uthmanic_hafs/UthmanicHafs1Ver18.ttf') format('truetype');
         font-display: swap;
       }
