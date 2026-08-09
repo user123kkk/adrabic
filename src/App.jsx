@@ -291,18 +291,18 @@ const WORDS_QALAM = [
 const MULK_1_5 = tagAyat([
   { ar: "تَبَارَكَ الَّذِي بِيَدِهِ الْمُلْكُ وَهُوَ عَلَىٰ كُلِّ شَيْءٍ قَدِيرٌ", tr: "tabāraka lladhī bi-yadihi l-mulku wa-huwa ʿalā kulli shayʾin qadīr"  },
   { ar: "الَّذِي خَلَقَ الْمَوْتَ وَالْحَيَاةَ لِيَبْلُوَكُمْ أَيُّكُمْ أَحْسَنُ عَمَلًا ۚ وَهُوَ الْعَزِيزُ الْغَفُورُ", tr: "alladhī khalaqa l-mawta wa-l-ḥayāta li-yabluwakum ayyukum aḥsanu ʿamalā, wa-huwa l-ʿazīzu l-ghafūr"  },
-  { ar: "الَّذِي خَلَقَ سَبْعَ سَمَاوَاتٍ طِبَاقًا ۖ مَا تَرَىٰ فِي خَلْقِ الرَّحْمَٰنِ مِن تَفَاوُتٍ ۖ فَارْجِعِ الْبَصَرَ هَلْ تَرَىٰ مِن فُطُورٍ", tr: "alladhī khalaqa sabʿa samāwātin ṭibāqā …"  },
-  { ar: "ثُمَّ ارْجِعِ الْبَصَرَ كَرَّتَيْنِ يَنقَلِبْ إِلَيْكَ الْبَصَرُ خَاسِئًا وَهُوَ حَسِيرٌ", tr: "thumma rjiʿi l-baṣara karratayni …"  },
-  { ar: "وَلَقَدْ زَيَّنَّا السَّمَاءَ الدُّنْيَا بِمَصَابِيحَ وَجَعَلْنَاهَا رُجُومًا لِّلشَّيَاطِينِ ۖ وَأَعْتَدْنَا لَهُمْ عَذَابَ السَّعِيرِ", tr: "wa-laqad zayyannā s-samāʾa d-dunyā bi-maṣābīḥ …"  },
+  { ar: "الَّذِي خَلَقَ سَبْعَ سَمَاوَاتٍ طِبَاقًا ۖ مَا تَرَىٰ فِي خَلْقِ الرَّحْمَٰنِ مِن تَفَاوُتٍ ۖ فَارْجِعِ الْبَصَرَ هَلْ تَرَىٰ مِن فُطُورٍ", tr: "alladhī khalaqa sabʿa samāwātin ṭibāqā, mā tarā fī khalqi r-raḥmāni min tafāwut, fa-rjiʿi l-baṣara hal tarā min fuṭūr" },
+  { ar: "ثُمَّ ارْجِعِ الْبَصَرَ كَرَّتَيْنِ يَنقَلِبْ إِلَيْكَ الْبَصَرُ خَاسِئًا وَهُوَ حَسِيرٌ", tr: "thumma rjiʿi l-baṣara karratayni yanqalib ilayka l-baṣaru khāsiʾan wa-huwa ḥasīr" },
+  { ar: "وَلَقَدْ زَيَّنَّا السَّمَاءَ الدُّنْيَا بِمَصَابِيحَ وَجَعَلْنَاهَا رُجُومًا لِّلشَّيَاطِينِ ۖ وَأَعْتَدْنَا لَهُمْ عَذَابَ السَّعِيرِ", tr: "wa-laqad zayyannā s-samāʾa d-dunyā bi-maṣābīḥ, wa-jaʿalnāhā rujūman li-sh-shayāṭīn, wa-aʿtadnā lahum ʿadhāba s-saʿīr" },
 ], 67, 1);
 
 // --- Surat al-Mulk (67), Ayat 6-11 ---
 const MULK_6_11 = tagAyat([
-  { ar: "وَلِلَّذِينَ كَفَرُوا بِرَبِّهِمْ عَذَابُ جَهَنَّمَ ۖ وَبِئْسَ الْمَصِيرُ", tr: "wa-li-lladhīna kafarū bi-rabbihim ʿadhābu jahannam …"  },
+  { ar: "وَلِلَّذِينَ كَفَرُوا بِرَبِّهِمْ عَذَابُ جَهَنَّمَ ۖ وَبِئْسَ الْمَصِيرُ", tr: "wa-li-lladhīna kafarū bi-rabbihim ʿadhābu jahannam, wa-biʾsa l-maṣīr" },
   { ar: "إِذَا أُلْقُوا فِيهَا سَمِعُوا لَهَا شَهِيقًا وَهِيَ تَفُورُ", tr: "idhā ulqū fīhā samiʿū lahā shahīqan wa-hiya tafūr"  },
-  { ar: "تَكَادُ تَمَيَّزُ مِنَ الْغَيْظِ ۖ كُلَّمَا أُلْقِيَ فِيهَا فَوْجٌ سَأَلَهُمْ خَزَنَتُهَا أَلَمْ يَأْتِكُمْ نَذِيرٌ", tr: "takādu tamayyazu mina l-ghayẓ …"  },
-  { ar: "قَالُوا بَلَىٰ قَدْ جَاءَنَا نَذِيرٌ فَكَذَّبْنَا وَقُلْنَا مَا نَزَّلَ اللَّهُ مِن شَيْءٍ إِنْ أَنتُمْ إِلَّا فِي ضَلَالٍ كَبِيرٍ", tr: "qālū balā qad jāʾanā nadhīr …"  },
-  { ar: "وَقَالُوا لَوْ كُنَّا نَسْمَعُ أَوْ نَعْقِلُ مَا كُنَّا فِي أَصْحَابِ السَّعِيرِ", tr: "wa-qālū law kunnā nasmaʿu aw naʿqilu …"  },
+  { ar: "تَكَادُ تَمَيَّزُ مِنَ الْغَيْظِ ۖ كُلَّمَا أُلْقِيَ فِيهَا فَوْجٌ سَأَلَهُمْ خَزَنَتُهَا أَلَمْ يَأْتِكُمْ نَذِيرٌ", tr: "takādu tamayyazu mina l-ghayẓ, kullamā ulqiya fīhā fawjun saʾalahum khazanatuhā a-lam yaʾtikum nadhīr" },
+  { ar: "قَالُوا بَلَىٰ قَدْ جَاءَنَا نَذِيرٌ فَكَذَّبْنَا وَقُلْنَا مَا نَزَّلَ اللَّهُ مِن شَيْءٍ إِنْ أَنتُمْ إِلَّا فِي ضَلَالٍ كَبِيرٍ", tr: "qālū balā qad jāʾanā nadhīr, fa-kadhdhabnā wa-qulnā mā nazzala llāhu min shayʾ, in antum illā fī ḍalālin kabīr" },
+  { ar: "وَقَالُوا لَوْ كُنَّا نَسْمَعُ أَوْ نَعْقِلُ مَا كُنَّا فِي أَصْحَابِ السَّعِيرِ", tr: "wa-qālū law kunnā nasmaʿu aw naʿqilu, mā kunnā fī aṣḥābi s-saʿīr" },
   { ar: "فَاعْتَرَفُوا بِذَنبِهِمْ فَسُحْقًا لِّأَصْحَابِ السَّعِيرِ", tr: "fa-ʿtarafū bi-dhanbihim fa-suḥqan li-aṣḥābi s-saʿīr"  },
 ], 67, 6);
 
@@ -314,7 +314,7 @@ const QALAM_1_16 = tagAyat([
   { ar: "وَإِنَّكَ لَعَلَىٰ خُلُقٍ عَظِيمٍ", tr: "wa-innaka la-ʿalā khuluqin ʿaẓīm"  },
   { ar: "فَسَتُبْصِرُ وَيُبْصِرُونَ", tr: "fa-satubṣiru wa-yubṣirūn"  },
   { ar: "بِأَيِّكُمُ الْمَفْتُونُ", tr: "bi-ayyikumu l-maftūn"  },
-  { ar: "إِنَّ رَبَّكَ هُوَ أَعْلَمُ بِمَن ضَلَّ عَن سَبِيلِهِ وَهُوَ أَعْلَمُ بِالْمُهْتَدِينَ", tr: "inna rabbaka huwa aʿlamu bi-man ḍalla ʿan sabīlih …"  },
+  { ar: "إِنَّ رَبَّكَ هُوَ أَعْلَمُ بِمَن ضَلَّ عَن سَبِيلِهِ وَهُوَ أَعْلَمُ بِالْمُهْتَدِينَ", tr: "inna rabbaka huwa aʿlamu bi-man ḍalla ʿan sabīlihī, wa-huwa aʿlamu bi-l-muhtadīn" },
   { ar: "فَلَا تُطِعِ الْمُكَذِّبِينَ", tr: "fa-lā tuṭiʿi l-mukadhdhibīn"  },
   { ar: "وَدُّوا لَوْ تُدْهِنُ فَيُدْهِنُونَ", tr: "waddū law tud-hinu fa-yud-hinūn"  },
   { ar: "وَلَا تُطِعْ كُلَّ حَلَّافٍ مَّهِينٍ", tr: "wa-lā tuṭiʿ kulla ḥallāfin mahīn"  },
@@ -334,7 +334,7 @@ const HAQQA_1_10 = tagAyat([
   { ar: "كَذَّبَتْ ثَمُودُ وَعَادٌ بِالْقَارِعَةِ", tr: "kadhdhabat thamūdu wa-ʿādun bi-l-qāriʿa"  },
   { ar: "فَأَمَّا ثَمُودُ فَأُهْلِكُوا بِالطَّاغِيَةِ", tr: "fa-ammā thamūdu fa-uhlikū bi-ṭ-ṭāghiya"  },
   { ar: "وَأَمَّا عَادٌ فَأُهْلِكُوا بِرِيحٍ صَرْصَرٍ عَاتِيَةٍ", tr: "wa-ammā ʿādun fa-uhlikū bi-rīḥin ṣarṣarin ʿātiya"  },
-  { ar: "سَخَّرَهَا عَلَيْهِمْ سَبْعَ لَيَالٍ وَثَمَانِيَةَ أَيَّامٍ حُسُومًا فَتَرَى الْقَوْمَ فِيهَا صَرْعَىٰ كَأَنَّهُمْ أَعْجَازُ نَخْلٍ خَاوِيَةٍ", tr: "sakhkharahā ʿalayhim sabʿa layālin wa-thamāniyata ayyāmin ḥusūmā …"  },
+  { ar: "سَخَّرَهَا عَلَيْهِمْ سَبْعَ لَيَالٍ وَثَمَانِيَةَ أَيَّامٍ حُسُومًا فَتَرَى الْقَوْمَ فِيهَا صَرْعَىٰ كَأَنَّهُمْ أَعْجَازُ نَخْلٍ خَاوِيَةٍ", tr: "sakhkharahā ʿalayhim sabʿa layālin wa-thamāniyata ayyāmin ḥusūmā, fa-tarā l-qawma fīhā ṣarʿā ka-annahum aʿjāzu nakhlin khāwiya" },
   { ar: "فَهَلْ تَرَىٰ لَهُم مِّن بَاقِيَةٍ", tr: "fa-hal tarā lahum min bāqiya"  },
   { ar: "وَجَاءَ فِرْعَوْنُ وَمَن قَبْلَهُ وَالْمُؤْتَفِكَاتُ بِالْخَاطِئَةِ", tr: "wa-jāʾa firʿawnu wa-man qablahu wa-l-muʾtafikātu bi-l-khāṭiʾa"  },
   { ar: "فَعَصَوْا رَسُولَ رَبِّهِمْ فَأَخَذَهُمْ أَخْذَةً رَّابِيَةً", tr: "fa-ʿaṣaw rasūla rabbihim fa-akhadhahum akhdhatan rābiya"  },
@@ -350,7 +350,7 @@ const MAARIJ_1_44 = tagAyat([
   { ar: "سَأَلَ سَائِلٌ بِعَذَابٍ وَاقِعٍ", tr: "saʾala sāʾilun bi-ʿadhābin wāqiʿ"  },
   { ar: "لِّلْكَافِرِينَ لَيْسَ لَهُ دَافِعٌ", tr: "li-l-kāfirīna laysa lahu dāfiʿ"  },
   { ar: "مِّنَ اللَّهِ ذِي الْمَعَارِجِ", tr: "mina llāhi dhī l-maʿārij"  },
-  { ar: "تَعْرُجُ الْمَلَائِكَةُ وَالرُّوحُ إِلَيْهِ فِي يَوْمٍ كَانَ مِقْدَارُهُ خَمْسِينَ أَلْفَ سَنَةٍ", tr: "taʿruju l-malāʾikatu wa-r-rūḥu ilayhi …"  },
+  { ar: "تَعْرُجُ الْمَلَائِكَةُ وَالرُّوحُ إِلَيْهِ فِي يَوْمٍ كَانَ مِقْدَارُهُ خَمْسِينَ أَلْفَ سَنَةٍ", tr: "taʿruju l-malāʾikatu wa-r-rūḥu ilayhi fī yawmin kāna miqdāruhū khamsīna alfa sana" },
   { ar: "فَاصْبِرْ صَبْرًا جَمِيلًا", tr: "fa-ṣbir ṣabran jamīlā"  },
   { ar: "إِنَّهُمْ يَرَوْنَهُ بَعِيدًا", tr: "innahum yarawnahu baʿīdā"  },
   { ar: "وَنَرَاهُ قَرِيبًا", tr: "wa-narāhu qarībā"  },
