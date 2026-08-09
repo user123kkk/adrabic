@@ -2338,9 +2338,9 @@ function ArabTrainerApp() {
 function MotivationCard({ C, fontStack }) {
   const [open, setOpen] = useState(() => {
     try {
-      return localStorage.getItem("arabtrainer_hadith_open") !== "0";
+      return localStorage.getItem("arabtrainer_hadith_open") === "1";
     } catch {
-      return true;
+      return false;
     }
   });
 
