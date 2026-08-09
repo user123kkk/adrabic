@@ -539,6 +539,26 @@ const MOTIVATION_HADITH = {
   src: "ʿĀʾiša (ra) — Buḫārī 4937, Muslim 798",
 };
 
+// Zweite Motivations-Karte: warum das Erlernen der arabischen Sprache selbst
+// zählt (nicht nur das Quran-Lesen als solches). Zwei Belege, beide gegen
+// die Originalquelle geprueft: der Hadith gegen den in mehreren arabischen
+// Fachquellen identisch belegten Wortlaut, das Ibn-Taimiyya-Zitat gegen eine
+// islamweb.net-Fatwa, die es wortgleich anfuehrt. Keine Seitenzahl angegeben:
+// die variiert je nach Druckausgabe, darum ist bei klassischen Werken wie
+// diesem der Buchtitel allein die uebliche Zitierweise.
+const LANGUAGE_MOTIVATION = [
+  {
+    ar: "مَنْ سَلَكَ طَرِيقًا يَلْتَمِسُ فِيهِ عِلْمًا سَهَّلَ اللَّهُ لَهُ بِهِ طَرِيقًا إِلَى الْجَنَّةِ",
+    de: "Wer einen Weg beschreitet, auf dem er nach Wissen sucht, dem ebnet Allah dadurch einen Weg ins Paradies.",
+    src: "Abū Huraira (ra) — Ṣaḥīḥ Muslim 2699",
+  },
+  {
+    ar: "وَأَيْضًا فَإِنَّ نَفْسَ اللُّغَةِ الْعَرَبِيَّةِ مِنَ الدِّينِ، وَمَعْرِفَتُهَا فَرْضٌ وَاجِبٌ، فَإِنَّ فَهْمَ الْكِتَابِ وَالسُّنَّةِ فَرْضٌ، وَلَا يُفْهَمُ إِلَّا بِفَهْمِ اللُّغَةِ الْعَرَبِيَّةِ، وَمَا لَا يَتِمُّ الْوَاجِبُ إِلَّا بِهِ فَهُوَ وَاجِبٌ",
+    de: "Auch die arabische Sprache selbst gehört zur Religion, und sie zu kennen ist eine verpflichtende Pflicht — denn das Verstehen von Buch und Sunna ist Pflicht, und das lässt sich nur durch das Verstehen der arabischen Sprache erreichen. Und was eine Pflicht erst vollständig macht, ist selbst Pflicht.",
+    src: "Ibn Taimiyya — Iqtiḍāʾ aṣ-Ṣirāṭ al-Mustaqīm",
+  },
+];
+
 // ---- Hilfsfunktionen ----
 function shuffle(arr) {
   const a = [...arr];
@@ -2128,6 +2148,7 @@ function ArabTrainerApp() {
         </header>
 
         {screen === "start" && <MotivationCard C={C} fontStack={fontStack} />}
+        {screen === "start" && <LanguageMotivationCard C={C} fontStack={fontStack} />}
 
         {screen === "start" && (
           <StartScreen
@@ -2388,6 +2409,95 @@ function MotivationCard({ C, fontStack }) {
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+// Zweite, eigenstaendig auf-/zuklappbare Karte direkt unter MotivationCard:
+// warum das Erlernen der arabischen Sprache selbst zaehlt. Gleiches Muster
+// (eigener localStorage-Key, damit sich beide Karten unabhaengig merken,
+// ob sie offen sind), standardmaessig zugeklappt, damit die Startseite
+// nicht mit Text zugestellt wird.
+function LanguageMotivationCard({ C, fontStack }) {
+  const [open, setOpen] = useState(() => {
+    try {
+      return localStorage.getItem("arabtrainer_language_open") === "1";
+    } catch {
+      return false;
+    }
+  });
+
+  const toggle = () => {
+    const next = !open;
+    setOpen(next);
+    try {
+      localStorage.setItem("arabtrainer_language_open", next ? "1" : "0");
+    } catch {
+      /* localStorage gesperrt (z.B. privater Modus) — dann halt nur diese Sitzung */
+    }
+  };
+
+  return (
+    <div
+      style={{
+        background: C.panel,
+        border: `1px solid ${C.line}`,
+        borderRadius: 16,
+        padding: open ? "14px 16px" : "10px 16px",
+        marginBottom: 16,
+      }}
+    >
+      <button
+        onClick={toggle}
+        style={{
+          width: "100%",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          background: "transparent",
+          border: "none",
+          padding: 0,
+          cursor: "pointer",
+          color: C.sub,
+          fontSize: 11,
+          letterSpacing: 0.5,
+          textTransform: "uppercase",
+          fontWeight: 700,
+        }}
+        aria-expanded={open}
+      >
+        <span>Warum Arabisch lernen wichtig ist</span>
+        <span style={{ fontSize: 13 }}>{open ? "▾" : "▸"}</span>
+      </button>
+
+      {open &&
+        LANGUAGE_MOTIVATION.map((q, i) => (
+          <div
+            key={i}
+            style={{
+              marginTop: 14,
+              paddingTop: i === 0 ? 0 : 14,
+              borderTop: i === 0 ? "none" : `1px solid ${C.line}`,
+            }}
+          >
+            <div
+              style={{
+                fontFamily: fontStack,
+                direction: "rtl",
+                fontSize: 19,
+                lineHeight: 2,
+                color: C.ink,
+                marginBottom: 8,
+              }}
+            >
+              {q.ar}
+            </div>
+            <p style={{ margin: 0, fontSize: 13.5, color: C.ink, lineHeight: 1.6 }}>
+              {q.de}
+            </p>
+            <div style={{ marginTop: 8, fontSize: 11.5, color: C.sub }}>{q.src}</div>
+          </div>
+        ))}
     </div>
   );
 }
