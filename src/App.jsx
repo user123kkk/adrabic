@@ -1176,22 +1176,39 @@ const CHECK_LS_KEY = "arabtrainer:checklist:v1";
 // "Lesen" traegt bewusst den Creme-Markenakzent (C.gold), da es die
 // abschliessende Kategorie ist.
 const CHECK_CATS = {
-  alphabet: { label: "Alphabet", fg: "#a9c6ea", bg: "rgba(143,180,224,0.16)" },
-  harakat: { label: "Harakat", fg: "#e6b3b3", bg: "rgba(215,154,154,0.16)" },
-  lesehilfen: { label: "Lesehilfen", fg: "#cbb3e6", bg: "rgba(187,156,224,0.16)" },
-  woerter: { label: "Wörter", fg: "#a3ddbb", bg: "rgba(127,206,159,0.16)" },
-  lesen: { label: "Lesen", fg: "#f4f0e3", bg: "rgba(244,240,227,0.18)" },
+  alphabet: { label: "Alphabet", fg: "#6fa3e0", bg: "rgba(111,163,224,0.18)" },
+  harakat: { label: "Harakat", fg: "#e08a8a", bg: "rgba(224,138,138,0.18)" },
+  lesehilfen: { label: "Lesehilfen", fg: "#b088e0", bg: "rgba(176,136,224,0.18)" },
+  woerter: { label: "Wörter", fg: "#5fc98f", bg: "rgba(95,201,143,0.18)" },
+  lesen: { label: "Lesen", fg: "#f4f0e3", bg: "rgba(244,240,227,0.2)" },
 };
 
-// Welches Modul (MODULE_ORDER-ID) beim Tippen auf das Kategorie-Badge
-// angesprungen wird. "alphabet" deckt im Checklisten-Sinn auch "Aehnliche
-// Buchstaben" mit ab, springt aber zum grundlegenderen "letters"-Modul.
-const CAT_TO_MODULE = {
-  alphabet: "letters",
-  harakat: "harakat",
-  lesehilfen: "lesehilfen",
-  woerter: "words",
-  lesen: "ayat",
+// Wohin das Tippen auf das Kategorie-Badge einer Checklisten-Zeile fuehrt —
+// pro ZEILE (item.id), nicht pro Kategorie: die Kategorie "harakat" deckt in
+// der Checkliste sowohl das Kurzvokale-Modul (c03) als auch mehrere
+// Aussprache-Pakete im Woerter-Modul ab (Sukun/Tanwin/Taa-marbuta/Shadda/
+// Madd, c04-c07+c18) — ein Pro-Kategorie-Sprung landet fuer die dort falsch.
+// packId ist optional: fehlt es, greift bei Auswahl-Modulen der erste Modus.
+const ITEM_TARGET = {
+  c01: { moduleId: "letters" },
+  c02: { moduleId: "similar" },
+  c03: { moduleId: "harakat" },
+  c04: { moduleId: "words", packId: "sukun" },
+  c05: { moduleId: "words", packId: "tanwin" },
+  c18: { moduleId: "words", packId: "tamarbuta" },
+  c06: { moduleId: "words", packId: "shadda" },
+  c07: { moduleId: "words", packId: "madd" },
+  c19: { moduleId: "lesehilfen", packId: "hamza" },
+  c08: { moduleId: "lesehilfen", packId: "lam" },
+  c09: { moduleId: "lesehilfen", packId: "waqf" },
+  c10: { moduleId: "words", packId: "mulkW" },
+  c11: { moduleId: "words", packId: "qalamW" },
+  c12: { moduleId: "ayat", packId: "mulk15" },
+  c13: { moduleId: "ayat", packId: "mulk611" },
+  c14: { moduleId: "ayat", packId: "qalam116" },
+  c15: { moduleId: "ayat", packId: "haqqa110" },
+  c16: { moduleId: "ayat", packId: "maarij" },
+  c17: { moduleId: "ayat", packId: "drei" },
 };
 
 const CHECKLIST = [
@@ -1793,14 +1810,19 @@ function ArabTrainerApp() {
     else setPackId(m.packs[0].id);
   }
 
-  // Von der Checkliste aus: Kategorie-Badge tippen -> passendes Modul
-  // auswaehlen, sanft dorthin scrollen (kein Screen-Wechsel, kein
-  // automatischer Start) und die Modul-Karte kurz aufleuchten lassen,
-  // damit sichtbar ist, was sich geaendert hat.
-  function jumpToModule(catId) {
-    const targetId = CAT_TO_MODULE[catId];
-    if (!targetId) return;
-    selectModule(targetId);
+  // Von der Checkliste aus: Kategorie-Badge einer Zeile tippen -> genau das
+  // Modul UND (falls vorhanden) das passende Paket auswaehlen, sanft dorthin
+  // scrollen (kein Screen-Wechsel, kein automatischer Start) und die
+  // Modul-Karte kurz aufleuchten lassen, damit sichtbar ist, was sich
+  // geaendert hat. Zielt pro Zeile (item.id), nicht pro Kategorie, siehe
+  // ITEM_TARGET.
+  function jumpToItem(itemId) {
+    const target = ITEM_TARGET[itemId];
+    if (!target) return;
+    const m = getModule(target.moduleId);
+    setModuleId(target.moduleId);
+    if (m.kind === "choice") setMode(m.modes[0].id);
+    else setPackId(target.packId || m.packs[0].id);
     setJustJumped(true);
     setTimeout(() => setJustJumped(false), 1400);
     const reduceMotion =
@@ -2015,7 +2037,7 @@ function ArabTrainerApp() {
     <div
       className="app-shell"
       style={{
-        background: `radial-gradient(120% 90% at 50% -5%, #221d14 0%, ${C.bg} 60%)`,
+        background: `radial-gradient(120% 90% at 50% -5%, #322a19 0%, #17140f 45%, ${C.bg} 80%)`,
         color: C.ink,
         fontFamily:
           "-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif",
@@ -2067,9 +2089,6 @@ function ArabTrainerApp() {
           <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>
             Adrabic-Trainer
           </h1>
-          <p style={{ margin: "4px 0 0", color: C.sub, fontSize: 14 }}>
-            {curMod.title} — {curMod.subtitle}
-          </p>
         </header>
 
         {screen === "start" && <MotivationCard C={C} fontStack={fontStack} />}
@@ -2214,7 +2233,7 @@ function ArabTrainerApp() {
             done={checklistDone}
             onToggle={toggleCheck}
             onReset={resetChecklist}
-            onJumpToModule={jumpToModule}
+            onJumpToModule={jumpToItem}
           />
         )}
 
@@ -2632,11 +2651,12 @@ function StartScreen({
   const isChoice = curMod.kind === "choice";
   const hasPacks = !!curMod.packs;
   const card = {
-    background: C.panel,
+    background: `linear-gradient(180deg, ${C.panel2} 0%, ${C.panel} 100%)`,
     border: `1px solid ${C.line}`,
     borderRadius: 18,
     padding: 20,
     marginBottom: 16,
+    boxShadow: "0 10px 28px rgba(0,0,0,.35)",
   };
   const pickBtn = (active) => ({
     flex: 1,
@@ -4438,8 +4458,9 @@ function ChecklistSection({ C, done, onToggle, onReset, onJumpToModule }) {
 
       <div
         style={{
-          background: C.panel,
+          background: `linear-gradient(180deg, ${C.panel2} 0%, ${C.panel} 100%)`,
           border: `1px solid ${C.line}`,
+          boxShadow: "0 10px 28px rgba(0,0,0,.35)",
           borderRadius: 16,
           overflow: "hidden",
         }}
@@ -4511,13 +4532,13 @@ function ChecklistSection({ C, done, onToggle, onReset, onJumpToModule }) {
                 aria-label={`Zum Modul „${cat.label}“ springen`}
                 onClick={(e) => {
                   e.stopPropagation();
-                  onJumpToModule(item.cat);
+                  onJumpToModule(item.id);
                 }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();
                     e.stopPropagation();
-                    onJumpToModule(item.cat);
+                    onJumpToModule(item.id);
                   }
                 }}
                 style={{
@@ -4526,7 +4547,7 @@ function ChecklistSection({ C, done, onToggle, onReset, onJumpToModule }) {
                   fontWeight: 600,
                   color: cat.fg,
                   background: cat.bg,
-                  boxShadow: `0 0 10px ${cat.fg}4d`,
+                  border: `1px solid ${cat.fg}55`,
                   borderRadius: 6,
                   padding: "3px 9px",
                   cursor: "pointer",
