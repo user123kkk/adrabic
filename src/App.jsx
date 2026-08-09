@@ -1171,12 +1171,27 @@ function statAccuracyOf(rec) {
 // ============================================================
 const CHECK_LS_KEY = "arabtrainer:checklist:v1";
 
+// Gedaempfte, aufeinander abgestimmte Set-Farben (kein grelles Regenbogen-Bunt) —
+// nur hier in Gebrauch, als kleines Badge rechts an jeder Checklisten-Zeile.
+// "Lesen" traegt bewusst den Creme-Markenakzent (C.gold), da es die
+// abschliessende Kategorie ist.
 const CHECK_CATS = {
-  alphabet: { label: "Alphabet", fg: "#8fb4e0", bg: "rgba(107,155,209,0.16)" },
-  harakat: { label: "Harakat", fg: "#d79a9a", bg: "rgba(201,138,138,0.16)" },
-  lesehilfen: { label: "Lesehilfen", fg: "#bb9ce0", bg: "rgba(168,138,201,0.16)" },
-  woerter: { label: "Wörter", fg: "#7fce9f", bg: "rgba(63,174,107,0.16)" },
-  lesen: { label: "Lesen", fg: "#e0c37f", bg: "rgba(217,178,95,0.16)" },
+  alphabet: { label: "Alphabet", fg: "#a9c6ea", bg: "rgba(143,180,224,0.16)" },
+  harakat: { label: "Harakat", fg: "#e6b3b3", bg: "rgba(215,154,154,0.16)" },
+  lesehilfen: { label: "Lesehilfen", fg: "#cbb3e6", bg: "rgba(187,156,224,0.16)" },
+  woerter: { label: "Wörter", fg: "#a3ddbb", bg: "rgba(127,206,159,0.16)" },
+  lesen: { label: "Lesen", fg: "#f4f0e3", bg: "rgba(244,240,227,0.18)" },
+};
+
+// Welches Modul (MODULE_ORDER-ID) beim Tippen auf das Kategorie-Badge
+// angesprungen wird. "alphabet" deckt im Checklisten-Sinn auch "Aehnliche
+// Buchstaben" mit ab, springt aber zum grundlegenderen "letters"-Modul.
+const CAT_TO_MODULE = {
+  alphabet: "letters",
+  harakat: "harakat",
+  lesehilfen: "lesehilfen",
+  woerter: "words",
+  lesen: "ayat",
 };
 
 const CHECKLIST = [
@@ -1316,7 +1331,7 @@ class ErrorBoundary extends React.Component {
     if (this.state.hasError) {
       return (
         <div className="eb-min-h">
-          <style>{`.eb-min-h{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:#0f1b14;color:#eaf3ec}`}</style>
+          <style>{`.eb-min-h{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:#0a0a09;color:#f2f1ea}`}</style>
           <div style={{ fontSize: 17, fontWeight: 700 }}>Etwas ist schiefgelaufen.</div>
           <div style={{ fontSize: 14, opacity: 0.75, maxWidth: 320 }}>
             Bitte die Seite neu laden. Dein gespeicherter Fortschritt (Checkliste, Statistik) bleibt erhalten.
@@ -1327,7 +1342,7 @@ class ErrorBoundary extends React.Component {
               padding: "10px 20px",
               borderRadius: 10,
               border: "none",
-              background: "#d9b25f",
+              background: "#f0e2c2",
               color: "#1a1a1a",
               fontWeight: 700,
               cursor: "pointer",
@@ -1358,6 +1373,7 @@ function ArabTrainerApp() {
   const [moduleId, setModuleId] = useState("letters");
   const [mode, setMode] = useState("form2letter"); // nur Auswahl-Module
   const [packId, setPackId] = useState(null); // nur Lese-Module
+  const [justJumped, setJustJumped] = useState(false); // Modul-Karte kurz hervorheben nach Sprung aus der Checkliste
 
   // Auto-Modus (nur Auswahl-Module): Frage wird gezeigt, nach X Sekunden
   // deckt die App die richtige Antwort selbst auf und geht weiter. Passives
@@ -1777,6 +1793,24 @@ function ArabTrainerApp() {
     else setPackId(m.packs[0].id);
   }
 
+  // Von der Checkliste aus: Kategorie-Badge tippen -> passendes Modul
+  // auswaehlen, sanft dorthin scrollen (kein Screen-Wechsel, kein
+  // automatischer Start) und die Modul-Karte kurz aufleuchten lassen,
+  // damit sichtbar ist, was sich geaendert hat.
+  function jumpToModule(catId) {
+    const targetId = CAT_TO_MODULE[catId];
+    if (!targetId) return;
+    selectModule(targetId);
+    setJustJumped(true);
+    setTimeout(() => setJustJumped(false), 1400);
+    const reduceMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    document
+      .getElementById("module-picker")
+      ?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+  }
+
   function resetStats() {
     setCorrect(0);
     setWrong(0);
@@ -1934,16 +1968,16 @@ function ArabTrainerApp() {
   //  Styles
   // =====================================================
   const C = {
-    bg: "#0f1b14",
-    panel: "#16261c",
-    panel2: "#1d3226",
-    line: "#2c4735",
-    ink: "#eaf3ec",
-    sub: "#9db8a6",
-    gold: "#d9b25f",
-    green: "#3fae6b",
-    greenD: "#2e8c53",
-    red: "#c9584f",
+    bg: "#0a0a09",
+    panel: "#141311",
+    panel2: "#1c1a16",
+    line: "#2c2924",
+    ink: "#f2f1ea",
+    sub: "#9c9c93",
+    gold: "#f4f0e3",
+    green: "#4fcf8f",
+    greenD: "#2f8f5c",
+    red: "#e2695c",
   };
 
   // Lese-Schrift: Standard ist die echte Mushaf-Schrift (KFGQPC Hafs
@@ -1981,7 +2015,7 @@ function ArabTrainerApp() {
     <div
       className="app-shell"
       style={{
-        background: `radial-gradient(120% 90% at 50% -10%, #17301f 0%, ${C.bg} 60%)`,
+        background: `radial-gradient(120% 90% at 50% -5%, #221d14 0%, ${C.bg} 60%)`,
         color: C.ink,
         fontFamily:
           "-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif",
@@ -1993,7 +2027,7 @@ function ArabTrainerApp() {
         .app-shell { min-height: 100vh; min-height: 100dvh; }
         * { -webkit-tap-highlight-color: transparent; }
         @keyframes pop { 0%{transform:scale(.96);opacity:0} 100%{transform:scale(1);opacity:1} }
-        @keyframes flashBox { 0%{background:rgba(217,178,95,.35)} 100%{background:transparent} }
+        @keyframes flashBox { 0%{background:rgba(244,240,227,.35)} 100%{background:transparent} }
         .opt:focus-visible { outline: 3px solid ${C.gold}; outline-offset: 2px; }
         button:focus-visible { outline: 3px solid ${C.gold}; outline-offset: 2px; }
         @media (prefers-reduced-motion: reduce){ *{animation:none!important;transition:none!important} }
@@ -2031,7 +2065,7 @@ function ArabTrainerApp() {
             أ ب ت
           </div>
           <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>
-            Schrift-Trainer
+            Adrabic-Trainer
           </h1>
           <p style={{ margin: "4px 0 0", color: C.sub, fontSize: 14 }}>
             {curMod.title} — {curMod.subtitle}
@@ -2045,6 +2079,7 @@ function ArabTrainerApp() {
             C={C}
             moduleId={moduleId}
             onSelectModule={selectModule}
+            justJumped={justJumped}
             curMod={curMod}
             isReading={isReading}
             mode={mode}
@@ -2174,7 +2209,13 @@ function ArabTrainerApp() {
         )}
 
         {screen === "start" && (
-          <ChecklistSection C={C} done={checklistDone} onToggle={toggleCheck} onReset={resetChecklist} />
+          <ChecklistSection
+            C={C}
+            done={checklistDone}
+            onToggle={toggleCheck}
+            onReset={resetChecklist}
+            onJumpToModule={jumpToModule}
+          />
         )}
 
         {screen === "start" && (
@@ -2460,7 +2501,7 @@ function CalligraphyPeek({ C, fontStack }) {
                       padding: "9px 6px",
                       borderRadius: 10,
                       border: `1px solid ${active ? C.gold : C.line}`,
-                      background: active ? "rgba(217,178,95,0.12)" : C.panel2,
+                      background: active ? "rgba(244,240,227,0.12)" : C.panel2,
                       color: active ? C.gold : C.ink,
                       fontSize: 12.5,
                       fontWeight: 700,
@@ -2579,7 +2620,7 @@ function Stepper({ C, label, value, unit, min, max, step, onChange, compact }) {
 }
 
 function StartScreen({
-  C, moduleId, onSelectModule, curMod, isReading,
+  C, moduleId, onSelectModule, justJumped, curMod, isReading,
   mode, setMode, packId, setPackId,
   needsVoice, voices, voiceURI, setVoiceURI, onPreviewVoice,
   needsReciter, reciterId, setReciterId, onTestReciter, rate, setRate,
@@ -2603,7 +2644,7 @@ function StartScreen({
     padding: "14px 12px",
     borderRadius: 12,
     border: `1px solid ${active ? C.green : C.line}`,
-    background: active ? "rgba(63,174,107,0.14)" : C.panel2,
+    background: active ? "rgba(79,207,143,0.14)" : C.panel2,
     color: C.ink,
     cursor: "pointer",
     textAlign: "left",
@@ -2615,7 +2656,7 @@ function StartScreen({
       {/* Hinweis: Was die App leistet — und was nicht (Tajwīd) */}
       <div
         style={{
-          background: "rgba(217,178,95,0.10)",
+          background: "rgba(244,240,227,0.10)",
           border: `1px solid ${C.line}`,
           borderRadius: 14,
           padding: "12px 14px",
@@ -2635,7 +2676,10 @@ function StartScreen({
       </div>
 
       {/* Modul waehlen */}
-      <div style={card}>
+      <div
+        id="module-picker"
+        style={{ ...card, animation: justJumped ? "flashBox 1.4s ease-out" : "none" }}
+      >
         <div style={{ fontSize: 13, color: C.sub, marginBottom: 10, fontWeight: 600 }}>
           MODUL WÄHLEN
         </div>
@@ -2697,7 +2741,7 @@ function StartScreen({
                 height: 30,
                 borderRadius: 999,
                 border: `1px solid ${autoMode ? C.green : C.line}`,
-                background: autoMode ? "rgba(63,174,107,0.25)" : C.panel2,
+                background: autoMode ? "rgba(79,207,143,0.25)" : C.panel2,
                 position: "relative",
                 cursor: "pointer",
                 transition: "all .15s",
@@ -2793,7 +2837,7 @@ function StartScreen({
                   padding: "8px 16px",
                   borderRadius: 10,
                   border: `1.5px solid ${rate === r ? C.gold : C.line}`,
-                  background: rate === r ? "rgba(217,178,95,.15)" : C.panel2,
+                  background: rate === r ? "rgba(244,240,227,.15)" : C.panel2,
                   color: rate === r ? C.gold : C.ink,
                   cursor: "pointer",
                   fontSize: 14,
@@ -2832,7 +2876,7 @@ function StartScreen({
                 height: 30,
                 borderRadius: 999,
                 border: `1px solid ${followMode ? C.green : C.line}`,
-                background: followMode ? "rgba(63,174,107,0.25)" : C.panel2,
+                background: followMode ? "rgba(79,207,143,0.25)" : C.panel2,
                 position: "relative",
                 cursor: "pointer",
                 transition: "all .15s",
@@ -2916,7 +2960,7 @@ function StartScreen({
                         padding: "10px 12px",
                         borderRadius: 10,
                         border: `1px solid ${active ? C.green : C.line}`,
-                        background: active ? "rgba(63,174,107,0.14)" : C.panel2,
+                        background: active ? "rgba(79,207,143,0.14)" : C.panel2,
                         color: C.ink,
                         cursor: "pointer",
                         textAlign: "left",
@@ -3022,7 +3066,7 @@ function StartScreen({
           fontSize: 17,
           fontWeight: 700,
           cursor: "pointer",
-          boxShadow: "0 6px 20px rgba(46,140,83,.35)",
+          boxShadow: "0 6px 20px rgba(47,143,92,.35)",
         }}
       >
         Los geht's
@@ -3179,11 +3223,11 @@ function PlayScreen({
           let bg = C.panel2;
           let border = C.line;
           if (locked && chosen === idx) {
-            bg = opt.correct ? "rgba(63,174,107,.2)" : "rgba(201,88,79,.2)";
+            bg = opt.correct ? "rgba(79,207,143,.2)" : "rgba(226,105,92,.2)";
             border = opt.correct ? C.green : C.red;
           }
           if (locked && opt.correct && chosen !== idx) {
-            bg = "rgba(63,174,107,.12)";
+            bg = "rgba(79,207,143,.12)";
             border = C.green;
           }
           return (
@@ -3341,7 +3385,7 @@ function ReadingScreen({
         style={{
           background: C.panel,
           border: `1px solid ${follow && !paused ? C.gold : C.line}`,
-          boxShadow: follow && !paused ? `0 0 0 2px rgba(217,178,95,.25)` : "none",
+          boxShadow: follow && !paused ? `0 0 0 2px rgba(244,240,227,.25)` : "none",
           borderRadius: 18,
           padding: "20px 18px 24px",
           textAlign: "center",
@@ -3615,7 +3659,7 @@ function ReadingScreen({
               padding: "15px",
               borderRadius: 14,
               border: `1.5px solid ${C.red}`,
-              background: "rgba(201,88,79,.14)",
+              background: "rgba(226,105,92,.14)",
               color: C.ink,
               fontSize: 16,
               fontWeight: 700,
@@ -4096,11 +4140,11 @@ function GuideScreen({ C, fontStack, pack, onExit }) {
           {q.options.map((opt, i) => {
             let bg = C.panel2, border = C.line;
             if (answered && i === chosen) {
-              bg = opt.correct ? "rgba(63,174,107,.2)" : "rgba(201,88,79,.2)";
+              bg = opt.correct ? "rgba(79,207,143,.2)" : "rgba(226,105,92,.2)";
               border = opt.correct ? C.green : C.red;
             }
             if (answered && opt.correct && i !== chosen) {
-              bg = "rgba(63,174,107,.12)";
+              bg = "rgba(79,207,143,.12)";
               border = C.green;
             }
             return (
@@ -4349,7 +4393,7 @@ const CHECK_INFO_BASE =
 const CHECK_INFO_LAST =
   " Ist die ganze Liste geschafft, kannst du mit Tajwīd anfangen — aber nur mit Lehrer, allein ist das zu fehleranfällig.";
 
-function ChecklistSection({ C, done, onToggle, onReset }) {
+function ChecklistSection({ C, done, onToggle, onReset, onJumpToModule }) {
   const total = CHECKLIST.length;
   const [infoId, setInfoId] = useState(null);
   const doneCount = CHECKLIST.filter((i) => done[i.id]).length;
@@ -4422,7 +4466,7 @@ function ChecklistSection({ C, done, onToggle, onReset }) {
                 font: "inherit",
                 textAlign: "left",
                 cursor: "pointer",
-                background: isDone ? "rgba(63,174,107,0.06)" : "transparent",
+                background: isDone ? "rgba(79,207,143,0.06)" : "transparent",
               }}
             >
               {/* Checkbox */}
@@ -4457,15 +4501,35 @@ function ChecklistSection({ C, done, onToggle, onReset }) {
                 {item.text}
               </span>
 
+              {/* Kategorie-Badge: eigener Tap-Ziel, springt zum passenden
+                  Modul, statt den Haken zu setzen. span+role=button aus
+                  demselben Grund wie beim i-Hinweis (kein <button> im
+                  <button>), stopPropagation haelt den Haken-Klick ab. */}
               <span
+                role="button"
+                tabIndex={0}
+                aria-label={`Zum Modul „${cat.label}“ springen`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onJumpToModule(item.cat);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onJumpToModule(item.cat);
+                  }
+                }}
                 style={{
                   flexShrink: 0,
                   fontSize: 11.5,
                   fontWeight: 600,
                   color: cat.fg,
                   background: cat.bg,
+                  boxShadow: `0 0 10px ${cat.fg}4d`,
                   borderRadius: 6,
                   padding: "3px 9px",
+                  cursor: "pointer",
                 }}
               >
                 {cat.label}
@@ -4517,7 +4581,7 @@ function ChecklistSection({ C, done, onToggle, onReset }) {
                   fontSize: 12.5,
                   lineHeight: 1.55,
                   color: C.sub,
-                  background: "rgba(217,178,95,0.06)",
+                  background: "rgba(244,240,227,0.06)",
                   borderTop: `1px dashed ${C.line}`,
                 }}
               >
