@@ -1374,6 +1374,33 @@ class ErrorBoundary extends React.Component {
   }
 }
 
+// Sehr zurueckhaltendes, fest am Bildschirm verankertes Sternfeld (position:
+// fixed, nicht Teil der scrollenden Seite) — behebt, dass die App unterhalb
+// der Kopfzeile flach schwarz wirkt, ohne selbst die Aufmerksamkeit zu
+// ziehen: wenige, kleine, langsam und schwach pulsierende Punkte.
+const AMBIENT_STARS = [
+  { top: "4%", left: "10%", size: 1.5, delay: "0.2s" },
+  { top: "9%", left: "82%", size: 2, delay: "1.4s" },
+  { top: "17%", left: "35%", size: 1.5, delay: "2.6s" },
+  { top: "23%", left: "68%", size: 1, delay: "0.8s" },
+  { top: "31%", left: "6%", size: 2, delay: "3.1s" },
+  { top: "38%", left: "91%", size: 1.5, delay: "1.9s" },
+  { top: "44%", left: "22%", size: 1, delay: "0.5s" },
+  { top: "52%", left: "56%", size: 2, delay: "2.2s" },
+  { top: "59%", left: "78%", size: 1.5, delay: "3.6s" },
+  { top: "66%", left: "14%", size: 1, delay: "1.1s" },
+  { top: "73%", left: "44%", size: 2, delay: "0.3s" },
+  { top: "79%", left: "88%", size: 1.5, delay: "2.8s" },
+  { top: "85%", left: "30%", size: 1, delay: "1.6s" },
+  { top: "92%", left: "63%", size: 2, delay: "3.3s" },
+  { top: "97%", left: "8%", size: 1.5, delay: "0.9s" },
+  { top: "13%", left: "50%", size: 1, delay: "2.4s" },
+  { top: "27%", left: "97%", size: 1.5, delay: "1.3s" },
+  { top: "48%", left: "3%", size: 1, delay: "3.8s" },
+  { top: "62%", left: "96%", size: 1.5, delay: "0.6s" },
+  { top: "88%", left: "50%", size: 1, delay: "2.1s" },
+];
+
 export default function App() {
   return (
     <ErrorBoundary>
@@ -2050,12 +2077,36 @@ function ArabTrainerApp() {
         * { -webkit-tap-highlight-color: transparent; }
         @keyframes pop { 0%{transform:scale(.96);opacity:0} 100%{transform:scale(1);opacity:1} }
         @keyframes flashBox { 0%{background:rgba(244,240,227,.35)} 100%{background:transparent} }
+        @keyframes starTwinkle { 0%,100%{opacity:.12} 50%{opacity:.55} }
         .opt:focus-visible { outline: 3px solid ${C.gold}; outline-offset: 2px; }
         button:focus-visible { outline: 3px solid ${C.gold}; outline-offset: 2px; }
         @media (prefers-reduced-motion: reduce){ *{animation:none!important;transition:none!important} }
       `}</style>
 
-      <div style={{ maxWidth: 620, margin: "0 auto" }}>
+      {/* Bleibt beim Scrollen am Bildschirm stehen (position:fixed, kein
+          Teil der Seite) -- ohne das waere alles unterhalb der Kopfzeile
+          einfach flach schwarz. Bewusst sehr dezent (kleine Punkte, schwache
+          Deckkraft), damit nichts vom Lesen ablenkt. */}
+      <div aria-hidden="true" style={{ position: "fixed", inset: 0, zIndex: 0, overflow: "hidden", pointerEvents: "none" }}>
+        {AMBIENT_STARS.map((s, i) => (
+          <div
+            key={i}
+            style={{
+              position: "absolute",
+              top: s.top,
+              left: s.left,
+              width: s.size,
+              height: s.size,
+              borderRadius: "50%",
+              background: C.gold,
+              opacity: 0.3,
+              animation: `starTwinkle ${3.5 + (i % 4) * 0.6}s ease-in-out ${s.delay} infinite`,
+            }}
+          />
+        ))}
+      </div>
+
+      <div style={{ maxWidth: 620, margin: "0 auto", position: "relative", zIndex: 1 }}>
         {/* Kopf */}
         <header style={{ textAlign: "center", marginBottom: 18 }}>
           {/* Basmala nur auf dem Startbildschirm: steht am Anfang, stoert
