@@ -1074,6 +1074,69 @@ const LAM_EXPLAIN = {
   qamariya: "Mondbuchstabe → Lam Qamariya: das ل wird gesprochen (Sukun auf dem Lam: الْ).",
 };
 
+// ---- Die 28 Buchstaben als Liste zum Auswendiglernen ----
+// Warum die Teilung so verlaeuft: die 14 Sonnenbuchstaben werden alle vorn
+// im Mund mit der Zungenspitze gebildet -- genau dort, wo auch das ل sitzt.
+// Zwei Nachbarn an derselben Stelle verschmelzen, das ل geht im Folgelaut
+// auf. Die Mondbuchstaben entstehen weiter hinten im Rachen oder an den
+// Lippen; dazwischen bleibt Platz, das ل bleibt hoerbar.
+const LAM_SUN_LETTERS = [
+  ["ت", "t"], ["ث", "th"], ["د", "d"], ["ذ", "dh"], ["ر", "r"], ["ز", "z"], ["س", "s"],
+  ["ش", "sh"], ["ص", "ṣ"], ["ض", "ḍ"], ["ط", "ṭ"], ["ظ", "ẓ"], ["ل", "l"], ["ن", "n"],
+];
+const LAM_MOON_LETTERS = [
+  ["ا", "a"], ["ب", "b"], ["ج", "j"], ["ح", "ḥ"], ["خ", "kh"], ["ع", "ʿ"], ["غ", "gh"],
+  ["ف", "f"], ["ق", "q"], ["ك", "k"], ["م", "m"], ["و", "w"], ["ه", "h"], ["ي", "y"],
+];
+// Klassischer Merksatz: enthaelt genau die 14 Mondbuchstaben (in anderer
+// Reihenfolge als die Liste oben). Reine Eselsbruecke, der Inhalt des Satzes
+// spielt keine Rolle -- wer ihn kann, hat die Mondbuchstaben, der Rest ist Sonne.
+const LAM_MOON_MNEMONIC = { ar: "ابغ حجك وخف عقيمه", tr: "ibgha ḥajjaka wa-khaf ʿaqīmah" };
+
+// ---- V2: dieselbe Regel, aber ohne Harakat ----
+// Entfernt Fatha, Kasra, Damma, Tanwin, Sukun, Shadda, kleines Alif und die
+// Quran-Zeichen. Genau diese Zeichen verraten in V1 die Loesung, ohne dass
+// man die Buchstaben kennen muss: Shadda auf dem Folgebuchstaben = Shamsiya,
+// Sukun auf dem Lam = Qamariya. Ohne sie zaehlt nur noch der Buchstabe.
+const HARAKAT_RE = /[\u064B-\u065F\u0670\u06D6-\u06ED]/g;
+function stripHarakat(s) {
+  return s.replace(HARAKAT_RE, "");
+}
+
+// Zusaetzliche Woerter, die es in V1 nicht gibt -- damit V2 nicht durch
+// Auswendiglernen der 28 bekannten Woerter loesbar ist. Wieder je 14, alle
+// 28 Buchstaben genau einmal.
+const GUIDE_LAM_V2_EXTRA = [
+  { ar: "التَّمْر", type: "shamsiya", read: "at-tamr", de: "die Datteln" },
+  { ar: "الثَّلْج", type: "shamsiya", read: "ath-thalj", de: "der Schnee" },
+  { ar: "الدَّرْس", type: "shamsiya", read: "ad-dars", de: "die Lektion" },
+  { ar: "الذِّكْر", type: "shamsiya", read: "adh-dhikr", de: "das Gedenken" },
+  { ar: "الرَّحْمَة", type: "shamsiya", read: "ar-raḥma", de: "die Barmherzigkeit" },
+  { ar: "الزَّرْع", type: "shamsiya", read: "az-zarʿ", de: "die Saat" },
+  { ar: "السُّوق", type: "shamsiya", read: "as-sūq", de: "der Markt" },
+  { ar: "الشَّجَر", type: "shamsiya", read: "ash-shajar", de: "die Bäume" },
+  { ar: "الصِّدْق", type: "shamsiya", read: "aṣ-ṣidq", de: "die Wahrhaftigkeit" },
+  { ar: "الضُّحَى", type: "shamsiya", read: "aḍ-ḍuḥā", de: "der Vormittag" },
+  { ar: "الطَّعَام", type: "shamsiya", read: "aṭ-ṭaʿām", de: "das Essen" },
+  { ar: "الظُّلْم", type: "shamsiya", read: "aẓ-ẓulm", de: "das Unrecht" },
+  { ar: "اللِّسَان", type: "shamsiya", read: "al-lisān", de: "die Zunge" },
+  { ar: "النُّور", type: "shamsiya", read: "an-nūr", de: "das Licht" },
+  { ar: "الْأُمّ", type: "qamariya", read: "al-umm", de: "die Mutter" },
+  { ar: "الْبَيْت", type: "qamariya", read: "al-bayt", de: "das Haus" },
+  { ar: "الْجَنَّة", type: "qamariya", read: "al-janna", de: "das Paradies" },
+  { ar: "الْحَقّ", type: "qamariya", read: "al-ḥaqq", de: "die Wahrheit" },
+  { ar: "الْخُبْز", type: "qamariya", read: "al-khubz", de: "das Brot" },
+  { ar: "الْعَبْد", type: "qamariya", read: "al-ʿabd", de: "der Diener" },
+  { ar: "الْغُرْفَة", type: "qamariya", read: "al-ghurfa", de: "das Zimmer" },
+  { ar: "الْفِعْل", type: "qamariya", read: "al-fiʿl", de: "das Verb" },
+  { ar: "الْقَلْب", type: "qamariya", read: "al-qalb", de: "das Herz" },
+  { ar: "الْكَلْب", type: "qamariya", read: "al-kalb", de: "der Hund" },
+  { ar: "الْمَسْجِد", type: "qamariya", read: "al-masjid", de: "die Moschee" },
+  { ar: "الْوَقْت", type: "qamariya", read: "al-waqt", de: "die Zeit" },
+  { ar: "الْهُدَى", type: "qamariya", read: "al-hudā", de: "die Rechtleitung" },
+  { ar: "الْيَد", type: "qamariya", read: "al-yad", de: "die Hand" },
+];
+
 // Waqf-Zeichen: exakt der Satz des Madinah-Mushaf (م لا ج قلى صلى ∴ س).
 // Quelle: Zeichenerklärung, die hinten in jedem Madinah-Mushaf (König-
 // Fahd-Komplex) abgedruckt ist. Zeichen anderer Drucktraditionen (ط ز ص ك,
@@ -2057,7 +2120,7 @@ function ArabTrainerApp() {
     <div
       className="app-shell"
       style={{
-        background: `radial-gradient(120% 90% at 50% -5%, #322a19 0%, #17140f 45%, ${C.bg} 80%)`,
+        background: C.bg,
         color: C.ink,
         fontFamily:
           "-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif",
@@ -2066,50 +2129,31 @@ function ArabTrainerApp() {
       }}
     >
       <style>{`
+        html, body { background: ${C.bg}; }
         .app-shell { min-height: 100vh; min-height: 100dvh; }
         * { -webkit-tap-highlight-color: transparent; }
         @keyframes pop { 0%{transform:scale(.96);opacity:0} 100%{transform:scale(1);opacity:1} }
         @keyframes flashBox { 0%{background:rgba(244,240,227,.35)} 100%{background:transparent} }
-        @keyframes driftA { 0%,100%{transform:translate(-4%,-6%)} 50%{transform:translate(5%,4%)} }
-        @keyframes driftB { 0%,100%{transform:translate(3%,5%)} 50%{transform:translate(-5%,-4%)} }
         .opt:focus-visible { outline: 3px solid ${C.gold}; outline-offset: 2px; }
         button:focus-visible { outline: 3px solid ${C.gold}; outline-offset: 2px; }
         @media (prefers-reduced-motion: reduce){ *{animation:none!important;transition:none!important} }
       `}</style>
 
-      {/* Bleibt beim Scrollen am Bildschirm stehen (position:fixed, kein Teil
-          der Seite) -- ohne das waere alles unterhalb der Kopfzeile flach
-          schwarz. Zwei grosse, weich verlaufende, langsam driftende
-          Lichtflecken statt einzelner Punkte -- die sahen wie Bildschirm-
-          schmutz aus. */}
-      <div aria-hidden="true" style={{ position: "fixed", inset: 0, zIndex: 0, overflow: "hidden", pointerEvents: "none" }}>
-        <div
-          style={{
-            position: "absolute",
-            top: "-15%",
-            left: "-15%",
-            width: "70vmin",
-            height: "70vmin",
-            borderRadius: "50%",
-            background: "radial-gradient(closest-side, rgba(244,240,227,.16), transparent 70%)",
-            filter: "blur(50px)",
-            animation: "driftA 26s ease-in-out infinite",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            bottom: "-20%",
-            right: "-15%",
-            width: "60vmin",
-            height: "60vmin",
-            borderRadius: "50%",
-            background: "radial-gradient(closest-side, rgba(244,240,227,.12), transparent 70%)",
-            filter: "blur(60px)",
-            animation: "driftB 32s ease-in-out infinite",
-          }}
-        />
-      </div>
+      {/* Lichtebene: position:fixed + inset:0 heisst genau Bildschirmgroesse --
+          damit ist der Verlauf auf jedem Screen gleich hell, egal wie lang die
+          Seite ist, und er wandert beim Scrollen nicht weg. Lag er auf
+          .app-shell, wurde er ueber die gesamte Inhaltshoehe gezogen und das
+          Licht verschwand nach unten. Keine driftenden Leuchtflecken mehr. */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 0,
+          pointerEvents: "none",
+          background: `radial-gradient(120% 90% at 50% -5%, #322a19 0%, #17140f 45%, ${C.bg} 80%)`,
+        }}
+      />
 
       <div style={{ maxWidth: 620, margin: "0 auto", position: "relative", zIndex: 1 }}>
         {/* Kopf */}
@@ -4050,7 +4094,7 @@ function PronunciationScreen({ C, fontStack, items, rule, packLabel, onExit }) {
 // =====================================================
 //  Lesehilfen-Simulator: Lern-Phase (Karten) + Quiz-Phase (mit Erklärung)
 // =====================================================
-function buildGuideQuiz(pack) {
+function buildGuideQuiz(pack, level = "v1") {
   const data = pack.data;
   if (pack.topic === "hamza") {
     return shuffle(
@@ -4063,6 +4107,22 @@ function buildGuideQuiz(pack) {
     );
   }
   if (pack.topic === "lam") {
+    // V2: aus V1-Woertern + neuen Woertern je 12 pro Typ ziehen (24 Fragen,
+    // jeder Durchgang anders) und die Harakat entfernen. Die Aufloesung zeigt
+    // danach die vokalisierte Form -- da sieht man Shadda bzw. Sukun wieder.
+    if (level === "v2") {
+      const pool = [...data, ...GUIDE_LAM_V2_EXTRA];
+      const pick = (t) => shuffle(pool.filter((x) => x.type === t)).slice(0, 12);
+      return shuffle([...pick("shamsiya"), ...pick("qamariya")]).map((it) => ({
+        prompt: stripHarakat(it.ar),
+        question: "Lam Shamsiya oder Qamariya?",
+        options: [
+          { label: "Lam Shamsiya", correct: it.type === "shamsiya" },
+          { label: "Lam Qamariya", correct: it.type === "qamariya" },
+        ],
+        explain: `${it.ar} · ${it.read} (${it.de}) — ${LAM_EXPLAIN[it.type]}`,
+      }));
+    }
     return shuffle(
       data.map((it) => ({
         prompt: it.ar,
@@ -4099,7 +4159,8 @@ function GuideScreen({ C, fontStack, pack, onExit }) {
 
   const [phase, setPhase] = useState("learn"); // learn | quiz | result
   const [learnIdx, setLearnIdx] = useState(0);
-  const [quiz, setQuiz] = useState(() => buildGuideQuiz(pack));
+  const [level, setLevel] = useState("v1"); // nur Lam: v1 = mit Harakat, v2 = ohne
+  const [quiz, setQuiz] = useState(() => buildGuideQuiz(pack, "v1"));
   const [qIdx, setQIdx] = useState(0);
   const [chosen, setChosen] = useState(null);
   const [correctCount, setCorrectCount] = useState(0);
@@ -4175,6 +4236,103 @@ function GuideScreen({ C, fontStack, pack, onExit }) {
     </div>
   );
 
+  // Kleine Nachschlage-Liste: 14 Sonnen-, 14 Mondbuchstaben. Steht nur in der
+  // Lern-Phase -- im Quiz waere sie die Loesung.
+  const letterBlock = (title, sub, letters, accent) => (
+    <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: accent, marginBottom: 1 }}>{title}</div>
+      <div style={{ fontSize: 11, color: C.sub, marginBottom: 7 }}>{sub}</div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
+        {letters.map(([ar, tr]) => (
+          <div
+            key={ar + tr}
+            style={{
+              background: C.panel2,
+              border: `1px solid ${C.line}`,
+              borderRadius: 8,
+              padding: "5px 0 3px",
+              textAlign: "center",
+              lineHeight: 1.1,
+            }}
+          >
+            <div style={{ fontFamily: fontStack, fontSize: 19, color: C.ink }}>{ar}</div>
+            <div style={{ fontSize: 9.5, color: C.sub }}>{tr}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+  const lamLetterList = (
+    <div
+      style={{
+        background: C.panel,
+        border: `1px solid ${C.line}`,
+        borderRadius: 14,
+        padding: "12px 12px 14px",
+        marginBottom: 14,
+      }}
+    >
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+        {letterBlock("Sonnenbuchstaben (14)", "ل stumm, Folgebuchstabe doppelt", LAM_SUN_LETTERS, C.gold)}
+        {letterBlock("Mondbuchstaben (14)", "ل wird gesprochen", LAM_MOON_LETTERS, C.green)}
+      </div>
+      <div style={{ fontSize: 12, color: C.sub, marginTop: 11, lineHeight: 1.5 }}>
+        Merksatz für die Mondbuchstaben — was nicht darin vorkommt, ist Sonne:
+      </div>
+      <div style={{ fontFamily: fontStack, direction: "rtl", fontSize: 22, color: C.green, margin: "3px 0 1px" }}>
+        {LAM_MOON_MNEMONIC.ar}
+      </div>
+      <div style={{ fontSize: 12, color: C.sub }}>{LAM_MOON_MNEMONIC.tr}</div>
+      <div style={{ fontSize: 12, color: C.sub, marginTop: 9, lineHeight: 1.5 }}>
+        Alle Sonnenbuchstaben werden vorn im Mund mit der Zungenspitze gebildet — dort sitzt auch das ل, deshalb geht es in ihnen auf.
+      </div>
+    </div>
+  );
+
+  // Stufen-Schalter (nur Lam). Betrifft das Quiz, nicht die Lernkarten.
+  const levelSwitch = (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ display: "flex", gap: 8 }}>
+        {[
+          { id: "v1", label: "V1 · mit Harakat" },
+          { id: "v2", label: "V2 · ohne Harakat" },
+        ].map((lv) => {
+          const on = level === lv.id;
+          return (
+            <button
+              key={lv.id}
+              onClick={() => {
+                setLevel(lv.id);
+                setQuiz(buildGuideQuiz(pack, lv.id));
+                setQIdx(0);
+                setChosen(null);
+                setCorrectCount(0);
+              }}
+              style={{
+                flex: 1,
+                padding: "11px 8px",
+                borderRadius: 12,
+                border: `1.5px solid ${on ? C.gold : C.line}`,
+                background: on ? "rgba(244,240,227,.08)" : C.panel2,
+                color: on ? C.gold : C.sub,
+                fontSize: 13.5,
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              {lv.label}
+            </button>
+          );
+        })}
+      </div>
+      <div style={{ fontSize: 12, color: C.sub, marginTop: 7, lineHeight: 1.5 }}>
+        {level === "v2"
+          ? "24 Wörter ohne Shadda und Sukun, teils welche, die hier nicht als Karte vorkommen. Damit zählt nur, ob du die Buchstaben auswendig kannst."
+          : "Die 28 Wörter von oben, voll vokalisiert. Shadda und Sukun sind sichtbar."}
+      </div>
+    </div>
+  );
+
   // ---------- LERN-PHASE ----------
   if (phase === "learn") {
     const c = data[learnIdx];
@@ -4190,6 +4348,7 @@ function GuideScreen({ C, fontStack, pack, onExit }) {
           {pack.intro}
         </div>
 
+        {isLam && lamLetterList}
         <div
           style={{
             background: C.panel,
@@ -4240,6 +4399,8 @@ function GuideScreen({ C, fontStack, pack, onExit }) {
           )}
         </div>
 
+        {isLam && levelSwitch}
+
         <div style={{ display: "flex", gap: 10 }}>
           <button
             style={{ ...ghostBtn, opacity: learnIdx === 0 ? 0.4 : 1 }}
@@ -4284,7 +4445,9 @@ function GuideScreen({ C, fontStack, pack, onExit }) {
     return (
       <div>
         <div style={headBar}>
-          <span style={{ fontSize: 13, color: C.sub, fontWeight: 600 }}>{pack.label} · Quiz</span>
+          <span style={{ fontSize: 13, color: C.sub, fontWeight: 600 }}>
+            {pack.label} · Quiz{isLam ? (level === "v2" ? " · V2" : " · V1") : ""}
+          </span>
           <span style={pill}>{qIdx + 1} / {quiz.length} · {correctCount} richtig</span>
         </div>
 
@@ -4381,7 +4544,9 @@ function GuideScreen({ C, fontStack, pack, onExit }) {
     >
       <div style={{ fontFamily: fontStack, fontSize: 38, color: C.gold }}>تم</div>
       <h2 style={{ margin: "6px 0 2px", fontSize: 21 }}>Quiz beendet</h2>
-      <p style={{ margin: "0 0 16px", color: C.sub, fontSize: 14 }}>{pack.label}</p>
+      <p style={{ margin: "0 0 16px", color: C.sub, fontSize: 14 }}>
+        {pack.label}{isLam ? (level === "v2" ? " · V2 — ohne Harakat" : " · V1 — mit Harakat") : ""}
+      </p>
       <div style={{ fontSize: 34, fontWeight: 800, color: pct >= 80 ? C.green : C.ink }}>
         {correctCount} / {quiz.length}
       </div>
@@ -4390,7 +4555,7 @@ function GuideScreen({ C, fontStack, pack, onExit }) {
         <button
           style={primaryBtn}
           onClick={() => {
-            setQuiz(buildGuideQuiz(pack));
+            setQuiz(buildGuideQuiz(pack, level));
             setQIdx(0);
             setChosen(null);
             setCorrectCount(0);
