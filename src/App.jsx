@@ -2079,13 +2079,13 @@ function ArabTrainerApp() {
     line: "#2c2924",
     ink: "#f2f1ea",
     sub: "#9c9c93",
-    gold: "#f4f0e3",
-    green: "#4fcf8f",
-    greenD: "#2f8f5c",
-    red: "#e2695c",
     accent: "#e3c88a",
     accentDark: "#c9a961",
     accentInk: "#1c1610",
+    accentSoft: "rgba(227,200,138,0.14)",
+    green: "#4fcf8f",
+    greenD: "#2f8f5c",
+    red: "#e2695c",
   };
 
   // Lese-Schrift: Standard ist die echte Mushaf-Schrift (KFGQPC Hafs
@@ -2136,9 +2136,9 @@ function ArabTrainerApp() {
         .app-shell { min-height: 100vh; min-height: 100dvh; }
         * { -webkit-tap-highlight-color: transparent; }
         @keyframes pop { 0%{transform:scale(.96);opacity:0} 100%{transform:scale(1);opacity:1} }
-        @keyframes flashBox { 0%{background:rgba(244,240,227,.35)} 100%{background:transparent} }
-        .opt:focus-visible { outline: 3px solid ${C.gold}; outline-offset: 2px; }
-        button:focus-visible { outline: 3px solid ${C.gold}; outline-offset: 2px; }
+        @keyframes flashBox { 0%{background:rgba(227,200,138,.35)} 100%{background:transparent} }
+        .opt:focus-visible { outline: 3px solid ${C.accent}; outline-offset: 2px; }
+        button:focus-visible { outline: 3px solid ${C.accent}; outline-offset: 2px; }
         @media (prefers-reduced-motion: reduce){ *{animation:none!important;transition:none!important} }
       `}</style>
 
@@ -2849,7 +2849,7 @@ function StartScreen({
     borderRadius: 18,
     padding: 20,
     marginBottom: 16,
-    boxShadow: "0 10px 28px rgba(0,0,0,.35)",
+    boxShadow: "0 4px 18px rgba(0,0,0,.45)",
   };
   const pickBtn = (active) => ({
     flex: 1,
@@ -4774,7 +4774,7 @@ function ChecklistSection({ C, done, onToggle, onReset, onJumpToModule }) {
         style={{
           background: `linear-gradient(180deg, ${C.panel2} 0%, ${C.panel} 100%)`,
           border: `1px solid ${C.line}`,
-          boxShadow: "0 10px 28px rgba(0,0,0,.35)",
+          boxShadow: "0 4px 18px rgba(0,0,0,.45)",
           borderRadius: 16,
           overflow: "hidden",
         }}
