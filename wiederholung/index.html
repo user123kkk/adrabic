@@ -1,0 +1,1821 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Adrabic-Wiederholung</title>
+<meta name="apple-mobile-web-app-title" content="Adrabic-Wiederholung">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0a09">
+<link rel="manifest" href="./manifest.json">
+<style>
+  :root {
+    --bg: #0a0a09;
+    --card: #141311;
+    --ink: #f2f1ea;
+    --ink-soft: #9c9c93;
+    --accent: #e3c88a;
+    --accent-dark: #c9a961;
+    --accent-ink: #1c1610;
+    --accent-soft: rgba(227, 200, 138, 0.14);
+    --green: #4fcf8f;
+    --green-soft: rgba(79, 207, 143, 0.14);
+    --red: #e2695c;
+    --red-soft: rgba(226, 105, 92, 0.16);
+    --border: #2c2924;
+    --radius: 14px;
+    --shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { background: var(--bg); }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+  .container { max-width: 640px; margin: 0 auto; padding: 16px; position: relative; z-index: 1; }
+
+  /* Lichtebene: position:fixed + inset:0 heisst genau Bildschirmgroesse.
+     Damit ist der Verlauf auf jedem Bildschirm gleich hell, unabhaengig davon
+     wie lang die Seite ist, und er bleibt beim Scrollen stehen. Lag er auf
+     dem body, wurde er ueber die gesamte Inhaltshoehe gezogen und das Licht
+     verschwand nach unten weg. Keine driftenden Leuchtflecken mehr. */
+  .bg-glow {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background: radial-gradient(120% 90% at 50% -5%, #322a19 0%, #17140f 45%, var(--bg) 80%);
+  }
+
+  h1 { font-size: 1.5rem; margin-bottom: 4px; }
+  h2 { font-size: 1.15rem; margin-bottom: 12px; }
+  .subtitle { color: var(--ink-soft); font-size: 0.95rem; margin-bottom: 24px; }
+
+  button {
+    font: inherit;
+    cursor: pointer;
+    border: none;
+    border-radius: var(--radius);
+    padding: 10px 18px;
+    background: var(--accent);
+    color: var(--accent-ink);
+    transition: background 0.15s;
+  }
+  button:hover { background: var(--accent-dark); }
+  button:disabled { opacity: 0.6; cursor: wait; }
+  button.secondary {
+    background: var(--card);
+    color: var(--ink);
+    border: 1px solid var(--border);
+  }
+  button.secondary:hover { background: var(--accent-soft); }
+  button.ghost {
+    background: transparent;
+    color: var(--ink-soft);
+    padding: 6px 10px;
+    font-size: 0.85rem;
+  }
+  button.ghost:hover { background: var(--accent-soft); color: var(--ink); }
+  button.linklike {
+    background: none;
+    color: var(--accent-dark);
+    padding: 4px 6px;
+    font-size: 0.88rem;
+    text-decoration: underline;
+  }
+  button.linklike:hover { background: none; color: var(--accent); }
+  button.tiny-link {
+    background: none;
+    color: var(--ink-soft);
+    padding: 4px 4px 4px 10px;
+    font-size: 0.72rem;
+    text-decoration: none;
+    opacity: 0.7;
+  }
+  button.tiny-link:hover { background: none; color: var(--accent-dark); text-decoration: underline; opacity: 1; }
+
+  input[type="text"], input[type="email"], input[type="password"], input[type="number"], textarea {
+    font: inherit;
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--card);
+    color: var(--ink);
+  }
+  input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+  label { display: block; font-size: 0.88rem; color: var(--ink-soft); margin-bottom: 4px; margin-top: 12px; }
+
+  .panel {
+    background: var(--card);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .error-box {
+    background: var(--red-soft);
+    color: var(--red);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    margin-top: 12px;
+    font-size: 0.92rem;
+  }
+  .info-box {
+    background: var(--green-soft);
+    color: var(--green);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    margin-top: 12px;
+    font-size: 0.92rem;
+  }
+
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .topbar .who { font-size: 0.9rem; color: var(--ink-soft); }
+  .topbar .who strong { color: var(--ink); }
+  .sync-dot { font-size: 0.78rem; color: var(--ink-soft); }
+
+  .pills { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .pill {
+    background: var(--card);
+    color: var(--ink-soft);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 7px 16px;
+    font-size: 0.92rem;
+  }
+  .pill:hover { background: var(--accent-soft); color: var(--ink); }
+  .pill.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .pill.add { border-style: dashed; }
+
+  .tabs { display: flex; gap: 0; margin-bottom: 16px; background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); overflow: hidden; }
+  .tab { flex: 1; background: transparent; color: var(--ink-soft); border-radius: 0; padding: 12px; }
+  .tab:hover { background: var(--accent-soft); color: var(--ink); }
+  .tab.active { background: var(--accent); color: var(--accent-ink); }
+
+  .card-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .card-row:last-child { border-bottom: none; }
+  .card-row.dragging { opacity: 0.5; background: var(--accent-soft); position: relative; z-index: 5; }
+  .drag-handle { cursor: grab; color: var(--ink-soft); font-size: 1.2rem; padding: 4px; touch-action: none; user-select: none; }
+  .drag-handle:active { cursor: grabbing; }
+  .card-row .words { flex: 1; min-width: 0; }
+  .card-row .wort { font-weight: 600; word-break: break-word; }
+  .card-row .uebersetzung { color: var(--ink-soft); font-size: 0.92rem; word-break: break-word; }
+  .card-row .extra-note { color: var(--ink-soft); font-size: 0.82rem; font-style: italic; word-break: break-word; white-space: pre-wrap; }
+  .badge {
+    background: var(--accent-soft);
+    color: var(--accent-dark);
+    border-radius: 999px;
+    padding: 3px 10px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .study-card { text-align: center; padding: 32px 20px; }
+  .study-word { font-size: 1.7rem; font-weight: 700; word-break: break-word; margin-bottom: 8px; }
+  .study-answer {
+    font-size: 1.3rem;
+    color: var(--accent-dark);
+    word-break: break-word;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px dashed var(--border);
+  }
+  .study-extra {
+    margin-top: 14px;
+    padding: 12px;
+    background: var(--bg);
+    border-radius: var(--radius);
+    font-size: 0.95rem;
+    color: var(--ink-soft);
+    word-break: break-word;
+    white-space: pre-wrap;
+    text-align: left;
+  }
+  .study-extra a { color: var(--accent-dark); }
+  .grade-row { display: flex; gap: 10px; margin-top: 22px; }
+  .grade-row button { flex: 1; padding: 14px; font-size: 1rem; }
+  .btn-known { background: var(--green); }
+  .btn-known:hover { background: #2f8f5c; }
+  .btn-unknown { background: var(--red); }
+  .btn-unknown:hover { background: #b8483d; }
+  .progress-note { font-size: 0.85rem; color: var(--ink-soft); margin-bottom: 10px; }
+
+  .done-box { text-align: center; padding: 36px 20px; }
+  .done-box .emoji { font-size: 2.5rem; margin-bottom: 10px; }
+
+  .hint { color: var(--ink-soft); font-size: 0.95rem; padding: 8px 0; }
+  .due-info { font-size: 1.05rem; margin-bottom: 16px; }
+  .due-info strong { color: var(--accent-dark); }
+
+  .form-actions { margin-top: 16px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .bereich-manage-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .bereich-manage-row button.ghost { font-size: 0.82rem; padding: 5px 8px; }
+  .drill-picker { background: var(--bg); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 14px; }
+  .drill-picker select { padding: 8px 10px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--card); color: var(--ink); font: inherit; }
+  .drill-banner { background: var(--accent-soft); color: var(--accent-dark); border-radius: var(--radius); padding: 8px 12px; font-size: 0.85rem; margin-bottom: 14px; }
+  .select-actionbar { background: var(--bg); border-radius: var(--radius); padding: 10px 14px; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .select-actionbar select { padding: 7px 10px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--card); color: var(--ink); font: inherit; }
+  .drill-picker select option, .select-actionbar select option { background: var(--card); color: var(--ink); }
+  .card-row input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--accent); flex-shrink: 0; }
+  .set-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .set-row:last-child { border-bottom: none; }
+  .set-row .set-name { flex: 1; min-width: 0; font-weight: 600; word-break: break-word; }
+  .set-cards { background: var(--bg); border-radius: var(--radius); padding: 4px 12px; margin: 0 0 10px; }
+  .set-cards .card-row { padding: 8px 0; }
+  .setup-steps { font-size: 0.92rem; color: var(--ink-soft); }
+  .setup-steps li { margin: 8px 0 8px 18px; }
+  code { background: var(--bg); padding: 2px 6px; border-radius: 6px; font-size: 0.85em; }
+
+  @font-face {
+    font-family: 'UthmanicHafs';
+    src: url('https://verses.quran.foundation/fonts/quran/hafs/uthmanic_hafs/UthmanicHafs1Ver18.woff2') format('woff2'),
+         url('https://verses.quran.foundation/fonts/quran/hafs/uthmanic_hafs/UthmanicHafs1Ver18.ttf') format('truetype');
+    font-display: swap;
+  }
+  .arabic {
+    font-family: 'UthmanicHafs', 'Amiri', 'Amiri Quran', 'Scheherazade New', 'Noto Naskh Arabic', serif;
+    direction: rtl;
+    unicode-bidi: plaintext;
+  }
+  input.arabic { text-align: right; }
+
+  .hw-canvas-wrap { background: var(--bg); border-radius: var(--radius); padding: 10px; margin: 18px 0; }
+  .hw-canvas-wrap canvas {
+    display: block;
+    width: 100%;
+    height: 240px;
+    touch-action: none;
+    background: #fffdf9;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+  }
+  .hw-canvas-wrap.fullscreen {
+    position: fixed;
+    inset: 12px;
+    z-index: 50;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+  }
+  .hw-canvas-wrap.fullscreen canvas { flex: 1; height: auto; }
+  .hw-toolbar { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; justify-content: center; }
+
+  @media (max-width: 480px) {
+    .container { padding: 12px; }
+    .panel { padding: 16px; }
+    .study-word { font-size: 1.4rem; }
+  }
+</style>
+</head>
+<body>
+<div class="bg-glow" aria-hidden="true"></div>
+<div class="container" id="app">
+  <div class="panel" style="text-align:center; margin-top:40px">Lädt…</div>
+</div>
+
+<script type="module">
+"use strict";
+
+/* ============================================================
+   FIREBASE-KONFIGURATION
+   Diese Werte kommen aus der Firebase-Konsole:
+   Projekteinstellungen → Allgemein → "Meine Apps" → Web-App → SDK-Konfiguration
+   ============================================================ */
+const firebaseConfig = {
+  apiKey: "AIzaSyAHP4a_UBPQ_22QnRSlXbnDLsRL-IRO9XU",
+  authDomain: "lernkarte-925c2.firebaseapp.com",
+  projectId: "lernkarte-925c2",
+  storageBucket: "lernkarte-925c2.firebasestorage.app",
+  messagingSenderId: "712373953233",
+  appId: "1:712373953233:web:d0f761786fc345b4b69bf0"
+};
+
+const CONFIGURED = firebaseConfig.apiKey !== "HIER_EINFUEGEN";
+const app = document.getElementById("app");
+
+/* ---------- XSS-Schutz ---------- */
+function esc(s) {
+  return String(s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+/* ---------- Datum & Intervall ---------- */
+function fmtDate(d) {
+  return d.getFullYear() + "-" +
+    String(d.getMonth() + 1).padStart(2, "0") + "-" +
+    String(d.getDate()).padStart(2, "0");
+}
+function todayStr() { return fmtDate(new Date()); }
+function dateInDays(n) {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return fmtDate(d);
+}
+/* Intervall-Formel: 2^(stufe-1) Tage. Stufe 1 → 1, 2 → 2, 3 → 4, 4 → 8 ... */
+function intervalForStufe(stufe) {
+  return Math.pow(2, stufe - 1);
+}
+function genId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+function shuffled(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/* ---------- Datenvalidierung ---------- */
+function normCard(c) {
+  return {
+    id: typeof c.id === "string" && c.id ? c.id : genId(),
+    wort: String(c.wort),
+    uebersetzung: String(c.uebersetzung),
+    extra: typeof c.extra === "string" ? c.extra : "",
+    stufe: Number.isInteger(c.stufe) && c.stufe >= 0 ? c.stufe : 0,
+    nextReview: /^\d{4}-\d{2}-\d{2}$/.test(c.nextReview) ? c.nextReview : todayStr()
+  };
+}
+/* Speicherkarte = benannte Merkliste. Sie speichert NUR Karten-IDs, keine Kopien
+   der Karten. Dadurch bleibt jede Karte genau einmal im Bereich vorhanden:
+   Änderungen am Wort oder an der Stufe wirken automatisch auch hier, und Üben
+   über eine Speicherkarte verändert den Lernfortschritt genauso wenig wie der
+   normale Übungsmodus. */
+function normSet(s) {
+  return {
+    id: typeof s.id === "string" && s.id ? s.id : genId(),
+    name: typeof s.name === "string" && s.name ? s.name.slice(0, 40) : "Speicherkarte",
+    cardIds: (Array.isArray(s.cardIds) ? s.cardIds : []).filter(x => typeof x === "string" && x)
+  };
+}
+function normBereiche(arr) {
+  const out = [];
+  if (Array.isArray(arr)) {
+    for (const b of arr) {
+      if (!b || typeof b !== "object" || typeof b.name !== "string" || !b.name) continue;
+      if (out.some(x => x.name === b.name)) continue;
+      out.push({
+        id: typeof b.id === "string" && b.id ? b.id : genId(),
+        name: b.name.slice(0, 40),
+        karten: (Array.isArray(b.karten) ? b.karten : [])
+          .filter(c => c && typeof c === "object" && c.wort != null && c.uebersetzung != null)
+          .map(normCard),
+        sets: (Array.isArray(b.sets) ? b.sets : [])
+          .filter(s => s && typeof s === "object")
+          .map(normSet)
+      });
+    }
+  }
+  if (out.length === 0) out.push({ id: genId(), name: "Vokabeln", karten: [], sets: [] });
+  return out;
+}
+/* Wandelt die lokale Bereiche-Liste (Array) in das in der Cloud gespeicherte
+   Map-Format um (Bereiche und Karten jeweils als Objekt, per ID adressierbar).
+   Nur DAMIT lassen sich einzelne Felder gezielt aktualisieren (siehe persistCardGrade),
+   ohne dabei aus Versehen Änderungen zu überschreiben, die zwischenzeitlich von
+   einem anderen Gerät gespeichert wurden. */
+function bereicheArrayToMap(arr) {
+  const out = {};
+  arr.forEach((b, bi) => {
+    const kartenMap = {};
+    b.karten.forEach((c, ci) => {
+      kartenMap[c.id] = { wort: c.wort, uebersetzung: c.uebersetzung, extra: c.extra, stufe: c.stufe, nextReview: c.nextReview, order: ci };
+    });
+    const setsMap = {};
+    (Array.isArray(b.sets) ? b.sets : []).forEach((s, si) => {
+      setsMap[s.id] = { name: s.name, order: si, cardIds: s.cardIds };
+    });
+    out[b.id] = { name: b.name, order: bi, karten: kartenMap, sets: setsMap };
+  });
+  return out;
+}
+function bereicheMapToArray(mapObj) {
+  const ids = Object.keys(mapObj || {});
+  const list = ids.map(id => {
+    const b = mapObj[id] || {};
+    const kartenMap = b.karten && typeof b.karten === "object" ? b.karten : {};
+    const karten = Object.keys(kartenMap).map(cid => {
+      const c = kartenMap[cid] || {};
+      return { card: normCard({ id: cid, wort: c.wort, uebersetzung: c.uebersetzung, extra: c.extra, stufe: c.stufe, nextReview: c.nextReview }), order: Number.isFinite(c.order) ? c.order : 0 };
+    }).sort((x, y) => x.order - y.order).map(x => x.card);
+    const setsMap = b.sets && typeof b.sets === "object" ? b.sets : {};
+    const sets = Object.keys(setsMap).map(sid => {
+      const s = setsMap[sid] || {};
+      return { set: normSet({ id: sid, name: s.name, cardIds: s.cardIds }), order: Number.isFinite(s.order) ? s.order : 0 };
+    }).sort((x, y) => x.order - y.order).map(x => x.set);
+    return { id: id, name: typeof b.name === "string" && b.name ? b.name.slice(0, 40) : "Vokabeln", karten: karten, sets: sets, order: Number.isFinite(b.order) ? b.order : 0 };
+  }).sort((x, y) => x.order - y.order).map(({ order, ...rest }) => rest);
+  return list.length ? list : [{ id: genId(), name: "Vokabeln", karten: [], sets: [] }];
+}
+function normStreak(s) {
+  if (!s || typeof s !== "object") return { count: 0, lastCompletedDate: null, lastEvaluatedDate: null };
+  return {
+    count: Number.isInteger(s.count) && s.count >= 0 ? s.count : 0,
+    lastCompletedDate: /^\d{4}-\d{2}-\d{2}$/.test(s.lastCompletedDate) ? s.lastCompletedDate : null,
+    lastEvaluatedDate: /^\d{4}-\d{2}-\d{2}$/.test(s.lastEvaluatedDate) ? s.lastEvaluatedDate : null
+  };
+}
+
+/* ---------- Zustand ---------- */
+let currentUser = null;      // Firebase-User
+let displayName = "";
+let bereiche = null;         // Array [{name, karten:[]}] – null solange Cloud-Daten noch nicht geladen
+let cloudDocExists = false;
+let syncError = null;
+let streak = normStreak(null); // { count, lastCompletedDate, lastEvaluatedDate } – nur echte Lernsessions zählen, Üben nicht
+
+let ui = {
+  authMode: "login",         // "login" | "register" | "reset"
+  authError: null,
+  authInfo: null,
+  authBusy: false,
+  bereichIdx: 0,
+  tab: "lernen",
+  session: null,
+  editId: null,
+  askImport: false,          // alte lokale Daten anbieten
+  searchQuery: "",           // Suchtext im Verwalten-Tab (nicht gespeichert, nur UI-Zustand)
+  selectMode: false,          // Mehrfachauswahl im Verwalten-Tab aktiv?
+  selectedIds: new Set(),     // ausgewählte Karten-IDs
+  drillOpen: false,           // Auswahl für Übungsmodus sichtbar?
+  drillSource: "stufen",      // "stufen" oder die ID einer Speicherkarte
+  openSetId: null             // Speicherkarte, deren Kartenliste aufgeklappt ist
+};
+
+/* ---------- Handschrift-Canvas-Zustand (bleibt über Re-Renders erhalten,
+   da render() das DOM inkl. Canvas bei jeder Aktion neu aufbaut) ---------- */
+let hwStrokes = [];
+let hwFullscreen = false;
+
+/* ---------- Alte lokale Daten (Offline-Version) ---------- */
+const OLD_STORAGE_KEY = "lernkarten-app-v1";
+function oldLocalProfiles() {
+  try {
+    const raw = localStorage.getItem(OLD_STORAGE_KEY);
+    if (!raw) return [];
+    const s = JSON.parse(raw);
+    if (!s || typeof s !== "object" || !s.profiles || typeof s.profiles !== "object") return [];
+    return Object.keys(s.profiles).filter(n => {
+      const p = s.profiles[n];
+      return p && typeof p === "object" && p.bereiche && typeof p.bereiche === "object";
+    });
+  } catch (e) { return []; }
+}
+function importOldProfile(name) {
+  try {
+    const s = JSON.parse(localStorage.getItem(OLD_STORAGE_KEY));
+    const p = s.profiles[name];
+    const arr = [];
+    for (const bn of Object.keys(p.bereiche)) {
+      if (Array.isArray(p.bereiche[bn])) arr.push({ name: bn, karten: p.bereiche[bn] });
+    }
+    bereiche = normBereiche(arr);
+  } catch (e) {
+    bereiche = normBereiche(null);
+  }
+  ui.askImport = false;
+  ui.bereichIdx = 0;
+  persist();
+  render();
+}
+
+/* ---------- Firebase ---------- */
+let auth = null, db = null, userDocRef = null, unsubscribeSnapshot = null;
+let fb = {}; // Firestore-/Auth-Funktionen nach dem Laden
+
+async function initFirebase() {
+  const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
+  const authMod = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
+  const fsMod = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+  fb = { ...authMod, ...fsMod };
+
+  const fbApp = initializeApp(firebaseConfig);
+  auth = fb.getAuth(fbApp);
+  try {
+    db = fb.initializeFirestore(fbApp, { localCache: fb.persistentLocalCache() });
+  } catch (e) {
+    db = fb.getFirestore(fbApp); // Fallback ohne Offline-Cache
+  }
+
+  fb.onAuthStateChanged(auth, user => {
+    currentUser = user;
+    if (unsubscribeSnapshot) { unsubscribeSnapshot(); unsubscribeSnapshot = null; }
+    bereiche = null;
+    streak = normStreak(null);
+    cloudDocExists = false;
+    ui.session = null;
+    ui.editId = null;
+    ui.askImport = false;
+    if (user) {
+      displayName = user.displayName || (user.email ? user.email.split("@")[0] : "Lernende:r");
+      userDocRef = fb.doc(db, "users", user.uid);
+      unsubscribeSnapshot = fb.onSnapshot(userDocRef, snap => {
+        if (snap.metadata.hasPendingWrites) return; // eigenes Echo ignorieren
+        const data = snap.data();
+        if (data) {
+          cloudDocExists = true;
+          if (typeof data.name === "string" && data.name) displayName = data.name;
+          if (Array.isArray(data.bereiche)) {
+            // Altes Format (vor der Konflikt-Absicherung) – einmalig ins neue Format überführen
+            bereiche = normBereiche(data.bereiche);
+            streak = normStreak(data.streak);
+            persist();
+          } else if (data.bereiche && typeof data.bereiche === "object") {
+            bereiche = bereicheMapToArray(data.bereiche);
+            streak = normStreak(data.streak);
+          } else {
+            bereiche = normBereiche(null);
+            streak = normStreak(null);
+          }
+          if (ui.bereichIdx >= bereiche.length) ui.bereichIdx = 0;
+        } else {
+          cloudDocExists = false;
+          bereiche = normBereiche(null);
+          streak = normStreak(null);
+          ui.askImport = oldLocalProfiles().length > 0;
+          if (!ui.askImport) persist(); // leeres Startdokument anlegen
+        }
+        syncError = null;
+        evaluateStreakForNewDay();
+        render();
+      }, err => {
+        syncError = err && err.code === "permission-denied"
+          ? "Zugriff verweigert – bitte Sicherheitsregeln in Firebase prüfen."
+          : "Verbindungsproblem beim Laden der Daten.";
+        render();
+      });
+    }
+    render();
+  });
+}
+
+let saveWarned = false;
+function persist() {
+  if (!userDocRef || bereiche === null) return;
+  fb.setDoc(userDocRef, { name: displayName, bereiche: bereicheArrayToMap(bereiche), streak: streak }).then(() => {
+    saveWarned = false;
+  }).catch(e => {
+    if (!saveWarned) {
+      saveWarned = true;
+      alert("Speichern in der Cloud fehlgeschlagen (" + (e && e.code ? e.code : "Fehler") + "). Änderungen werden erneut versucht, sobald die Verbindung steht.");
+    }
+  });
+}
+/* Gezieltes Speichern für's Lernen: ändert in der Cloud NUR die Stufe/das Fälligkeitsdatum
+   dieser einen Karte, statt (wie persist()) den kompletten Kartenbestand zu überschreiben.
+   Dadurch kann ein Gerät nie mehr den Fortschritt eines anderen Geräts auslöschen –
+   auch nicht, wenn eine Karte offline bewertet und die Änderung erst später hochgeladen wird. */
+function persistCardGrade(bereichId, cardId, fields) {
+  if (!userDocRef) return;
+  const base = "bereiche." + bereichId + ".karten." + cardId;
+  const patch = {};
+  patch[base + ".stufe"] = fields.stufe;
+  patch[base + ".nextReview"] = fields.nextReview;
+  fb.updateDoc(userDocRef, patch).catch(e => {
+    if (!saveWarned) {
+      saveWarned = true;
+      alert("Speichern in der Cloud fehlgeschlagen (" + (e && e.code ? e.code : "Fehler") + "). Änderungen werden erneut versucht, sobald die Verbindung steht.");
+    }
+  });
+}
+function persistStreak() {
+  if (!userDocRef) return;
+  fb.updateDoc(userDocRef, { streak: streak }).catch(() => {});
+}
+
+/* ---------- Streak: zählt nur echte, vollständig erledigte Lerntage (kein Üben) ---------- */
+function evaluateStreakForNewDay() {
+  if (bereiche === null) return;
+  const t = todayStr();
+  if (streak.lastEvaluatedDate === t) return; // heute schon geprüft
+  // Gab es eine Karte, die schon VOR heute fällig war und nicht bearbeitet wurde?
+  // -> ein Tag wurde verpasst, die Streak reißt (Tage ganz ohne fällige Karten zählen nicht als verpasst)
+  const hadOverdue = bereiche.some(b => b.karten.some(c => c.nextReview < t));
+  if (hadOverdue && streak.lastCompletedDate !== t) {
+    streak.count = 0;
+  }
+  streak.lastEvaluatedDate = t;
+  persistStreak();
+}
+function checkStreakOnSessionComplete() {
+  if (bereiche === null) return;
+  const t = todayStr();
+  if (streak.lastCompletedDate === t) return; // heute schon gezählt
+  const allClear = bereiche.every(b => !b.karten.some(c => c.nextReview <= t));
+  if (!allClear) return; // in einem anderen Bereich ist noch was fällig
+  streak.count += 1;
+  streak.lastCompletedDate = t;
+  persistStreak();
+}
+
+/* ---------- Auth-Aktionen ---------- */
+const AUTH_ERRORS = {
+  "auth/invalid-credential": "E-Mail oder Passwort ist falsch.",
+  "auth/user-not-found": "Kein Konto mit dieser E-Mail gefunden.",
+  "auth/wrong-password": "E-Mail oder Passwort ist falsch.",
+  "auth/invalid-email": "Das ist keine gültige E-Mail-Adresse.",
+  "auth/email-already-in-use": "Mit dieser E-Mail gibt es schon ein Konto – bitte anmelden.",
+  "auth/weak-password": "Passwort zu schwach – mindestens 6 Zeichen.",
+  "auth/missing-password": "Bitte ein Passwort eingeben.",
+  "auth/too-many-requests": "Zu viele Versuche – bitte kurz warten und erneut probieren.",
+  "auth/network-request-failed": "Keine Verbindung – bitte Internet prüfen."
+};
+function authErrorText(e) {
+  return (e && AUTH_ERRORS[e.code]) || "Das hat nicht geklappt (" + (e && e.code ? e.code : "unbekannter Fehler") + ").";
+}
+function val(id) {
+  const el = document.getElementById(id);
+  return el ? el.value : "";
+}
+
+async function doLogin() {
+  const email = val("a-email").trim();
+  const pass = val("a-pass");
+  ui.authError = null; ui.authInfo = null; ui.authBusy = true; render();
+  try {
+    await fb.signInWithEmailAndPassword(auth, email, pass);
+  } catch (e) {
+    ui.authError = authErrorText(e);
+  }
+  ui.authBusy = false;
+  render();
+}
+async function doRegister() {
+  const name = val("a-name").trim().slice(0, 40);
+  const email = val("a-email").trim();
+  const pass = val("a-pass");
+  ui.authError = null; ui.authInfo = null;
+  if (!name) { ui.authError = "Bitte einen Namen eingeben."; render(); return; }
+  ui.authBusy = true; render();
+  try {
+    const cred = await fb.createUserWithEmailAndPassword(auth, email, pass);
+    displayName = name;
+    await fb.updateProfile(cred.user, { displayName: name });
+  } catch (e) {
+    ui.authError = authErrorText(e);
+  }
+  ui.authBusy = false;
+  render();
+}
+async function doReset() {
+  const email = val("a-email").trim();
+  ui.authError = null; ui.authInfo = null; ui.authBusy = true; render();
+  try {
+    await fb.sendPasswordResetEmail(auth, email);
+    ui.authInfo = "E-Mail zum Zurücksetzen wurde verschickt – bitte Posteingang (und Spam) prüfen.";
+  } catch (e) {
+    ui.authError = authErrorText(e);
+  }
+  ui.authBusy = false;
+  render();
+}
+function doLogout() {
+  fb.signOut(auth);
+}
+
+/* ---------- Datenzugriff ---------- */
+function currentBereich() { return bereiche[ui.bereichIdx]; }
+function currentCards() { return currentBereich().karten; }
+function findCard(id) { return currentCards().find(c => c.id === id); }
+/* Bereiche aus älteren Datenständen haben noch kein sets-Feld – hier einmalig nachrüsten. */
+function currentSets() {
+  const b = currentBereich();
+  if (!Array.isArray(b.sets)) b.sets = [];
+  return b.sets;
+}
+function findSet(id) { return currentSets().find(s => s.id === id); }
+/* Karten einer Speicherkarte in Bereichsreihenfolge, gelöschte IDs fallen weg. */
+function setCards(set) {
+  const ids = new Set(set.cardIds);
+  return currentCards().filter(c => ids.has(c.id));
+}
+function dueCards() {
+  const t = todayStr();
+  return currentCards().filter(c => c.nextReview <= t);
+}
+const LAST_BACKUP_KEY = "adrabic-last-backup";
+function daysSinceLastBackup() {
+  const raw = localStorage.getItem(LAST_BACKUP_KEY);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null; // noch nie exportiert
+  const last = new Date(raw + "T00:00:00");
+  const now = new Date(todayStr() + "T00:00:00");
+  return Math.round((now - last) / 86400000);
+}
+function exportBackup(onlyCurrent) {
+  const data = {
+    exportedAt: new Date().toISOString(),
+    profil: displayName,
+    bereiche: onlyCurrent ? [currentBereich()] : bereiche
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  const nameSlug = onlyCurrent ? "-" + currentBereich().name.toLowerCase().replace(/[^a-z0-9äöüß]+/g, "-").replace(/(^-|-$)/g, "") : "";
+  a.download = "lernkarten-backup" + nameSlug + "-" + todayStr() + ".json";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  if (!onlyCurrent) {
+    try { localStorage.setItem(LAST_BACKUP_KEY, todayStr()); } catch (e) {}
+  }
+  render();
+}
+function importBackupFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    let data;
+    try {
+      data = JSON.parse(reader.result);
+    } catch (e) {
+      alert("Diese Datei ist keine gültige Backup-Datei (kein lesbares JSON).");
+      return;
+    }
+    if (!data || !Array.isArray(data.bereiche)) {
+      alert("Diese Datei ist keine gültige Lernkarten-Backup-Datei.");
+      return;
+    }
+    const imported = normBereiche(data.bereiche);
+    for (const b of imported) {
+      let name = b.name;
+      if (bereiche.some(x => x.name === name)) {
+        let n = 2;
+        while (bereiche.some(x => x.name === name + " (" + n + ")")) n++;
+        name = name + " (" + n + ")";
+      }
+      bereiche.push({ id: genId(), name: name, karten: b.karten, sets: b.sets || [] });
+    }
+    persist();
+    render();
+    alert(imported.length + " Bereich(e) mit insgesamt " + imported.reduce((sum, b) => sum + b.karten.length, 0) + " Karte(n) importiert.");
+  };
+  reader.readAsText(file);
+}
+
+/* ---------- Bereiche ---------- */
+function addBereich() {
+  const name = prompt("Name des neuen Bereichs:");
+  if (!name || !name.trim()) return;
+  const n = name.trim().slice(0, 40);
+  let idx = bereiche.findIndex(b => b.name === n);
+  if (idx === -1) {
+    bereiche.push({ id: genId(), name: n, karten: [], sets: [] });
+    idx = bereiche.length - 1;
+    persist();
+  }
+  ui.bereichIdx = idx;
+  ui.session = null;
+  ui.editId = null;
+  render();
+}
+function selectBereich(idx) {
+  ui.bereichIdx = idx;
+  ui.session = null;
+  ui.editId = null;
+  ui.searchQuery = "";
+  ui.selectMode = false;
+  ui.selectedIds = new Set();
+  ui.drillOpen = false;
+  ui.drillSource = "stufen";
+  ui.openSetId = null;
+  render();
+}
+function renameBereich() {
+  const b = currentBereich();
+  const name = prompt("Neuer Name für den Bereich:", b.name);
+  if (!name || !name.trim()) return;
+  const n = name.trim().slice(0, 40);
+  if (n === b.name) return;
+  if (bereiche.some(x => x !== b && x.name === n)) {
+    alert('Ein Bereich namens "' + n + '" existiert schon.');
+    return;
+  }
+  b.name = n;
+  persist();
+  render();
+}
+function deleteBereich() {
+  if (bereiche.length <= 1) {
+    alert("Der letzte verbleibende Bereich kann nicht gelöscht werden.");
+    return;
+  }
+  const b = currentBereich();
+  if (!confirm('Bereich "' + b.name + '" mit ' + b.karten.length + ' Karte(n) endgültig löschen? Das kann nicht rückgängig gemacht werden.')) return;
+  bereiche.splice(ui.bereichIdx, 1);
+  ui.bereichIdx = Math.max(0, Math.min(ui.bereichIdx, bereiche.length - 1));
+  ui.session = null;
+  ui.editId = null;
+  persist();
+  render();
+}
+
+/* ---------- Mehrfachauswahl ---------- */
+function reverseOrder() {
+  const cards = currentCards();
+  if (cards.length < 2) return;
+  if (!confirm('Reihenfolge aller ' + cards.length + ' Karten in „' + currentBereich().name + '" einmalig umkehren?')) return;
+  cards.reverse();
+  persist();
+  render();
+}
+function toggleSelectMode() {
+  ui.selectMode = !ui.selectMode;
+  ui.selectedIds = new Set();
+  ui.drillOpen = false;
+  render();
+}
+function toggleCardSelected(id) {
+  if (ui.selectedIds.has(id)) ui.selectedIds.delete(id);
+  else ui.selectedIds.add(id);
+  render();
+}
+function deleteSelectedCards() {
+  const n = ui.selectedIds.size;
+  if (n === 0) return;
+  if (!confirm(n + " Karte(n) endgültig löschen? Das kann nicht rückgängig gemacht werden.")) return;
+  const cards = currentCards();
+  for (let i = cards.length - 1; i >= 0; i--) {
+    if (ui.selectedIds.has(cards[i].id)) cards.splice(i, 1);
+  }
+  purgeFromSets(ui.selectedIds);
+  ui.selectedIds = new Set();
+  persist();
+  render();
+}
+function moveSelectedCardsTo(targetName) {
+  const n = ui.selectedIds.size;
+  if (n === 0) return;
+  const target = bereiche.find(b => b.name === targetName);
+  if (!target) return;
+  const cards = currentCards();
+  const moved = [];
+  for (let i = cards.length - 1; i >= 0; i--) {
+    if (ui.selectedIds.has(cards[i].id)) {
+      moved.unshift(cards[i]);
+      cards.splice(i, 1);
+    }
+  }
+  target.karten.unshift(...moved);
+  purgeFromSets(ui.selectedIds);
+  ui.selectedIds = new Set();
+  ui.selectMode = false;
+  persist();
+  render();
+}
+
+/* ---------- Speicherkarten (benannte Merklisten aus ausgewählten Karten) ---------- */
+/* Entfernt IDs aus allen Speicherkarten des Bereichs, wenn Karten gelöscht oder
+   verschoben werden – sonst zeigt eine Speicherkarte auf nicht mehr vorhandene Karten. */
+function purgeFromSets(ids) {
+  const idSet = ids instanceof Set ? ids : new Set(ids);
+  currentSets().forEach(s => { s.cardIds = s.cardIds.filter(id => !idSet.has(id)); });
+}
+function saveSelectedToSet(targetId) {
+  const ids = [...ui.selectedIds];
+  if (ids.length === 0) return;
+  let set;
+  if (targetId === "__new__") {
+    const name = prompt("Name der neuen Speicherkarte:", "Schwierige Wörter");
+    if (!name || !name.trim()) return;
+    const n = name.trim().slice(0, 40);
+    if (currentSets().some(s => s.name === n)) {
+      alert('Eine Speicherkarte namens „' + n + '" existiert schon.');
+      return;
+    }
+    set = { id: genId(), name: n, cardIds: [] };
+    currentSets().push(set);
+  } else {
+    set = findSet(targetId);
+    if (!set) return;
+  }
+  const known = new Set(set.cardIds);
+  ids.forEach(id => { if (!known.has(id)) set.cardIds.push(id); });
+  ui.selectedIds = new Set();
+  ui.selectMode = false;
+  ui.openSetId = set.id;
+  persist();
+  render();
+}
+function renameSet(id) {
+  const set = findSet(id);
+  if (!set) return;
+  const name = prompt("Neuer Name für die Speicherkarte:", set.name);
+  if (!name || !name.trim()) return;
+  const n = name.trim().slice(0, 40);
+  if (n === set.name) return;
+  if (currentSets().some(s => s !== set && s.name === n)) {
+    alert('Eine Speicherkarte namens „' + n + '" existiert schon.');
+    return;
+  }
+  set.name = n;
+  persist();
+  render();
+}
+function deleteSet(id) {
+  const sets = currentSets();
+  const idx = sets.findIndex(s => s.id === id);
+  if (idx === -1) return;
+  if (!confirm('Speicherkarte „' + sets[idx].name + '" löschen? Die Vokabeln selbst bleiben erhalten.')) return;
+  sets.splice(idx, 1);
+  if (ui.openSetId === id) ui.openSetId = null;
+  if (ui.drillSource === id) ui.drillSource = "stufen";
+  persist();
+  render();
+}
+function removeCardFromSet(setId, cardId) {
+  const set = findSet(setId);
+  if (!set) return;
+  set.cardIds = set.cardIds.filter(x => x !== cardId);
+  persist();
+  render();
+}
+function toggleSetOpen(id) {
+  ui.openSetId = ui.openSetId === id ? null : id;
+  render();
+}
+
+/* ---------- Übungsmodus: Stufen-Range, ändert nichts am echten Fortschritt ---------- */
+function availableStufen() {
+  const set = new Set(currentCards().map(c => c.stufe));
+  return [...set].sort((a, b) => a - b);
+}
+function openDrillPicker(source) {
+  ui.drillOpen = true;
+  ui.selectMode = false;
+  ui.drillSource = source && findSet(source) ? source : "stufen";
+  render();
+}
+function startDrill(min, max, handwriting) {
+  const cards = currentCards().filter(c => c.stufe >= min && c.stufe <= max);
+  if (cards.length === 0) {
+    alert("Keine Karten in diesem Stufenbereich.");
+    return;
+  }
+  startDrillWithCards(cards, min === max ? ("Stufe " + min) : ("Stufe " + min + "–" + max), handwriting);
+}
+function startDrillFromSet(setId, handwriting) {
+  const set = findSet(setId);
+  if (!set) return;
+  const cards = setCards(set);
+  if (cards.length === 0) {
+    alert('Die Speicherkarte „' + set.name + '" enthält keine Karten (mehr).');
+    return;
+  }
+  startDrillWithCards(cards, "Speicherkarte: " + set.name, handwriting);
+}
+function startDrillWithCards(cards, label, handwriting) {
+  const ids = cards.map(c => c.id);
+  hwStrokes = [];
+  hwFullscreen = false;
+  ui.session = {
+    queue: shuffled(ids),
+    total: ids.length,
+    revealed: false,
+    extraOpen: false,
+    lastAction: null,
+    isDrill: true,
+    handwriting: !!handwriting,
+    drillIds: ids,
+    drillLabel: label
+  };
+  ui.drillOpen = false;
+  ui.tab = "lernen";
+  render();
+}
+
+/* ---------- Karten ---------- */
+function submitCardForm() {
+  const wort = val("f-wort").trim();
+  const ueb = val("f-ueb").trim();
+  const extra = val("f-extra").trim();
+  if (!wort || !ueb) {
+    alert("Bitte Wort und Übersetzung ausfüllen.");
+    return;
+  }
+  if (ui.editId) {
+    const card = findCard(ui.editId);
+    if (card) {
+      card.wort = wort;
+      card.uebersetzung = ueb;
+      card.extra = extra;
+      const stufeEl = document.getElementById("f-stufe");
+      if (stufeEl) {
+        let newStufe = parseInt(stufeEl.value, 10);
+        if (!Number.isInteger(newStufe) || newStufe < 0) newStufe = 0;
+        if (newStufe !== card.stufe) {
+          card.stufe = newStufe;
+          card.nextReview = newStufe === 0 ? todayStr() : dateInDays(intervalForStufe(newStufe));
+        }
+      }
+    }
+    ui.editId = null;
+  } else {
+    currentCards().unshift({
+      id: genId(),
+      wort: wort,
+      uebersetzung: ueb,
+      extra: extra,
+      stufe: 0,
+      nextReview: todayStr()
+    });
+  }
+  persist();
+  render();
+}
+function editCard(id) {
+  ui.editId = id;
+  render();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+function cancelEdit() { ui.editId = null; render(); }
+function deleteCard(id) {
+  const card = findCard(id);
+  if (!card) return;
+  if (!confirm('Karte "' + card.wort + '" wirklich löschen?')) return;
+  const cards = currentCards();
+  cards.splice(cards.findIndex(c => c.id === id), 1);
+  purgeFromSets([id]);
+  persist();
+  render();
+}
+
+/* ---------- Lern-Session ---------- */
+function startSession() {
+  const due = dueCards();
+  if (due.length === 0) return;
+  ui.session = { queue: shuffled(due.map(c => c.id)), total: due.length, revealed: false, extraOpen: false, lastAction: null, isDrill: false, bereichId: currentBereich().id };
+  render();
+}
+function revealAnswer() { ui.session.revealed = true; render(); }
+function toggleExtra() { ui.session.extraOpen = !ui.session.extraOpen; render(); }
+function gradeKnown() {
+  const s = ui.session;
+  const card = findCard(s.queue[0]);
+  if (card && !s.isDrill) {
+    s.lastAction = { cardId: card.id, prevStufe: card.stufe, prevNextReview: card.nextReview, prevQueue: s.queue.slice() };
+    card.stufe = card.stufe + 1;
+    card.nextReview = dateInDays(intervalForStufe(card.stufe));
+  }
+  s.queue.shift();
+  if (s.isDrill && s.queue.length === 0) s.queue = shuffled(s.drillIds);
+  s.revealed = false;
+  s.extraOpen = false;
+  hwStrokes = [];
+  if (!s.isDrill) {
+    persistCardGrade(s.bereichId, card.id, { stufe: card.stufe, nextReview: card.nextReview });
+    if (s.queue.length === 0) checkStreakOnSessionComplete();
+  }
+  render();
+}
+function gradeUnknown() {
+  const s = ui.session;
+  const card = findCard(s.queue[0]);
+  if (card && !s.isDrill) {
+    s.lastAction = { cardId: card.id, prevStufe: card.stufe, prevNextReview: card.nextReview, prevQueue: s.queue.slice() };
+    card.stufe = 0;
+    card.nextReview = todayStr();
+  }
+  const id = s.queue.shift();
+  if (card) {
+    s.queue.push(id);
+  }
+  s.revealed = false;
+  s.extraOpen = false;
+  hwStrokes = [];
+  if (!s.isDrill) {
+    persistCardGrade(s.bereichId, card.id, { stufe: card.stufe, nextReview: card.nextReview });
+    if (s.queue.length === 0) checkStreakOnSessionComplete();
+  }
+  render();
+}
+function undoLastGrade() {
+  const s = ui.session;
+  if (!s || !s.lastAction) return;
+  const card = findCard(s.lastAction.cardId);
+  if (card) {
+    card.stufe = s.lastAction.prevStufe;
+    card.nextReview = s.lastAction.prevNextReview;
+  }
+  s.queue = s.lastAction.prevQueue;
+  s.lastAction = null;
+  s.revealed = true;
+  s.extraOpen = false;
+  if (card) persistCardGrade(s.bereichId, card.id, { stufe: card.stufe, nextReview: card.nextReview });
+  render();
+}
+function endSession() { ui.session = null; hwStrokes = []; hwFullscreen = false; render(); }
+
+/* ---------- Tastatur-Shortcuts während einer Session ---------- */
+document.addEventListener("keydown", e => {
+  if (!ui.session || ui.tab !== "lernen") return;
+  const tag = document.activeElement && document.activeElement.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA") return;
+  const s = ui.session;
+  if (s.queue.length === 0) return;
+  if (e.key === " ") {
+    e.preventDefault();
+    if (!s.revealed) revealAnswer();
+  } else if (e.key === "ArrowRight") {
+    if (s.revealed) gradeKnown();
+  } else if (e.key === "ArrowLeft") {
+    if (s.revealed) gradeUnknown();
+  }
+});
+
+/* ---------- Rendering ---------- */
+function render() {
+  if (!CONFIGURED) { renderSetup(); return; }
+  if (currentUser === null) { renderAuth(); return; }
+  if (bereiche === null) {
+    app.innerHTML = '<div class="panel" style="text-align:center; margin-top:40px">Daten werden geladen…' +
+      (syncError ? '<div class="error-box">' + esc(syncError) + '</div>' : '') + '</div>';
+    return;
+  }
+  if (ui.askImport) { renderImport(); return; }
+  renderMain();
+}
+
+function renderSetup() {
+  app.innerHTML =
+    '<div style="padding-top:32px"><h1>🌱 Adrabic-Wiederholung</h1>' +
+    '<p class="subtitle">Einmalige Einrichtung nötig</p>' +
+    '<div class="panel"><h2>Firebase-Konfiguration fehlt</h2>' +
+    '<p class="setup-steps">Diese Datei ist noch nicht mit eurem Firebase-Projekt verbunden. So geht\'s:</p>' +
+    '<ol class="setup-steps">' +
+    '<li>Auf <code>console.firebase.google.com</code> ein Projekt anlegen.</li>' +
+    '<li>Unter <strong>Authentication → Sign-in method</strong> „E-Mail/Passwort" aktivieren.</li>' +
+    '<li>Unter <strong>Firestore Database</strong> eine Datenbank im Produktionsmodus anlegen und die Sicherheitsregeln einfügen.</li>' +
+    '<li>Unter <strong>Projekteinstellungen → Meine Apps</strong> eine Web-App anlegen und die <code>firebaseConfig</code>-Werte kopieren.</li>' +
+    '<li>Die Werte oben in dieser Datei bei <code>firebaseConfig</code> eintragen (Editor genügt).</li>' +
+    '</ol></div></div>';
+}
+
+function renderAuth() {
+  const m = ui.authMode;
+  let html = '<div style="padding-top:32px">';
+  html += '<h1>🌱 Adrabic-Wiederholung</h1>';
+  html += '<p class="subtitle">' + (m === "register" ? "Neues Konto anlegen – einmalig, dann auf jedem Gerät nutzbar."
+    : m === "reset" ? "Passwort zurücksetzen" : "Anmelden und weiterlernen – auf jedem Gerät.") + '</p>';
+  html += '<div class="panel">';
+  if (m === "register") {
+    html += '<label for="a-name">Dein Name (wird im Programm angezeigt)</label>';
+    html += '<input type="text" id="a-name" maxlength="40" autocomplete="nickname">';
+  }
+  html += '<label for="a-email">E-Mail</label>';
+  html += '<input type="email" id="a-email" autocomplete="email">';
+  if (m !== "reset") {
+    html += '<label for="a-pass">Passwort' + (m === "register" ? " (mindestens 6 Zeichen)" : "") + '</label>';
+    html += '<input type="password" id="a-pass" autocomplete="' + (m === "register" ? "new-password" : "current-password") + '">';
+  }
+  if (ui.authError) html += '<div class="error-box">' + esc(ui.authError) + '</div>';
+  if (ui.authInfo) html += '<div class="info-box">' + esc(ui.authInfo) + '</div>';
+  html += '<div class="form-actions">';
+  const busy = ui.authBusy ? " disabled" : "";
+  if (m === "login") {
+    html += '<button data-action="login"' + busy + '>Anmelden</button>';
+    html += '<button class="secondary" data-action="mode-register"' + busy + '>Neues Konto</button>';
+    html += '<button class="linklike" data-action="mode-reset"' + busy + '>Passwort vergessen?</button>';
+  } else if (m === "register") {
+    html += '<button data-action="register"' + busy + '>Konto anlegen</button>';
+    html += '<button class="secondary" data-action="mode-login"' + busy + '>Zurück zur Anmeldung</button>';
+  } else {
+    html += '<button data-action="reset"' + busy + '>Link zusenden</button>';
+    html += '<button class="secondary" data-action="mode-login"' + busy + '>Zurück zur Anmeldung</button>';
+  }
+  html += '</div></div></div>';
+  app.innerHTML = html;
+
+  const pass = document.getElementById("a-pass");
+  if (pass) pass.addEventListener("keydown", e => {
+    if (e.key === "Enter") (m === "register" ? doRegister() : doLogin());
+  });
+  const email = document.getElementById("a-email");
+  if (email && m === "reset") email.addEventListener("keydown", e => {
+    if (e.key === "Enter") doReset();
+  });
+}
+
+function renderImport() {
+  const profiles = oldLocalProfiles();
+  let html = '<div style="padding-top:32px"><h1>🌱 Adrabic-Wiederholung</h1>';
+  html += '<p class="subtitle">Willkommen, ' + esc(displayName) + '!</p>';
+  html += '<div class="panel"><h2>Alte Karten gefunden</h2>';
+  html += '<p class="hint">Auf diesem Gerät gibt es noch Karten aus der Offline-Version. Sollen sie in dein Konto übernommen werden?</p>';
+  html += '<div class="form-actions">';
+  for (const p of profiles) {
+    html += '<button data-action="import-old" data-name="' + esc(p) + '">Übernehmen von „' + esc(p) + '"</button>';
+  }
+  html += '<button class="secondary" data-action="skip-import">Ohne Import starten</button>';
+  html += '</div></div></div>';
+  app.innerHTML = html;
+}
+
+function renderMain() {
+  let html = "";
+  html += '<div class="topbar">';
+  html += '<div class="who">Angemeldet: <strong>' + esc(displayName) + '</strong>' +
+    (syncError ? ' <span class="sync-dot">⚠ ' + esc(syncError) + '</span>' : '') + '</div>';
+  html += '<div>';
+  html += '<button class="ghost" data-action="logout">Abmelden</button>';
+  html += '<button class="tiny-link" data-action="export-backup" title="Lädt alle Bereiche mit allen Karten herunter">Backup (alle Bereiche)</button>';
+  html += '<button class="tiny-link" data-action="export-backup-current" title="Lädt nur den gerade geöffneten Bereich &quot;' + esc(currentBereich().name) + '&quot; herunter">Nur „' + esc(currentBereich().name) + '" exportieren</button>';
+  html += '<button class="tiny-link" data-action="import-trigger" title="Karten aus einer Backup-Datei importieren">Import</button>';
+  html += '<input type="file" id="import-file-input" accept="application/json" style="display:none">';
+  html += '</div>';
+  html += '</div>';
+
+  const backupAge = daysSinceLastBackup();
+  if (backupAge === null || backupAge >= 14) {
+    html += '<p class="hint" style="margin:-4px 0 12px">💾 ' +
+      (backupAge === null ? "Du hast noch nie ein Backup heruntergeladen." : "Dein letztes Backup ist " + backupAge + " Tage her.") +
+      ' <button class="tiny-link" data-action="export-backup" style="padding:0">Jetzt sichern</button></p>';
+  }
+
+  html += '<div class="pills">';
+  bereiche.forEach((b, i) => {
+    html += '<button class="pill' + (i === ui.bereichIdx ? " active" : "") + '" data-action="select-bereich" data-idx="' + i + '">' + esc(b.name) + '</button>';
+  });
+  html += '<button class="pill add" data-action="add-bereich">+ Bereich</button>';
+  html += '</div>';
+
+  html += '<div class="tabs">';
+  html += '<button class="tab' + (ui.tab === "lernen" ? " active" : "") + '" data-action="tab-lernen">Lernen</button>';
+  html += '<button class="tab' + (ui.tab === "verwalten" ? " active" : "") + '" data-action="tab-verwalten">Verwalten</button>';
+  html += '</div>';
+
+  html += ui.tab === "lernen" ? renderLernen() : renderVerwalten();
+
+  const prevSearchEl = document.getElementById("f-search");
+  const searchWasFocused = !!prevSearchEl && document.activeElement === prevSearchEl;
+  const prevSelStart = searchWasFocused ? prevSearchEl.selectionStart : null;
+
+  app.innerHTML = html;
+
+  const importInput = document.getElementById("import-file-input");
+  if (importInput) {
+    importInput.addEventListener("change", e => {
+      importBackupFile(e.target.files[0]);
+      e.target.value = "";
+    });
+  }
+
+  if (ui.tab === "lernen" && ui.session && ui.session.handwriting && ui.session.queue.length > 0) {
+    setupHandwritingCanvas();
+  }
+
+  if (ui.tab === "verwalten") {
+    ["f-wort", "f-ueb"].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener("keydown", e => {
+        if (e.key === "Enter") submitCardForm();
+      });
+    });
+    const srcEl = document.getElementById("drill-source");
+    if (srcEl) {
+      srcEl.addEventListener("change", e => {
+        ui.drillSource = e.target.value;
+        render();
+      });
+    }
+    const searchEl = document.getElementById("f-search");
+    if (searchEl) {
+      searchEl.addEventListener("input", e => {
+        ui.searchQuery = e.target.value;
+        render();
+      });
+      if (searchWasFocused) {
+        searchEl.focus();
+        const pos = prevSelStart !== null ? prevSelStart : searchEl.value.length;
+        searchEl.setSelectionRange(pos, pos);
+      }
+    }
+  }
+}
+
+function renderLernen() {
+  if (ui.session) return renderSession();
+  const cards = currentCards();
+  const due = dueCards();
+  let html = "";
+  if (streak.count > 0) {
+    html += '<p class="hint" style="margin-bottom:10px">🔥 <strong>' + streak.count + '</strong> Tag' + (streak.count === 1 ? "" : "e") + ' am Stück</p>';
+  }
+  html += '<div class="panel">';
+  if (cards.length === 0) {
+    html += '<p class="hint">Noch keine Karten in diesem Bereich – leg welche unter <strong>Verwalten</strong> an. 📝</p>';
+  } else if (due.length === 0) {
+    html += '<p class="hint">🎉 Für heute nichts mehr fällig in „' + esc(currentBereich().name) + '". Schau morgen wieder rein!</p>';
+  } else {
+    html += '<p class="due-info">Heute fällig: <strong>' + due.length + '</strong> von ' + cards.length + ' Karten</p>';
+    html += '<button data-action="start-session">Lernsession starten (' + due.length + ')</button>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function renderSession() {
+  const s = ui.session;
+  if (s.queue.length === 0) {
+    let html = '<div class="panel done-box">' +
+      '<div class="emoji">🎉</div>' +
+      '<h2>Session fertig!</h2>' +
+      '<p class="hint">Alle ' + s.total + ' Karten für heute geschafft.' +
+      (streak.lastCompletedDate === todayStr() ? ' 🔥 ' + streak.count + ' Tag' + (streak.count === 1 ? "" : "e") + ' am Stück!' : '') +
+      '</p>';
+    if (s.lastAction) {
+      html += '<div style="margin-top:14px"><button class="ghost" data-action="undo-grade">↶ Letzte Bewertung rückgängig machen</button></div>';
+    }
+    html += '<div style="margin-top:16px"><button data-action="end-session">Zurück</button></div></div>';
+    return html;
+  }
+  const card = findCard(s.queue[0]);
+  if (!card) {
+    s.queue.shift();
+    return renderSession();
+  }
+  const remaining = s.queue.length;
+  const promptText = s.handwriting ? card.uebersetzung : card.wort;
+  const promptArabic = !s.handwriting;
+  const answerText = s.handwriting ? card.wort : card.uebersetzung;
+  const answerArabic = s.handwriting;
+  let html = '<div class="panel study-card">';
+  if (s.isDrill) {
+    html += '<div class="drill-banner">🔁 Übungsmodus (' + esc(s.drillLabel) + ')' +
+      (s.handwriting ? ' · ✍️ Handschrift Deutsch → Arabisch' : '') +
+      ' – dein Fortschritt wird hier nicht verändert</div>';
+  }
+  html += '<p class="progress-note">Noch ' + remaining + ' Karte' + (remaining === 1 ? "" : "n") + (s.isDrill ? " in dieser Runde" : " in dieser Session") + '</p>';
+  html += '<div class="study-word' + (promptArabic ? ' arabic' : '') + '">' + esc(promptText) + '</div>';
+  if (!s.revealed) {
+    if (s.handwriting) {
+      html += renderHandwritingCanvas(false);
+    } else {
+      html += '<div style="margin-top:20px"><button data-action="reveal">Antwort zeigen</button></div>';
+    }
+  } else {
+    if (s.handwriting) {
+      html += renderHandwritingCanvas(true);
+    }
+    html += '<div class="study-answer' + (answerArabic ? ' arabic' : '') + '">' + esc(answerText) + '</div>';
+    if (card.extra) {
+      html += '<div style="margin-top:12px"><button class="ghost" data-action="toggle-extra">' +
+        (s.extraOpen ? "▾ Beispiel / Bild verbergen" : "▸ Beispiel / Bild anzeigen") + '</button></div>';
+      if (s.extraOpen) {
+        html += '<div class="study-extra">' + renderExtra(card.extra) + '</div>';
+      }
+    }
+    html += '<div class="grade-row">';
+    html += '<button class="btn-unknown" data-action="grade-unknown">Wusste ich nicht</button>';
+    html += '<button class="btn-known" data-action="grade-known">Wusste ich</button>';
+    html += '</div>';
+  }
+  if (s.lastAction) {
+    html += '<div style="margin-top:10px"><button class="ghost" data-action="undo-grade">↶ Letzte Bewertung rückgängig machen</button></div>';
+  }
+  html += '<div style="margin-top:18px"><button class="ghost" data-action="end-session">' + (s.isDrill ? "Übung beenden" : "Session abbrechen") + '</button></div>';
+  html += '</div>';
+  return html;
+}
+
+/* Handschrift-Canvas: bleibt nach "Fertig" sichtbar, damit die eigene
+   Zeichnung neben der aufgedeckten Lösung stehen bleibt. */
+function renderHandwritingCanvas(revealed) {
+  let html = '<div class="hw-canvas-wrap' + (hwFullscreen ? ' fullscreen' : '') + '">';
+  html += '<canvas id="hw-canvas" width="700" height="260"></canvas>';
+  html += '<div class="hw-toolbar">';
+  html += '<button class="secondary" data-action="hw-clear">🗑️ Löschen</button>';
+  html += '<button class="secondary" data-action="hw-fullscreen">' + (hwFullscreen ? "↙ Verkleinern" : "⛶ Vollbild") + '</button>';
+  if (!revealed) html += '<button data-action="reveal">Fertig</button>';
+  html += '</div></div>';
+  return html;
+}
+
+/* Extra-Feld: Bild-Links als Bild, http(s)-Links klickbar, Rest als Text */
+function renderExtra(extra) {
+  const trimmed = extra.trim();
+  if (/^https?:\/\/\S+\.(png|jpe?g|gif|webp|svg)(\?\S*)?$/i.test(trimmed)) {
+    return '<img src="' + esc(trimmed) + '" alt="Bild" style="max-width:100%;border-radius:8px">';
+  }
+  if (/^https?:\/\/\S+$/i.test(trimmed)) {
+    return '<a href="' + esc(trimmed) + '" target="_blank" rel="noopener noreferrer">' + esc(trimmed) + '</a>';
+  }
+  return esc(extra);
+}
+
+function renderVerwalten() {
+  const cards = currentCards();
+  const editing = ui.editId ? findCard(ui.editId) : null;
+  let html = '<div class="panel">';
+  html += '<h2>' + (editing ? "Karte bearbeiten" : "Neue Karte") + '</h2>';
+  html += '<label for="f-wort">Wort *</label>';
+  html += '<input type="text" id="f-wort" class="arabic" dir="rtl" value="' + (editing ? esc(editing.wort) : "") + '">';
+  html += '<label for="f-ueb">Übersetzung *</label>';
+  html += '<input type="text" id="f-ueb" value="' + (editing ? esc(editing.uebersetzung) : "") + '">';
+  html += '<label for="f-extra">Optional: Beispielsatz, Bild-Link oder Notiz</label>';
+  html += '<textarea id="f-extra" rows="2">' + (editing ? esc(editing.extra) : "") + '</textarea>';
+  if (editing) {
+    html += '<label for="f-stufe">Wiederholungsstufe (0 = sofort fällig, 1 = morgen fällig, 2 = in 2 Tagen, usw.)</label>';
+    html += '<input type="number" id="f-stufe" min="0" step="1" value="' + editing.stufe + '">';
+  }
+  html += '<div class="form-actions">';
+  html += '<button data-action="submit-card">' + (editing ? "Änderungen speichern" : "Karte hinzufügen") + '</button>';
+  if (editing) html += '<button class="secondary" data-action="cancel-edit">Abbrechen</button>';
+  html += '</div></div>';
+
+  html += '<div class="panel">';
+  html += '<div class="bereich-manage-row">';
+  html += '<h2 style="margin-bottom:0">Karten in „' + esc(currentBereich().name) + '" (' + cards.length + ')</h2>';
+  html += '<div>';
+  if (cards.length > 0) html += '<button class="ghost" data-action="open-drill" title="Bestimmte Stufen beliebig oft üben">🔁 Üben</button>';
+  if (cards.length > 1) html += '<button class="ghost" data-action="reverse-order" title="Reihenfolge aller Karten in diesem Bereich einmalig umkehren">🔃 Umkehren</button>';
+  if (cards.length > 0) html += '<button class="ghost" data-action="toggle-select-mode" title="Mehrere Karten auswählen">' + (ui.selectMode ? "✕ Fertig" : "☑️ Auswählen") + '</button>';
+  html += '<button class="ghost" data-action="rename-bereich" title="Bereich umbenennen">✏️ Umbenennen</button>';
+  html += '<button class="ghost" data-action="delete-bereich" title="Bereich löschen">🗑️ Löschen</button>';
+  html += '</div></div>';
+
+  if (ui.drillOpen) {
+    const stufen = availableStufen();
+    const sets = currentSets();
+    const srcSet = ui.drillSource === "stufen" ? null : findSet(ui.drillSource);
+    html += '<div class="drill-picker">';
+    html += '<p class="hint" style="padding-top:0">Was üben? (Fortschritt bleibt dabei unverändert)</p>';
+    html += '<div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">';
+    if (sets.length > 0) {
+      html += '<select id="drill-source">';
+      html += '<option value="stufen"' + (srcSet ? "" : " selected") + '>Nach Stufen</option>';
+      html += sets.map(s => '<option value="' + esc(s.id) + '"' + (srcSet && srcSet.id === s.id ? " selected" : "") + '>⭐ ' + esc(s.name) + ' (' + setCards(s).length + ')</option>').join("");
+      html += '</select>';
+    }
+    if (srcSet) {
+      html += '<span class="hint" style="padding:0">' + setCards(srcSet).length + ' Karte(n)</span>';
+    } else {
+      html += 'von <select id="drill-min">' + stufen.map(s => '<option value="' + s + '">' + s + '</option>').join("") + '</select>';
+      html += 'bis <select id="drill-max">' + stufen.map(s => '<option value="' + s + '"' + (s === stufen[stufen.length - 1] ? " selected" : "") + '>' + s + '</option>').join("") + '</select>';
+    }
+    html += '<button data-action="start-drill">Start</button>';
+    html += '<button class="secondary" data-action="close-drill">Abbrechen</button>';
+    html += '</div>';
+    html += '<label style="display:flex; align-items:center; gap:6px; margin-top:12px; cursor:pointer; font-size:0.92rem; color:var(--ink)">';
+    html += '<input type="checkbox" id="drill-handwriting" style="width:18px;height:18px">';
+    html += '✍️ Handschriftlich üben (Deutsch → Arabisch)';
+    html += '</label>';
+    html += '</div>';
+  }
+
+  if (ui.selectMode && ui.selectedIds.size > 0) {
+    html += '<div class="select-actionbar">';
+    html += '<strong>' + ui.selectedIds.size + '</strong> ausgewählt &nbsp;';
+    html += '<button class="ghost" data-action="delete-selected">🗑️ Löschen</button>';
+    if (bereiche.length > 1) {
+      html += '<select id="move-target-select">' +
+        bereiche.filter((b, i) => i !== ui.bereichIdx).map(b => '<option value="' + esc(b.name) + '">' + esc(b.name) + '</option>').join("") +
+        '</select>';
+      html += '<button class="ghost" data-action="move-selected">↪ Verschieben</button>';
+    }
+    const sets = currentSets();
+    if (sets.length > 0) {
+      html += '<select id="save-set-select">';
+      html += '<option value="__new__">＋ Neue Speicherkarte</option>';
+      html += sets.map(s => '<option value="' + esc(s.id) + '">' + esc(s.name) + '</option>').join("");
+      html += '</select>';
+      html += '<button class="ghost" data-action="save-to-set" title="Ausgewählte Karten in einer Speicherkarte ablegen">⭐ Speichern</button>';
+    } else {
+      html += '<button class="ghost" data-action="save-to-new-set" title="Ausgewählte Karten als Speicherkarte ablegen, um sie später gezielt zu üben">⭐ Als Speicherkarte</button>';
+    }
+    html += '</div>';
+  }
+
+  html += renderSetsPanel();
+
+  const q = ui.searchQuery.trim().toLowerCase();
+  const shownCards = q
+    ? cards.filter(c => c.wort.toLowerCase().includes(q) || c.uebersetzung.toLowerCase().includes(q) || c.extra.toLowerCase().includes(q))
+    : cards;
+
+  if (cards.length === 0) {
+    html += '<p class="hint">Noch keine Karten vorhanden.</p>';
+  } else {
+    html += '<input type="text" id="f-search" placeholder="🔍 Suche nach Wort oder Übersetzung…" value="' + esc(ui.searchQuery) + '" style="margin-bottom:14px">';
+    if (shownCards.length === 0) {
+      html += '<p class="hint">Keine Treffer für „' + esc(ui.searchQuery) + '".</p>';
+    } else {
+      const draggable = !q && !ui.selectMode;
+      if (draggable) html += '<p class="hint" style="margin-bottom:10px">↕ Ziehe eine Karte am ⠿-Griff, um die Reihenfolge zu ändern.</p>';
+      for (let i = 0; i < shownCards.length; i++) {
+        const c = shownCards[i];
+        if (ui.selectMode) {
+          const checked = ui.selectedIds.has(c.id);
+          html += '<div class="card-row" data-action="toggle-card-select" data-id="' + esc(c.id) + '" style="cursor:pointer">';
+          html += '<input type="checkbox" style="pointer-events:none" ' + (checked ? "checked" : "") + '>';
+        } else {
+          html += '<div class="card-row"' + (draggable ? ' data-cardid="' + esc(c.id) + '"' : '') + '>';
+          if (draggable) html += '<span class="drag-handle" title="Ziehen zum Sortieren">⠿</span>';
+        }
+        html += '<div class="words">';
+        html += '<div class="wort arabic">' + esc(c.wort) + '</div>';
+        html += '<div class="uebersetzung">' + esc(c.uebersetzung) + '</div>';
+        if (c.extra) html += '<div class="extra-note">' + renderExtra(c.extra) + '</div>';
+        html += '</div>';
+        html += '<span class="badge">Stufe ' + c.stufe + '</span>';
+        if (!ui.selectMode) {
+          html += '<button class="ghost" data-action="edit-card" data-id="' + esc(c.id) + '" title="Bearbeiten">✏️</button>';
+          html += '<button class="ghost" data-action="delete-card" data-id="' + esc(c.id) + '" title="Löschen">🗑️</button>';
+        }
+        html += '</div>';
+      }
+    }
+  }
+  html += '</div>';
+  return html;
+}
+
+/* Liste der Speicherkarten. Wird nur gezeigt, wenn es welche gibt – solange
+   keine existiert, bleibt der Verwalten-Tab unverändert schlicht. */
+function renderSetsPanel() {
+  const sets = currentSets();
+  if (sets.length === 0) return "";
+  let html = '<div class="drill-picker" style="margin-bottom:14px">';
+  html += '<p class="hint" style="padding:0 0 6px">⭐ Speicherkarten – feste Auswahl an Vokabeln, jederzeit beliebig oft übbar</p>';
+  for (const s of sets) {
+    const cards = setCards(s);
+    const open = ui.openSetId === s.id;
+    html += '<div class="set-row">';
+    html += '<span class="set-name">' + esc(s.name) + '</span>';
+    html += '<span class="badge">' + cards.length + ' Karte' + (cards.length === 1 ? "" : "n") + '</span>';
+    html += '<button class="ghost" data-action="drill-set" data-id="' + esc(s.id) + '" title="Diese Auswahl üben">🔁 Üben</button>';
+    html += '<button class="ghost" data-action="toggle-set-open" data-id="' + esc(s.id) + '" title="Karten anzeigen">' + (open ? "▾" : "▸") + '</button>';
+    html += '<button class="ghost" data-action="rename-set" data-id="' + esc(s.id) + '" title="Umbenennen">✏️</button>';
+    html += '<button class="ghost" data-action="delete-set" data-id="' + esc(s.id) + '" title="Speicherkarte löschen (Vokabeln bleiben erhalten)">🗑️</button>';
+    html += '</div>';
+    if (open) {
+      html += '<div class="set-cards">';
+      if (cards.length === 0) {
+        html += '<p class="hint">Keine Karten mehr in dieser Speicherkarte.</p>';
+      } else {
+        for (const c of cards) {
+          html += '<div class="card-row">';
+          html += '<div class="words"><div class="wort arabic">' + esc(c.wort) + '</div>';
+          html += '<div class="uebersetzung">' + esc(c.uebersetzung) + '</div></div>';
+          html += '<span class="badge">Stufe ' + c.stufe + '</span>';
+          html += '<button class="ghost" data-action="remove-from-set" data-set="' + esc(s.id) + '" data-id="' + esc(c.id) + '" title="Aus dieser Speicherkarte entfernen (Karte bleibt im Bereich)">✕</button>';
+          html += '</div>';
+        }
+      }
+      html += '</div>';
+    }
+  }
+  html += '</div>';
+  return html;
+}
+
+/* ---------- Karten sortieren: per Zeigegerät (Maus UND Touch) ---------- */
+let dragState = null;
+let autoScrollRAF = null;
+
+function updateDragPosition(y) {
+  if (!dragState) return;
+  const row = dragState.row;
+  const parent = row.parentNode;
+  if (!parent) return;
+  const siblings = [...parent.querySelectorAll(".card-row")].filter(r => r !== row);
+  let target = null;
+  for (const sib of siblings) {
+    const rect = sib.getBoundingClientRect();
+    if (y < rect.top + rect.height / 2) { target = sib; break; }
+  }
+  if (target) parent.insertBefore(row, target);
+  else parent.appendChild(row);
+}
+
+function autoScrollTick() {
+  if (!dragState) { autoScrollRAF = null; return; }
+  const margin = 70;   // Bereich am Bildschirmrand, der das Scrollen auslöst
+  const maxSpeed = 16; // Pixel pro Frame, ganz am Rand
+  const y = dragState.clientY;
+  const vh = window.innerHeight;
+  let dy = 0;
+  if (y < margin) {
+    dy = -maxSpeed * Math.min(1, Math.max(0, (margin - y) / margin));
+  } else if (y > vh - margin) {
+    dy = maxSpeed * Math.min(1, Math.max(0, (y - (vh - margin)) / margin));
+  }
+  if (dy !== 0) {
+    window.scrollBy(0, dy);
+    updateDragPosition(y);
+  }
+  autoScrollRAF = requestAnimationFrame(autoScrollTick);
+}
+
+app.addEventListener("pointerdown", e => {
+  const handle = e.target.closest(".drag-handle");
+  if (!handle) return;
+  const row = handle.closest(".card-row");
+  if (!row) return;
+  e.preventDefault();
+  dragState = { pointerId: e.pointerId, row: row, cardid: row.dataset.cardid, clientY: e.clientY };
+  handle.setPointerCapture(e.pointerId);
+  row.classList.add("dragging");
+  if (!autoScrollRAF) autoScrollRAF = requestAnimationFrame(autoScrollTick);
+});
+
+app.addEventListener("pointermove", e => {
+  if (!dragState || e.pointerId !== dragState.pointerId) return;
+  dragState.clientY = e.clientY;
+  updateDragPosition(e.clientY);
+});
+
+function endDrag() {
+  if (!dragState) return;
+  if (autoScrollRAF) { cancelAnimationFrame(autoScrollRAF); autoScrollRAF = null; }
+  const row = dragState.row;
+  const parent = row.parentNode;
+  row.classList.remove("dragging");
+  if (parent) {
+    const newOrderIds = [...parent.querySelectorAll(".card-row")].map(r => r.dataset.cardid);
+    const cards = currentCards();
+    const byId = new Map(cards.map(c => [c.id, c]));
+    const reordered = newOrderIds.map(cid => byId.get(cid)).filter(Boolean);
+    if (reordered.length === cards.length) {
+      cards.length = 0;
+      cards.push(...reordered);
+      persist();
+    }
+  }
+  dragState = null;
+  render();
+}
+app.addEventListener("pointerup", endDrag);
+app.addEventListener("pointercancel", endDrag);
+
+/* ---------- Handschrift-Canvas: Zeichnen per Zeigegerät (Maus/Touch/Stylus) ---------- */
+function drawStrokes(ctx, canvas) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = "#2a2016";
+  ctx.lineWidth = 4;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  for (const stroke of hwStrokes) {
+    if (stroke.length === 1) {
+      ctx.beginPath();
+      ctx.arc(stroke[0].x, stroke[0].y, ctx.lineWidth / 2, 0, Math.PI * 2);
+      ctx.fillStyle = ctx.strokeStyle;
+      ctx.fill();
+      continue;
+    }
+    ctx.beginPath();
+    ctx.moveTo(stroke[0].x, stroke[0].y);
+    for (let i = 1; i < stroke.length; i++) ctx.lineTo(stroke[i].x, stroke[i].y);
+    ctx.stroke();
+  }
+}
+function setupHandwritingCanvas() {
+  const canvas = document.getElementById("hw-canvas");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  drawStrokes(ctx, canvas);
+  let drawing = false;
+  function posFromEvent(e) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: (e.clientX - rect.left) * (canvas.width / rect.width),
+      y: (e.clientY - rect.top) * (canvas.height / rect.height)
+    };
+  }
+  canvas.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    drawing = true;
+    canvas.setPointerCapture(e.pointerId);
+    hwStrokes.push([posFromEvent(e)]);
+    drawStrokes(ctx, canvas);
+  });
+  canvas.addEventListener("pointermove", e => {
+    if (!drawing) return;
+    hwStrokes[hwStrokes.length - 1].push(posFromEvent(e));
+    drawStrokes(ctx, canvas);
+  });
+  function endStroke() { drawing = false; }
+  canvas.addEventListener("pointerup", endStroke);
+  canvas.addEventListener("pointercancel", endStroke);
+}
+
+/* ---------- Event-Delegation ---------- */
+app.addEventListener("click", e => {
+  const btn = e.target.closest("[data-action]");
+  if (!btn) return;
+  switch (btn.dataset.action) {
+    case "login": doLogin(); break;
+    case "register": doRegister(); break;
+    case "reset": doReset(); break;
+    case "mode-login": ui.authMode = "login"; ui.authError = null; ui.authInfo = null; render(); break;
+    case "mode-register": ui.authMode = "register"; ui.authError = null; ui.authInfo = null; render(); break;
+    case "mode-reset": ui.authMode = "reset"; ui.authError = null; ui.authInfo = null; render(); break;
+    case "logout": doLogout(); break;
+    case "import-old": importOldProfile(btn.dataset.name); break;
+    case "skip-import": ui.askImport = false; persist(); render(); break;
+    case "select-bereich": selectBereich(Number(btn.dataset.idx)); break;
+    case "add-bereich": addBereich(); break;
+    case "rename-bereich": renameBereich(); break;
+    case "delete-bereich": deleteBereich(); break;
+    case "tab-lernen": ui.tab = "lernen"; ui.editId = null; ui.searchQuery = ""; ui.selectMode = false; ui.selectedIds = new Set(); ui.drillOpen = false; render(); break;
+    case "tab-verwalten": ui.tab = "verwalten"; ui.session = null; render(); break;
+    case "start-session": startSession(); break;
+    case "reveal": revealAnswer(); break;
+    case "toggle-extra": toggleExtra(); break;
+    case "grade-known": gradeKnown(); break;
+    case "grade-unknown": gradeUnknown(); break;
+    case "undo-grade": undoLastGrade(); break;
+    case "end-session": endSession(); break;
+    case "submit-card": submitCardForm(); break;
+    case "edit-card": editCard(btn.dataset.id); break;
+    case "cancel-edit": cancelEdit(); break;
+    case "delete-card": deleteCard(btn.dataset.id); break;
+    case "reverse-order": reverseOrder(); break;
+    case "toggle-select-mode": toggleSelectMode(); break;
+    case "toggle-card-select": toggleCardSelected(btn.dataset.id); break;
+    case "delete-selected": deleteSelectedCards(); break;
+    case "move-selected": {
+      const sel = document.getElementById("move-target-select");
+      if (sel && sel.value) moveSelectedCardsTo(sel.value);
+      break;
+    }
+    case "open-drill": openDrillPicker(); break;
+    case "close-drill": ui.drillOpen = false; render(); break;
+    case "start-drill": {
+      const hwEl = document.getElementById("drill-handwriting");
+      const hw = hwEl && hwEl.checked;
+      if (ui.drillSource !== "stufen" && findSet(ui.drillSource)) {
+        startDrillFromSet(ui.drillSource, hw);
+        break;
+      }
+      const minEl = document.getElementById("drill-min");
+      const maxEl = document.getElementById("drill-max");
+      if (minEl && maxEl) {
+        const a = parseInt(minEl.value, 10), b = parseInt(maxEl.value, 10);
+        startDrill(Math.min(a, b), Math.max(a, b), hw);
+      }
+      break;
+    }
+    case "save-to-new-set": saveSelectedToSet("__new__"); break;
+    case "save-to-set": {
+      const sel = document.getElementById("save-set-select");
+      if (sel && sel.value) saveSelectedToSet(sel.value);
+      break;
+    }
+    case "drill-set": openDrillPicker(btn.dataset.id); break;
+    case "toggle-set-open": toggleSetOpen(btn.dataset.id); break;
+    case "rename-set": renameSet(btn.dataset.id); break;
+    case "delete-set": deleteSet(btn.dataset.id); break;
+    case "remove-from-set": removeCardFromSet(btn.dataset.set, btn.dataset.id); break;
+    case "hw-clear": hwStrokes = []; render(); break;
+    case "hw-fullscreen": hwFullscreen = !hwFullscreen; render(); break;
+    case "export-backup": exportBackup(false); break;
+    case "export-backup-current": exportBackup(true); break;
+    case "import-trigger": {
+      const el = document.getElementById("import-file-input");
+      if (el) el.click();
+      break;
+    }
+  }
+});
+
+/* ---------- Start ---------- */
+if (CONFIGURED) {
+  initFirebase().catch(e => {
+    app.innerHTML = '<div class="panel" style="margin-top:40px"><h2>Start fehlgeschlagen</h2>' +
+      '<p class="hint">Firebase konnte nicht geladen werden. Bitte Internetverbindung prüfen und die Seite neu laden.</p>' +
+      '<div class="error-box">' + esc(e && e.message ? e.message : String(e)) + '</div></div>';
+  });
+} else {
+  render();
+}
+
+/* ---------- Offline-Fähigkeit: Service Worker registrieren ---------- */
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
