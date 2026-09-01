@@ -86,6 +86,12 @@ function voiceBadges(v) {
 const AUDIO_BASE = "/audio";
 const HARAKAT_AUDIO_ENABLED = false;
 const WORD_AUDIO_ENABLED = false;
+// Buchstaben-Aufnahmen (public/audio/letters/ba.mp3 usw.). Frueher wurde hier
+// hart "/letters/<key>.mp3" gebaut — ohne AUDIO_BASE und ohne Schalter. Da die
+// Dateien nicht existieren, lief bei JEDER Laut-Frage erst ein Fehlversuch und
+// dann erst TTS: hoerbare Verzoegerung. Jetzt wie bei Harakat/Woertern ueber
+// einen Schalter, der erst auf true geht, wenn die Dateien wirklich da sind.
+const LETTER_AUDIO_ENABLED = false;
 
 // Dateinamen-tauglicher ASCII-Slug aus einer Transliteration.
 // Muss identisch zur slugify-Funktion im Generier-Skript sein, sonst
@@ -102,6 +108,9 @@ function slugify(s) {
 
 function harakatAudioSrc(letterKey, harakaId) {
   return `${AUDIO_BASE}/harakat/${letterKey}_${harakaId}.mp3`;
+}
+function letterAudioSrc(letterKey) {
+  return `${AUDIO_BASE}/letters/${letterKey}.mp3`;
 }
 function wordAudioSrc(item) {
   if (item.audio) return item.audio; // explizit gesetzter Pfad hat Vorrang
@@ -231,8 +240,12 @@ const HARAKAT = [
 //  QURAN-INHALTE
 //  ----------------------------------------------------------
 //  VERSE (alles mit tagAyat(..., surah, ayah)):
-//  Die `ar`-Texte hier sind aus dem Gedaechtnis eingetragen und koennen
-//  in einzelnen Zeichen (Tashkil/Rasm) falsch sein. Sie werden zur
+//  Herkunft der `ar`-Texte ist gemischt: die spaeter ergaenzten Bloecke
+//  (MULK_12_30, QALAM_17_52, HAQQA_11_52, MAARIJ_1_44) wurden gegen
+//  quran.com/alim.org abgeglichen, die ersten Haeppchen (MULK_1_5,
+//  MULK_6_11, QALAM_1_16, HAQQA_1_10) sind aus dem Gedaechtnis eingetragen.
+//  Behandelt werden ALLE gleich: als potenziell in einzelnen Zeichen
+//  (Tashkil/Rasm) falsch. Sie werden zur
 //  Laufzeit NICHT mehr angezeigt, solange der geprüfte Text von
 //  quranenc.com geladen werden kann (siehe fetchAyah weiter unten) —
 //  der wird pro Vers geholt, gecached und bevorzugt gerendert.
@@ -592,17 +605,27 @@ function fmtTime(ms) {
 // Aufnahme vorhanden, deshalb im Buchstaben-Quiz aussen vor.
 const QUIZ_LETTERS = LETTERS.filter((l) => l.key !== "lamalif");
 
+// Nicht-verbindende Buchstaben (Alif, Dāl, Ḏāl, Rāʾ, Zāy, Wāw) haben nur
+// isoliert + final — und ihre Finalform sieht der Isolierform zum Verwechseln
+// aehnlich. In "Form→Buchstabe" stuende die richtige Antwort damit praktisch
+// sichtbar als Option daneben: die Frage waere geschenkt. Darum kommen dort
+// nur verbindende Buchstaben als ZIEL vor; als Ablenker und im Modus
+// "Laut→Form" sind alle weiter dabei, ebenso im Modul "Aehnliche Buchstaben".
+const FORM_QUIZ_LETTERS = QUIZ_LETTERS.filter((l) => l.connectsAfter);
+
 function makeLetterQuestion(mode) {
-  const target = randOf(QUIZ_LETTERS);
+  const isForm2Letter = mode === "form2letter";
+  const target = randOf(isForm2Letter ? FORM_QUIZ_LETTERS : QUIZ_LETTERS);
   const posKeys = Object.keys(target.forms);
   // Im Modus Form→Buchstabe nie die isolierte Form abfragen: die Antwort-
   // Optionen zeigen die isolierten Grundformen — die Frage stuende sonst
   // identisch als richtige Antwort sichtbar da.
-  const askable = mode === "form2letter" ? posKeys.filter((p) => p !== "isolated") : posKeys;
+  const askable = isForm2Letter ? posKeys.filter((p) => p !== "isolated") : posKeys;
   const pos = randOf(askable.length ? askable : posKeys);
   const badge = `Position: ${POS_LABEL[pos]}`;
+  const audioSrc = LETTER_AUDIO_ENABLED ? letterAudioSrc(target.key) : null;
 
-  if (mode === "form2letter") {
+  if (isForm2Letter) {
     const distractors = shuffle(QUIZ_LETTERS.filter((l) => l.key !== target.key)).slice(0, 3);
     const options = shuffle([target, ...distractors]).map((l) => ({
       label: l.forms.isolated,
@@ -612,7 +635,7 @@ function makeLetterQuestion(mode) {
     return {
       audio: false,
       speakText: target.base,
-      audioSrc: "/letters/" + target.key + ".mp3",
+      audioSrc,
       badge,
       prompt: target.forms[pos],
       promptArabic: true,
@@ -620,12 +643,16 @@ function makeLetterQuestion(mode) {
       options,
     };
   }
-  // sound2form
-  const others = shuffle(QUIZ_LETTERS.filter((l) => l.key !== target.key)).slice(0, 3);
+  // sound2form: Ablenker muessen dieselbe Positionsform WIRKLICH besitzen.
+  // Vorher fielen nicht-verbindende Buchstaben auf ihre Isolierform zurueck,
+  // waehrend das Badge "in der Mitte" behauptete — die Option war dann schon
+  // an der Form als falsch zu erkennen, ohne den Laut gehoert zu haben.
+  const pool = QUIZ_LETTERS.filter((l) => l.key !== target.key && l.forms[pos]);
+  const others = shuffle(pool).slice(0, 3);
   const options = shuffle([
     { label: target.forms[pos], correct: true, arabic: true },
     ...others.map((l) => ({
-      label: l.forms[pos] || l.forms.isolated,
+      label: l.forms[pos],
       correct: false,
       arabic: true,
     })),
@@ -633,7 +660,7 @@ function makeLetterQuestion(mode) {
   return {
     audio: true,
     speakText: target.base,
-    audioSrc: "/letters/" + target.key + ".mp3",
+    audioSrc,
     badge,
     prompt: null,
     promptArabic: false,
@@ -1299,7 +1326,7 @@ const CHECKLIST = [
   { id: "c02", cat: "alphabet", text: "Ich unterscheide ähnlich aussehende Buchstaben (ب/ت/ث/ن/ي) im Mushaf" },
   { id: "c03", cat: "harakat", text: "Ich kenne die drei Kurzvokale: Fatha (a), Kasra (i), Damma (u)" },
   { id: "c04", cat: "harakat", text: "Ich lese Wörter mit Sukūn im Qurʾān (z. B. قَدْ, لَمْ, قُلْ)" },
-  { id: "c05", cat: "harakat", text: "Ich lese Wörter mit Tanwīn (رَجُلٌ, قَلْبٍ, شُكْرًا)" },
+  { id: "c05", cat: "harakat", text: "Ich lese Wörter mit Tanwīn (رَجُلٌ, يَوْمٍ, شُكْرًا)" },
   { id: "c18", cat: "harakat", text: "Ich lese Wörter mit Tāʾ marbūṭa (ة): beim Anhalten „h“, beim Weiterlesen „t“ (سَنَة, رَحْمَة)" },
   { id: "c06", cat: "harakat", text: "Ich lese Wörter mit Shadda im Qurʾān (z. B. إِنَّ, رَبّ, حَقّ)" },
   { id: "c07", cat: "harakat", text: "Ich lese Wörter mit Madd Aslī / natürlichem Madd (قَالَ, يَقُولُ, قِيلَ)" },
@@ -1539,8 +1566,12 @@ function ArabTrainerApp() {
   const statLabel = hasPacks
     ? (curMod.packs.find((p) => p.id === packId) || {}).label || curMod.title
     : (curMode && curMode.label) || curMod.title;
-  // Aussprache-Check und Lesehilfen haben keine gespeicherte Statistik; Auto-Modus ebenfalls nicht.
-  const showStats = !isPronun && !isGuide && !(autoMode && isChoice);
+  // Aussprache-Check und Lesehilfen haben keine gespeicherte Statistik; Auto-Modus
+  // ebenfalls nicht — und die Leseverfolgung genauso wenig (finish() kehrt dort
+  // ohne Speichern zurueck). Sonst stuende ein Statistik-Kasten da, in den nie
+  // etwas eingetragen wird.
+  const showStats =
+    !isPronun && !isGuide && !(autoMode && isChoice) && !(followMode && isReading);
 
   // Lesen-Checkliste (Selbst-Abhaken)
   const [checklistDone, setChecklistDone] = useState(() => loadChecklist());
@@ -1639,7 +1670,11 @@ function ArabTrainerApp() {
     const u = new SpeechSynthesisUtterance(text);
     if (selectedVoice) u.voice = selectedVoice;
     u.lang = selectedVoice ? selectedVoice.lang : "ar-SA";
-    u.rate = 0.85;
+    // 0.85 ist die ruhige Grundgeschwindigkeit; die Tempo-Auswahl (0,5×…1,25×)
+    // wirkte bisher nur auf die Rezitations-Dateien, nicht auf den TTS-Fallback.
+    // Nach unten/oben begrenzt, weil sehr niedrige Raten bei manchen Stimmen
+    // gar nichts mehr ausgeben.
+    u.rate = Math.min(2, Math.max(0.5, 0.85 * rate));
     u.onstart = () => {
       setAudioPlaying(true);
       if (handlers.onStart) handlers.onStart();
@@ -1701,7 +1736,9 @@ function ArabTrainerApp() {
   }
 
   // Fuer Auswahl-Module (Buchstaben/Harakat): nutzt die statische Datei der
-  // Frage, sonst TTS. q.audioSrc ist null, solange die Dateien nicht aktiv sind.
+  // Frage, sonst TTS. q.audioSrc ist null, solange die Dateien nicht aktiv sind
+  // (LETTER_AUDIO_ENABLED / HARAKAT_AUDIO_ENABLED) — dann geht es direkt an TTS,
+  // ohne den Umweg ueber einen fehlschlagenden Ladeversuch.
   function playPrompt(qq) {
     playFileOrTTS(qq.audioSrc, qq.speakText);
   }
@@ -1997,14 +2034,21 @@ function ArabTrainerApp() {
   function readingRate(ok) {
     stopAudio();
     const item = rQueue[rIdx];
-    setAnswered((n) => n + 1);
+    // Die neuen Werte hier ausrechnen, NICHT nur setState aufrufen: wenn die
+    // letzte Karte bewertet wird, laeuft finish() noch im selben Durchlauf.
+    // React hat den State dann noch nicht aktualisiert — finish() haette die
+    // letzte Antwort sonst gar nicht mitgezaehlt (und bei einem Paket mit nur
+    // einer Karte gar nichts gespeichert).
+    const nAnswered = answered + 1;
+    const nCorrect = ok ? correct + 1 : correct;
+    const nStreak = ok ? streak + 1 : 0;
+    const nBestStreak = Math.max(bestStreak, nStreak);
+
+    setAnswered(nAnswered);
     if (ok) {
-      setCorrect((c) => c + 1);
-      setStreak((s) => {
-        const ns = s + 1;
-        setBestStreak((b) => Math.max(b, ns));
-        return ns;
-      });
+      setCorrect(nCorrect);
+      setStreak(nStreak);
+      setBestStreak(nBestStreak);
     } else {
       setWrong((w) => w + 1);
       setStreak(0);
@@ -2015,13 +2059,22 @@ function ArabTrainerApp() {
     setRQueue(newQueue);
     setRevealed(false);
     if (nextIdx >= newQueue.length) {
-      finish();
+      finish({ answered: nAnswered, correct: nCorrect, bestStreak: nBestStreak });
     } else {
       setRIdx(nextIdx);
     }
   }
 
-  function finish() {
+  // `totals` ist optional. Wird finish() aus einem Handler heraus aufgerufen,
+  // der im selben Durchlauf noch gezaehlt hat (siehe readingRate), muessen die
+  // frischen Werte mitkommen — der State hinkt an der Stelle noch hinterher.
+  function finish(totals) {
+    // Achtung: finish wird auch direkt als onClick-Handler ("Fertig") benutzt
+    // und bekommt dann ein Event statt Zahlen. Darum explizit pruefen.
+    const t = totals && typeof totals.answered === "number" ? totals : null;
+    const finAnswered = t ? t.answered : answered;
+    const finCorrect = t ? t.correct : correct;
+    const finBestStreak = t ? t.bestStreak : bestStreak;
     clearAutoTimers();
     if (synthRef.current) synthRef.current.cancel();
     stopAudio();
@@ -2037,16 +2090,16 @@ function ArabTrainerApp() {
     }
     setFinalMs(startTs ? Date.now() - startTs : 0);
     // Statistik nur zusammenfuehren, wenn wirklich etwas beantwortet wurde
-    if (answered > 0) {
+    if (finAnswered > 0) {
       setStatsMap((prev) => {
         const old = prev[statKey] || { runs: 0, answered: 0, correct: 0, bestStreak: 0 };
         const merged = {
           ...prev,
           [statKey]: {
             runs: old.runs + 1,
-            answered: old.answered + answered,
-            correct: old.correct + correct,
-            bestStreak: Math.max(old.bestStreak, bestStreak),
+            answered: old.answered + finAnswered,
+            correct: old.correct + finCorrect,
+            bestStreak: Math.max(old.bestStreak, finBestStreak),
             lastTs: Date.now(),
           },
         };
@@ -2244,7 +2297,7 @@ function ArabTrainerApp() {
             chosen={chosen}
             locked={locked}
             onChoose={choose}
-            onFinish={finish}
+            onFinish={() => finish()}
             onReplay={() => playPrompt(q)}
             correct={correct}
             wrong={wrong}
@@ -2297,7 +2350,7 @@ function ArabTrainerApp() {
                 playReadingAudio(rItem);
               }
             }}
-            onFinish={finish}
+            onFinish={() => finish()}
             correct={correct}
             wrong={wrong}
             streak={streak}
@@ -3179,12 +3232,16 @@ function StartScreen({
                         textAlign: "left",
                       }}
                     >
-                      <span>
-                        <div style={{ fontWeight: 600, fontSize: 13.5 }}>{v.name}</div>
-                        <div style={{ fontSize: 11.5, color: C.sub, marginTop: 2 }}>
+                      <span style={{ display: "block", minWidth: 0 }}>
+                        <span style={{ display: "block", fontWeight: 600, fontSize: 13.5 }}>
+                          {v.name}
+                        </span>
+                        <span
+                          style={{ display: "block", fontSize: 11.5, color: C.sub, marginTop: 2 }}
+                        >
                           {v.lang}
                           {badges.length ? " · " + badges.join(", ") : ""}
-                        </div>
+                        </span>
                       </span>
                       <span style={{ fontSize: 18, color: C.gold, flexShrink: 0 }}>▶</span>
                     </button>
@@ -3949,7 +4006,7 @@ function PronunciationScreen({ C, fontStack, items, rule, packLabel, onExit }) {
   // Enter als Shortcut: erst auflösen, dann weiter (nützlich mit iPad-Tastatur).
   useEffect(() => {
     function onKey(e) {
-      if (e.key !== "Enter") return;
+      if (e.key !== "Enter" && e.key !== " ") return;
       e.preventDefault();
       if (!revealed) reveal();
       else next();
