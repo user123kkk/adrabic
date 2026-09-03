@@ -2,6 +2,36 @@
 
 Neueste Version oben. Einträge werden **ergänzt**, nie ersetzt.
 
+## 1.7.0 – 3. September 2026
+
+**Neue Funktionen**
+- **Fortschritts-Tab**: Stufenverteilung in vier Farben (neu/wackelig/im Aufbau/sitzt),
+  7-Tage-Vorschau mit Warnung ab 60 Karten/Tag, 30-Tage-Verlauf neu eingeführter Karten.
+  Umschalter zwischen allen Bereichen und nur dem offenen Bereich. Rechnet nichts neu,
+  speichert nichts – nur Anzeige aus vorhandenen Feldern.
+- **Verbrannte Karten**: Nach 5 Rückfällen wird eine Karte im Fortschritts-Tab rot
+  gekennzeichnet (🔥-Plakette) – Signal, dass die Karte umformuliert oder geteilt werden
+  sollte statt einfach immer wieder versucht zu werden. Im Verwalten-Tab mit Badge.
+  Übungsmodus zählt nicht, der Zähler wird nur beim echten Lernen hochgezählt.
+- **Bibliothek-Tab**: Öffentliche, nur lesbare Sammlung fertiger Kartensätze (Firestore
+  `library`). Jeder Satz kann mit „+ In mein Konto kopieren" als neuer Bereich übernommen
+  werden – mit eigenem Fortschritt, alle Karten starten auf Stufe 0. Der Betreiber pflegt
+  die Sätze über die Firebase-Konsole, die App bietet dafür keine Verwaltungsoberfläche.
+  Wird erst geladen, wenn der Tab tatsächlich geöffnet wird (Kostenersparnis).
+- **E-Mail-Bestätigung**: Nach der Registrierung wird eine Bestätigungs-E-Mail versendet.
+  Die App sperrt sich selbst, bis der Nutzer den Link bestätigt hat. Verhindert
+  Fake-Registrierungen mit erfundenen Adressen. Button „E-Mail erneut senden" auf der
+  Verifikations-Seite, falls der Link nicht ankommt.
+
+**Datenformat**
+- Neu: `karten.*.rueckfaelle` (Zähler für Rückfälle beim Bewerten). Alte Karten starten
+  bei 0; die Zählung beginnt mit dem Einbau. Nach 5 Rückfällen gelten Karten als
+  „verbrannt" und werden gekennzeichnet.
+
+**Sonstiges**
+- Reste von E1 (Massen-Import) aufgeräumt – leere Zeilen und verwaiste Kommentare
+  entfernt.
+  
 ## 1.6.0 – 3. September 2026
 
 **Lernlogik**
