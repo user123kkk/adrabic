@@ -227,8 +227,6 @@
   .limit-row select { padding: 8px 10px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--card); color: var(--ink); font: inherit; }
   .limit-row select option { background: var(--card); color: var(--ink); }
 
-
-
   .progress-note { font-size: 0.85rem; color: var(--ink-soft); margin-bottom: 10px; }
 
   .done-box { text-align: center; padding: 36px 20px; }
@@ -284,6 +282,31 @@
   .spark-reihe.oben { margin-bottom: 5px; }
   .spark-reihe.unten { margin-top: 6px; }
   .spark-spanne { display: flex; justify-content: space-between; margin-top: 6px; font-size: 0.7rem; color: var(--ink-soft); }
+
+  /* E6: Hinweis auf eine Karte, die immer wieder zurückfällt. Bewusst in Rot
+     und nicht in Gold - es ist keine Auszeichnung, sondern eine Aufforderung,
+     die Karte zu ändern. */
+  .leech-banner {
+    background: var(--red-soft);
+    color: var(--red);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    font-size: 0.85rem;
+    margin-top: 14px;
+    text-align: left;
+  }
+  .leech-badge {
+    background: var(--red-soft);
+    color: var(--red);
+    border-radius: 999px;
+    padding: 3px 10px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .leech-row { display: flex; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .leech-row:last-of-type { border-bottom: none; }
+  .leech-row .words { flex: 1; min-width: 0; }
 
   .setup-steps { font-size: 0.92rem; color: var(--ink-soft); }
   .setup-steps li { margin: 8px 0 8px 18px; }
@@ -358,7 +381,7 @@ const firebaseConfig = {
 
 /* Versionsnummer: bei jeder Veroeffentlichung hochzaehlen und denselben Wert
    als CACHE_NAME in sw.js eintragen, damit alte Dateien verworfen werden. */
-const APP_VERSION = "1.6.0";
+const APP_VERSION = "1.7.0";
 
 const CONFIGURED = firebaseConfig.apiKey !== "HIER_EINFUEGEN";
 const app = document.getElementById("app");
@@ -445,6 +468,11 @@ function shuffled(arr) {
    Platzhalter. Stufe 0 → gilt als neu und laeuft einmalig durch das Tageslimit.
    Das ist gewollt: sonst braechte das Limit beim ersten grossen Import nichts. */
 const LEGACY_FIRST_GRADE = "1970-01-01"; // "schon bewertet, Datum unbekannt"
+/* E6: Ab wie vielen Rueckfaellen gilt eine Karte als "verbrannt"? Anki nennt
+   solche Karten leeches. Wenige davon fressen sonst einen Grossteil der
+   Lernzeit, ohne je zu sitzen - meist liegt es an der Karte selbst
+   (zu viel auf einmal, unklare Uebersetzung), nicht am Gedaechtnis. */
+const LEECH_SCHWELLE = 5;
 function normCard(c) {
   const stufe = Number.isInteger(c.stufe) && c.stufe >= 0 ? c.stufe : 0;
   let erste = null;
@@ -457,10 +485,15 @@ function normCard(c) {
     extra: typeof c.extra === "string" ? c.extra : "",
     stufe: stufe,
     nextReview: /^\d{4}-\d{2}-\d{2}$/.test(c.nextReview) ? c.nextReview : todayStr(),
-    ersteBewertung: erste
+    ersteBewertung: erste,
+    /* E6: Karten von vor 1.7.0 haben das Feld nicht - sie starten bei 0.
+       Rueckwirkend laesst es sich nicht rekonstruieren, die Zaehlung beginnt
+       also mit dem Einbau. */
+    rueckfaelle: Number.isInteger(c.rueckfaelle) && c.rueckfaelle >= 0 ? c.rueckfaelle : 0
   };
 }
 function istNeueKarte(c) { return !c.ersteBewertung; }
+function istVerbrannt(c) { return (c.rueckfaelle || 0) >= LEECH_SCHWELLE; }
 /* Speicherkarte = benannte Merkliste. Sie speichert NUR Karten-IDs, keine Kopien
    der Karten. Dadurch bleibt jede Karte genau einmal im Bereich vorhanden:
    Änderungen am Wort oder an der Stufe wirken automatisch auch hier, und Üben
@@ -504,7 +537,7 @@ function bereicheArrayToMap(arr) {
   arr.forEach((b, bi) => {
     const kartenMap = {};
     b.karten.forEach((c, ci) => {
-      kartenMap[c.id] = { wort: c.wort, uebersetzung: c.uebersetzung, extra: c.extra, stufe: c.stufe, nextReview: c.nextReview, ersteBewertung: c.ersteBewertung === undefined ? null : c.ersteBewertung, order: ci };
+      kartenMap[c.id] = { wort: c.wort, uebersetzung: c.uebersetzung, extra: c.extra, stufe: c.stufe, nextReview: c.nextReview, ersteBewertung: c.ersteBewertung === undefined ? null : c.ersteBewertung, rueckfaelle: c.rueckfaelle || 0, order: ci };
     });
     const setsMap = {};
     (Array.isArray(b.sets) ? b.sets : []).forEach((s, si) => {
@@ -521,7 +554,7 @@ function bereicheMapToArray(mapObj) {
     const kartenMap = b.karten && typeof b.karten === "object" ? b.karten : {};
     const karten = Object.keys(kartenMap).map(cid => {
       const c = kartenMap[cid] || {};
-      return { card: normCard({ id: cid, wort: c.wort, uebersetzung: c.uebersetzung, extra: c.extra, stufe: c.stufe, nextReview: c.nextReview, ersteBewertung: c.ersteBewertung }), order: Number.isFinite(c.order) ? c.order : 0 };
+      return { card: normCard({ id: cid, wort: c.wort, uebersetzung: c.uebersetzung, extra: c.extra, stufe: c.stufe, nextReview: c.nextReview, ersteBewertung: c.ersteBewertung, rueckfaelle: c.rueckfaelle }), order: Number.isFinite(c.order) ? c.order : 0 };
     }).sort((x, y) => x.order - y.order).map(x => x.card);
     const setsMap = b.sets && typeof b.sets === "object" ? b.sets : {};
     const sets = Object.keys(setsMap).map(sid => {
@@ -576,10 +609,6 @@ let ui = {
   drillSource: "stufen",      // "stufen" oder die ID einer Speicherkarte
   openSetId: null,            // Speicherkarte, deren Kartenliste aufgeklappt ist
 };
-
-/* E1: Der eingefügte Text darf ein render() ueberleben - genau wie formDraft.
-   Ein Cloud-Snapshot mitten im Einfuegen wuerde sonst 80 Vokabeln loeschen. */
-
 
 /* ---------- Formular-Entwurf ----------
    render() baut das gesamte DOM neu. Ohne diesen Zwischenspeicher waere jede
@@ -722,6 +751,10 @@ function persistCardGrade(bereichId, cardId, fields) {
   /* B3: gehoert zum Bewerten dazu - sonst gilt eine heute eingefuehrte Karte auf
      dem naechsten Geraet wieder als neu und frisst das Tageslimit ein zweites Mal. */
   patch[base + ".ersteBewertung"] = fields.ersteBewertung === undefined ? null : fields.ersteBewertung;
+  /* E6: gehoert zum selben Schreibvorgang. Ein eigener Aufruf waere ein
+     zweiter Schreibzugriff pro Bewertung - und koennte einzeln fehlschlagen,
+     sodass Stufe und Rueckfallzaehler auseinanderlaufen. */
+  patch[base + ".rueckfaelle"] = Number.isInteger(fields.rueckfaelle) ? fields.rueckfaelle : 0;
   fb.updateDoc(userDocRef, patch).catch(e => {
     if (!saveWarned) {
       saveWarned = true;
@@ -986,6 +1019,42 @@ function neuVerlauf(cards, tage) {
   return out;
 }
 
+/* E6: alle verbrannten Karten im gewaehlten Umfang, die schlimmste zuerst.
+   Der Bereich wird mitgegeben, weil die Liste im Fortschritts-Tab auch
+   bereichsuebergreifend sein kann und die Knoepfe wissen muessen, wohin. */
+function verbrannteKarten() {
+  if (bereiche === null) return [];
+  const quelle = ui.statsScope === "bereich" ? [currentBereich()] : bereiche;
+  const out = [];
+  for (const b of quelle) {
+    for (const c of b.karten) if (istVerbrannt(c)) out.push({ card: c, bereich: b });
+  }
+  return out.sort((x, y) => y.card.rueckfaelle - x.card.rueckfaelle);
+}
+/* Zaehler von Hand zuruecksetzen - fuer den Fall, dass die Karte in Ordnung
+   ist und nur eine schlechte Phase hatte. */
+function resetRueckfaelle(bereichId, cardId) {
+  const b = bereiche.find(x => x.id === bereichId);
+  const c = b && b.karten.find(x => x.id === cardId);
+  if (!c) return;
+  c.rueckfaelle = 0;
+  persist();
+  render();
+}
+/* Aus dem Fortschritts-Tab direkt zur Karte springen: Bereich wechseln,
+   Verwalten oeffnen, Formular mit der Karte fuellen. */
+function editCardInBereich(bereichId, cardId) {
+  const idx = bereiche.findIndex(x => x.id === bereichId);
+  if (idx < 0) return;
+  ui.bereichIdx = idx;
+  ui.tab = "verwalten";
+  ui.session = null;
+  ui.searchQuery = "";
+  ui.selectMode = false;
+  ui.selectedIds = new Set();
+  editCard(cardId);
+}
+
 const LAST_BACKUP_KEY = "adrabic-last-backup";
 function daysSinceLastBackup() {
   const raw = localStorage.getItem(LAST_BACKUP_KEY);
@@ -1074,8 +1143,6 @@ function selectBereich(idx) {
   ui.drillOpen = false;
   ui.drillSource = "stufen";
   ui.openSetId = null;
-  /* Die Duplikatprüfung der Vorschau gilt immer für genau einen Bereich –
-     nach dem Wechsel wäre sie falsch, also zurücksetzen. */
   render();
 }
 function renameBereich() {
@@ -1310,6 +1377,11 @@ function submitCardForm() {
   if (ui.editId) {
     const card = findCard(ui.editId);
     if (card) {
+      /* E6: Wer eine verbrannte Karte umformuliert, hat genau das getan, was
+         der Hinweis verlangt - dann faengt die Zaehlung wieder bei null an.
+         Nur bei geaendertem Wort oder geaenderter Uebersetzung; eine Notiz
+         oder eine korrigierte Stufe aendert die Karte nicht wirklich. */
+      if (card.wort !== wort || card.uebersetzung !== ueb) card.rueckfaelle = 0;
       card.wort = wort;
       card.uebersetzung = ueb;
       card.extra = extra;
@@ -1336,7 +1408,8 @@ function submitCardForm() {
       extra: extra,
       stufe: 0,
       nextReview: todayStr(),
-      ersteBewertung: null   // B3: noch nie bewertet = neue Karte
+      ersteBewertung: null,  // B3: noch nie bewertet = neue Karte
+      rueckfaelle: 0         // E6
     });
   }
   resetFormDraft();
@@ -1390,11 +1463,15 @@ function gradeCard(kind) {
      waehrend diese Session offen ist. Frueher stuerzte hier card.id ab. */
   const card = findCard(s.queue[0]);
   if (card && !s.isDrill) {
+    /* E6: vor der Aenderung merken - direkt darunter wird ersteBewertung
+       gesetzt, danach waere die Karte nicht mehr als "neu" erkennbar. */
+    const warNeu = istNeueKarte(card);
     s.lastAction = {
       cardId: card.id,
       prevStufe: card.stufe,
       prevNextReview: card.nextReview,
       prevErsteBewertung: card.ersteBewertung,
+      prevRueckfaelle: card.rueckfaelle || 0,
       prevQueue: s.queue.slice()
     };
     // B3: ab jetzt gilt die Karte als eingeführt und zählt gegen das Tageslimit
@@ -1408,6 +1485,11 @@ function gradeCard(kind) {
     } else {
       card.stufe = Math.max(0, card.stufe - 2);
       card.nextReview = todayStr();
+      /* E6: Nur ein echter Rueckfall zaehlt - "Nicht" bei einer Karte, die
+         schon einmal saß. Eine Karte, die man beim allerersten Anblick nicht
+         weiß, ist kein Rueckfall, sondern normal. "Fast" zaehlt ebenfalls
+         nicht: da war die Erinnerung ja da. */
+      if (!warNeu) card.rueckfaelle = (card.rueckfaelle || 0) + 1;
     }
   }
   const id = s.queue.shift();
@@ -1419,7 +1501,7 @@ function gradeCard(kind) {
   s.extraOpen = false;
   hwStrokes = [];
   if (!s.isDrill) {
-    if (card) persistCardGrade(s.bereichId, card.id, { stufe: card.stufe, nextReview: card.nextReview, ersteBewertung: card.ersteBewertung });
+    if (card) persistCardGrade(s.bereichId, card.id, { stufe: card.stufe, nextReview: card.nextReview, ersteBewertung: card.ersteBewertung, rueckfaelle: card.rueckfaelle || 0 });
     if (s.queue.length === 0) checkStreakOnSessionComplete();
   }
   render();
@@ -1436,12 +1518,14 @@ function undoLastGrade() {
     card.nextReview = s.lastAction.prevNextReview;
     // sonst bliebe eine irrtümlich bewertete neue Karte für heute verbraucht
     card.ersteBewertung = s.lastAction.prevErsteBewertung;
+    // E6: sonst bliebe ein irrtuemlicher Rueckfall dauerhaft gezaehlt
+    card.rueckfaelle = s.lastAction.prevRueckfaelle;
   }
   s.queue = s.lastAction.prevQueue;
   s.lastAction = null;
   s.revealed = true;
   s.extraOpen = false;
-  if (card) persistCardGrade(s.bereichId, card.id, { stufe: card.stufe, nextReview: card.nextReview, ersteBewertung: card.ersteBewertung });
+  if (card) persistCardGrade(s.bereichId, card.id, { stufe: card.stufe, nextReview: card.nextReview, ersteBewertung: card.ersteBewertung, rueckfaelle: card.rueckfaelle || 0 });
   render();
 }
 function endSession() { ui.session = null; hwStrokes = []; hwFullscreen = false; render(); }
@@ -1764,6 +1848,28 @@ function renderFortschritt() {
   html += '</div>';
   html += '</div>';
 
+  /* --- E6: verbrannte Karten --- */
+  const leeches = verbrannteKarten();
+  if (leeches.length > 0) {
+    html += '<div class="stat-block">';
+    html += '<h3>🔥 Karten, die nicht klappen (' + leeches.length + ')</h3>';
+    html += '<p class="stat-sub">ab ' + LEECH_SCHWELLE + ' Rückfällen – meist liegt es an der Karte, nicht am Gedächtnis</p>';
+    leeches.slice(0, 8).forEach(x => {
+      html += '<div class="leech-row">';
+      html += '<div class="words"><div class="wort arabic">' + esc(x.card.wort) + '</div>' +
+        '<div class="uebersetzung">' + esc(x.card.uebersetzung) +
+        (ui.statsScope === "alle" && bereiche.length > 1 ? ' · ' + esc(x.bereich.name) : '') + '</div></div>';
+      html += '<span class="leech-badge">' + x.card.rueckfaelle + '×</span>';
+      html += '<button class="ghost" data-action="edit-leech" data-bid="' + esc(x.bereich.id) + '" data-id="' + esc(x.card.id) + '" title="Karte umformulieren oder aufteilen">✏️</button>';
+      html += '<button class="ghost" data-action="reset-leech" data-bid="' + esc(x.bereich.id) + '" data-id="' + esc(x.card.id) + '" title="Zähler auf 0 setzen – die Karte bleibt unverändert">↺</button>';
+      html += '</div>';
+    });
+    if (leeches.length > 8) {
+      html += '<p class="hint" style="padding-bottom:0">… und ' + (leeches.length - 8) + ' weitere. Nimm dir erst die obersten vor.</p>';
+    }
+    html += '</div>';
+  }
+
   /* --- Vorschau auf die nächsten sieben Tage --- */
   const tage = vorschau7(cards);
   const maxTag = Math.max(1, ...tage.map(x => x.anzahl));
@@ -1859,6 +1965,14 @@ function renderSession() {
       html += renderHandwritingCanvas(true);
     }
     html += '<div class="study-answer' + (answerArabic ? ' arabic' : '') + '">' + esc(answerText) + '</div>';
+    /* E6: erst NACH dem Aufdecken. Vorher waere der Hinweis ein Tipp
+       ("Achtung, die kannst du nicht") und wuerde die Bewertung verfaelschen.
+       Im Uebungsmodus bleibt er weg, dort zaehlt nichts. */
+    if (!s.isDrill && istVerbrannt(card)) {
+      html += '<div class="leech-banner">🔥 Diese Karte ist dir schon <strong>' + card.rueckfaelle +
+        '-mal</strong> wieder entfallen. Formuliere sie im Verwalten-Tab um oder teile sie in zwei Karten – ' +
+        'sonst frisst sie weiter deine Lernzeit. Sobald du Wort oder Übersetzung änderst, beginnt die Zählung von vorn.</div>';
+    }
     if (card.extra) {
       html += '<div style="margin-top:12px"><button class="ghost" data-action="toggle-extra">' +
         (s.extraOpen ? "▾ Beispiel / Bild verbergen" : "▸ Beispiel / Bild anzeigen") + '</button></div>';
@@ -2021,6 +2135,9 @@ function renderVerwalten() {
         if (c.extra) html += '<div class="extra-note">' + renderExtra(c.extra) + '</div>';
         html += '</div>';
         html += '<span class="badge">Stufe ' + c.stufe + '</span>';
+        /* E6: In der Liste sichtbar machen, damit beim Durchsehen sofort
+           auffaellt, welche Karte umformuliert gehoert. */
+        if (istVerbrannt(c)) html += '<span class="leech-badge" title="' + c.rueckfaelle + '-mal wieder vergessen – umformulieren oder aufteilen">🔥 ' + c.rueckfaelle + '×</span>';
         if (!ui.selectMode) {
           html += '<button class="ghost" data-action="edit-card" data-id="' + esc(c.id) + '" title="Bearbeiten">✏️</button>';
           html += '<button class="ghost" data-action="delete-card" data-id="' + esc(c.id) + '" title="Löschen">🗑️</button>';
@@ -2253,6 +2370,8 @@ app.addEventListener("click", e => {
     case "tab-lernen": ui.tab = "lernen"; ui.editId = null; resetFormDraft(); ui.searchQuery = ""; ui.selectMode = false; ui.selectedIds = new Set(); ui.drillOpen = false; render(); break;
     case "tab-fortschritt": ui.tab = "fortschritt"; ui.session = null; ui.editId = null; resetFormDraft(); ui.drillOpen = false; render(); break;
     case "stats-scope": ui.statsScope = btn.dataset.scope === "bereich" ? "bereich" : "alle"; render(); break;
+    case "edit-leech": editCardInBereich(btn.dataset.bid, btn.dataset.id); break;
+    case "reset-leech": resetRueckfaelle(btn.dataset.bid, btn.dataset.id); break;
     case "tab-verwalten": ui.tab = "verwalten"; ui.session = null; render(); break;
     case "start-session": startSession(); break;
     case "reveal": revealAnswer(); break;
@@ -2260,10 +2379,6 @@ app.addEventListener("click", e => {
     case "grade-known": gradeKnown(); break;
     case "grade-almost": gradeAlmost(); break;
     case "grade-unknown": gradeUnknown(); break;
-    
-    
-    
-    
     case "undo-grade": undoLastGrade(); break;
     case "end-session": endSession(); break;
     case "submit-card": submitCardForm(); break;
