@@ -6,6 +6,7 @@
 <title>Adrabic-Wiederholung</title>
 <meta name="apple-mobile-web-app-title" content="Adrabic-Wiederholung">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0a0a09">
 <link rel="manifest" href="./manifest.json">
@@ -306,6 +307,10 @@ const firebaseConfig = {
   appId: "1:712373953233:web:d0f761786fc345b4b69bf0"
 };
 
+/* Versionsnummer: bei jeder Veroeffentlichung hochzaehlen und denselben Wert
+   als CACHE_NAME in sw.js eintragen, damit alte Dateien verworfen werden. */
+const APP_VERSION = "1.5.0";
+
 const CONFIGURED = firebaseConfig.apiKey !== "HIER_EINFUEGEN";
 const app = document.getElementById("app");
 
@@ -328,9 +333,15 @@ function dateInDays(n) {
   d.setDate(d.getDate() + n);
   return fmtDate(d);
 }
-/* Intervall-Formel: 2^(stufe-1) Tage. Stufe 1 → 1, 2 → 2, 3 → 4, 4 → 8 ... */
+/* Hoechste erlaubte Stufe. Ohne Deckel ueberschreitet 2^(stufe-1) irgendwann den
+   gueltigen Datumsbereich von JavaScript: nextReview wird dann "NaN-NaN-NaN" und
+   die Karte gilt nie wieder als faellig - sie verschwindet stillschweigend. */
+const MAX_STUFE = 12;
+/* Intervall-Formel: 2^(stufe-1) Tage. Stufe 1 → 1, 2 → 2, 3 → 4, 4 → 8 ...
+   Stufe 12 entspricht 2048 Tagen. */
 function intervalForStufe(stufe) {
-  return Math.pow(2, stufe - 1);
+  const s = Math.min(Math.max(stufe, 1), MAX_STUFE);
+  return Math.pow(2, s - 1);
 }
 function genId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -460,6 +471,13 @@ let ui = {
   drillSource: "stufen",      // "stufen" oder die ID einer Speicherkarte
   openSetId: null             // Speicherkarte, deren Kartenliste aufgeklappt ist
 };
+
+/* ---------- Formular-Entwurf ----------
+   render() baut das gesamte DOM neu. Ohne diesen Zwischenspeicher waere jede
+   halb getippte Vokabel weg, sobald irgendetwas anderes ein render() ausloest -
+   zum Beispiel ein Datensatz, der aus der Cloud hereinkommt. */
+let formDraft = { wort: "", ueb: "", extra: "" };
+function resetFormDraft() { formDraft = { wort: "", ueb: "", extra: "" }; }
 
 /* ---------- Handschrift-Canvas-Zustand (bleibt über Re-Renders erhalten,
    da render() das DOM inkl. Canvas bei jeder Aktion neu aufbaut) ---------- */
@@ -793,6 +811,7 @@ function selectBereich(idx) {
   ui.bereichIdx = idx;
   ui.session = null;
   ui.editId = null;
+  resetFormDraft();
   ui.searchQuery = "";
   ui.selectMode = false;
   ui.selectedIds = new Set();
@@ -1023,6 +1042,7 @@ function submitCardForm() {
       if (stufeEl) {
         let newStufe = parseInt(stufeEl.value, 10);
         if (!Number.isInteger(newStufe) || newStufe < 0) newStufe = 0;
+        if (newStufe > MAX_STUFE) newStufe = MAX_STUFE;
         if (newStufe !== card.stufe) {
           card.stufe = newStufe;
           card.nextReview = newStufe === 0 ? todayStr() : dateInDays(intervalForStufe(newStufe));
@@ -1040,15 +1060,22 @@ function submitCardForm() {
       nextReview: todayStr()
     });
   }
+  resetFormDraft();
   persist();
   render();
+  /* D1: Fokus zurueck ins Wort-Feld, damit man mehrere Vokabeln
+     hintereinander eingeben kann, ohne jedes Mal hineinzutippen. */
+  const wortEl = document.getElementById("f-wort");
+  if (wortEl) wortEl.focus();
 }
 function editCard(id) {
   ui.editId = id;
+  const c = findCard(id);
+  formDraft = c ? { wort: c.wort, ueb: c.uebersetzung, extra: c.extra } : { wort: "", ueb: "", extra: "" };
   render();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
-function cancelEdit() { ui.editId = null; render(); }
+function cancelEdit() { ui.editId = null; resetFormDraft(); render(); }
 function deleteCard(id) {
   const card = findCard(id);
   if (!card) return;
@@ -1074,7 +1101,7 @@ function gradeKnown() {
   const card = findCard(s.queue[0]);
   if (card && !s.isDrill) {
     s.lastAction = { cardId: card.id, prevStufe: card.stufe, prevNextReview: card.nextReview, prevQueue: s.queue.slice() };
-    card.stufe = card.stufe + 1;
+    card.stufe = Math.min(card.stufe + 1, MAX_STUFE);
     card.nextReview = dateInDays(intervalForStufe(card.stufe));
   }
   s.queue.shift();
@@ -1083,7 +1110,9 @@ function gradeKnown() {
   s.extraOpen = false;
   hwStrokes = [];
   if (!s.isDrill) {
-    persistCardGrade(s.bereichId, card.id, { stufe: card.stufe, nextReview: card.nextReview });
+    /* card kann fehlen, wenn die Karte auf einem anderen Geraet geloescht wurde,
+       waehrend diese Session offen ist. Frueher stuerzte hier card.id ab. */
+    if (card) persistCardGrade(s.bereichId, card.id, { stufe: card.stufe, nextReview: card.nextReview });
     if (s.queue.length === 0) checkStreakOnSessionComplete();
   }
   render();
@@ -1104,7 +1133,7 @@ function gradeUnknown() {
   s.extraOpen = false;
   hwStrokes = [];
   if (!s.isDrill) {
-    persistCardGrade(s.bereichId, card.id, { stufe: card.stufe, nextReview: card.nextReview });
+    if (card) persistCardGrade(s.bereichId, card.id, { stufe: card.stufe, nextReview: card.nextReview });
     if (s.queue.length === 0) checkStreakOnSessionComplete();
   }
   render();
@@ -1265,12 +1294,26 @@ function renderMain() {
   html += '</div>';
 
   html += ui.tab === "lernen" ? renderLernen() : renderVerwalten();
+  html += '<p style="text-align:center; font-size:0.72rem; color:var(--ink-soft); opacity:0.6; margin:18px 0 8px">Version ' + APP_VERSION + '</p>';
 
-  const prevSearchEl = document.getElementById("f-search");
-  const searchWasFocused = !!prevSearchEl && document.activeElement === prevSearchEl;
-  const prevSelStart = searchWasFocused ? prevSearchEl.selectionStart : null;
+  /* Vor dem Neuaufbau merken, in welchem Feld der Cursor stand - sonst springt
+     er bei jedem Tastendruck heraus. Galt bisher nur fuer das Suchfeld. */
+  const prevActive = document.activeElement;
+  const prevActiveId = prevActive && prevActive.id ? prevActive.id : null;
+  const prevSelStart = prevActive && typeof prevActive.selectionStart === "number"
+    ? prevActive.selectionStart : null;
 
   app.innerHTML = html;
+
+  if (prevActiveId) {
+    const again = document.getElementById(prevActiveId);
+    if (again && typeof again.focus === "function") {
+      again.focus();
+      if (prevSelStart !== null && typeof again.setSelectionRange === "function") {
+        try { again.setSelectionRange(prevSelStart, prevSelStart); } catch (e) {}
+      }
+    }
+  }
 
   const importInput = document.getElementById("import-file-input");
   if (importInput) {
@@ -1291,6 +1334,12 @@ function renderMain() {
         if (e.key === "Enter") submitCardForm();
       });
     });
+    /* Jede Eingabe sofort in den Entwurf spiegeln, damit ein render()
+       dazwischen nichts loeschen kann. */
+    [["f-wort", "wort"], ["f-ueb", "ueb"], ["f-extra", "extra"]].forEach(([id, key]) => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener("input", e => { formDraft[key] = e.target.value; });
+    });
     const srcEl = document.getElementById("drill-source");
     if (srcEl) {
       srcEl.addEventListener("change", e => {
@@ -1304,11 +1353,6 @@ function renderMain() {
         ui.searchQuery = e.target.value;
         render();
       });
-      if (searchWasFocused) {
-        searchEl.focus();
-        const pos = prevSelStart !== null ? prevSelStart : searchEl.value.length;
-        searchEl.setSelectionRange(pos, pos);
-      }
     }
   }
 }
@@ -1429,14 +1473,14 @@ function renderVerwalten() {
   let html = '<div class="panel">';
   html += '<h2>' + (editing ? "Karte bearbeiten" : "Neue Karte") + '</h2>';
   html += '<label for="f-wort">Wort *</label>';
-  html += '<input type="text" id="f-wort" class="arabic" dir="rtl" value="' + (editing ? esc(editing.wort) : "") + '">';
+  html += '<input type="text" id="f-wort" class="arabic" dir="rtl" lang="ar" value="' + esc(formDraft.wort) + '">';
   html += '<label for="f-ueb">Übersetzung *</label>';
-  html += '<input type="text" id="f-ueb" value="' + (editing ? esc(editing.uebersetzung) : "") + '">';
+  html += '<input type="text" id="f-ueb" value="' + esc(formDraft.ueb) + '">';
   html += '<label for="f-extra">Optional: Beispielsatz, Bild-Link oder Notiz</label>';
-  html += '<textarea id="f-extra" rows="2">' + (editing ? esc(editing.extra) : "") + '</textarea>';
+  html += '<textarea id="f-extra" rows="2">' + esc(formDraft.extra) + '</textarea>';
   if (editing) {
     html += '<label for="f-stufe">Wiederholungsstufe (0 = sofort fällig, 1 = morgen fällig, 2 = in 2 Tagen, usw.)</label>';
-    html += '<input type="number" id="f-stufe" min="0" step="1" value="' + editing.stufe + '">';
+    html += '<input type="number" id="f-stufe" min="0" max="' + MAX_STUFE + '" step="1" value="' + editing.stufe + '">';
   }
   html += '<div class="form-actions">';
   html += '<button data-action="submit-card">' + (editing ? "Änderungen speichern" : "Karte hinzufügen") + '</button>';
@@ -1669,23 +1713,42 @@ app.addEventListener("pointerup", endDrag);
 app.addEventListener("pointercancel", endDrag);
 
 /* ---------- Handschrift-Canvas: Zeichnen per Zeigegerät (Maus/Touch/Stylus) ---------- */
+/* Die Striche werden NICHT in Pixeln gespeichert, sondern als Anteil der
+   Canvas-Breite (0 bis 1) - fuer x und y mit demselben Faktor. Dadurch bleibt
+   das Seitenverhaeltnis erhalten, wenn man auf Vollbild umschaltet oder das
+   Geraet dreht. Frueher war die Zeichenflaeche fest 700x260 gross, wurde aber
+   auf etwa 350x240 angezeigt: waagerecht um Faktor 2 gestaucht, senkrecht fast
+   gar nicht. Runde Boegen wurden dadurch zu Ellipsen. */
+function sizeCanvas(canvas, ctx) {
+  const rect = canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.max(1, Math.round(rect.width * dpr));
+  canvas.height = Math.max(1, Math.round(rect.height * dpr));
+  /* Ab hier rechnet der Kontext in CSS-Pixeln, die Bitmap ist aber feiner
+     aufgeloest - deshalb sind die Striche auf dem Handy nicht mehr unscharf. */
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
 function drawStrokes(ctx, canvas) {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const rect = canvas.getBoundingClientRect();
+  const w = rect.width || 1;
+  const h = rect.height || 1;
+  ctx.clearRect(0, 0, w, h);
   ctx.strokeStyle = "#2a2016";
   ctx.lineWidth = 4;
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
   for (const stroke of hwStrokes) {
-    if (stroke.length === 1) {
+    const pts = stroke.map(p => ({ x: p.x * w, y: p.y * w }));
+    if (pts.length === 1) {
       ctx.beginPath();
-      ctx.arc(stroke[0].x, stroke[0].y, ctx.lineWidth / 2, 0, Math.PI * 2);
+      ctx.arc(pts[0].x, pts[0].y, ctx.lineWidth / 2, 0, Math.PI * 2);
       ctx.fillStyle = ctx.strokeStyle;
       ctx.fill();
       continue;
     }
     ctx.beginPath();
-    ctx.moveTo(stroke[0].x, stroke[0].y);
-    for (let i = 1; i < stroke.length; i++) ctx.lineTo(stroke[i].x, stroke[i].y);
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
     ctx.stroke();
   }
 }
@@ -1693,13 +1756,15 @@ function setupHandwritingCanvas() {
   const canvas = document.getElementById("hw-canvas");
   if (!canvas) return;
   const ctx = canvas.getContext("2d");
+  sizeCanvas(canvas, ctx);
   drawStrokes(ctx, canvas);
   let drawing = false;
   function posFromEvent(e) {
     const rect = canvas.getBoundingClientRect();
+    const w = rect.width || 1;
     return {
-      x: (e.clientX - rect.left) * (canvas.width / rect.width),
-      y: (e.clientY - rect.top) * (canvas.height / rect.height)
+      x: (e.clientX - rect.left) / w,
+      y: (e.clientY - rect.top) / w
     };
   }
   canvas.addEventListener("pointerdown", e => {
@@ -1718,6 +1783,15 @@ function setupHandwritingCanvas() {
   canvas.addEventListener("pointerup", endStroke);
   canvas.addEventListener("pointercancel", endStroke);
 }
+/* Beim Drehen des Geraets aendert sich die Breite - Flaeche neu vermessen
+   und die vorhandenen Striche neu zeichnen. */
+window.addEventListener("resize", () => {
+  const canvas = document.getElementById("hw-canvas");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  sizeCanvas(canvas, ctx);
+  drawStrokes(ctx, canvas);
+});
 
 /* ---------- Event-Delegation ---------- */
 app.addEventListener("click", e => {
@@ -1737,7 +1811,7 @@ app.addEventListener("click", e => {
     case "add-bereich": addBereich(); break;
     case "rename-bereich": renameBereich(); break;
     case "delete-bereich": deleteBereich(); break;
-    case "tab-lernen": ui.tab = "lernen"; ui.editId = null; ui.searchQuery = ""; ui.selectMode = false; ui.selectedIds = new Set(); ui.drillOpen = false; render(); break;
+    case "tab-lernen": ui.tab = "lernen"; ui.editId = null; resetFormDraft(); ui.searchQuery = ""; ui.selectMode = false; ui.selectedIds = new Set(); ui.drillOpen = false; render(); break;
     case "tab-verwalten": ui.tab = "verwalten"; ui.session = null; render(); break;
     case "start-session": startSession(); break;
     case "reveal": revealAnswer(); break;
