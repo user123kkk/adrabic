@@ -1,24 +1,40 @@
 /* Service Worker für Adrabic-Wiederholung
-   Ziel: die App-Hülle (index.html + Firebase-SDK-Dateien) zwischenspeichern,
+   Ziel: die App-Hülle (index.html + Firebase-SDK + Quran-Schrift) zwischenspeichern,
    damit die App auch ohne Internet startet. Echte Firebase-/Google-API-Aufrufe
    (Login, Firestore-Sync) werden NICHT angefasst – dafür sorgt Firebase selbst
    mit seinem eigenen Offline-Cache.
 
-   Bei Änderungen an dieser Datei bitte CACHE_NAME hochzählen (z.B. v2),
-   sonst behalten Nutzer:innen die alte Version im Cache. */
+   WICHTIG: Bei jeder neuen Version CACHE_NAME hochzählen (v2 → v3 → ...),
+   sonst behalten Nutzer:innen alte Dateien im Cache. */
 
-const CACHE_NAME = "adrabic-shell-v1";
+const CACHE_NAME = "adrabic-shell-v2";
+
 const APP_SHELL = [
   "./",
   "./index.html",
   "./manifest.json"
 ];
 
+/* Fremde Server, deren Dateien die App zum Starten braucht.
+   Sie werden beim ersten Online-Besuch automatisch mitgespeichert
+   (siehe fetch-Handler weiter unten). */
+const CACHEABLE_ORIGINS = [
+  "https://www.gstatic.com",            // Firebase-SDK
+  "https://verses.quran.foundation"     // Quran-Schrift (UthmanicHafs)
+];
+
 self.addEventListener("install", event => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(APP_SHELL))
-      .catch(() => {})
+    caches.open(CACHE_NAME).then(cache =>
+      /* Einzeln statt addAll: Wenn eine Datei fehlt (z.B. manifest.json),
+         schlägt sonst der GESAMTE Vorgang fehl und es wird gar nichts
+         zwischengespeichert – still und unbemerkt. */
+      Promise.all(APP_SHELL.map(url =>
+        cache.add(url).catch(() => {
+          console.warn("[SW] Konnte nicht zwischenspeichern:", url);
+        })
+      ))
+    )
   );
   self.skipWaiting();
 });
@@ -33,17 +49,18 @@ self.addEventListener("activate", event => {
 });
 
 function isCacheable(url) {
-  // Nur die eigene App und die Firebase-SDK-Dateien von gstatic cachen.
-  return url.origin === self.location.origin || url.origin === "https://www.gstatic.com";
+  return url.origin === self.location.origin || CACHEABLE_ORIGINS.includes(url.origin);
 }
 
 self.addEventListener("fetch", event => {
   const req = event.request;
-  if (req.method !== "GET") return; // Firestore-Schreibvorgänge etc. unangetastet lassen
+  if (req.method !== "GET") return;      // Schreibvorgänge unangetastet lassen
 
   const url = new URL(req.url);
-  if (!isCacheable(url)) return; // Auth-/Firestore-API-Aufrufe komplett durchreichen
+  if (!isCacheable(url)) return;         // Auth-/Firestore-Aufrufe durchreichen
 
+  /* Zuerst Netz, dann Cache: online sieht man immer sofort die neueste
+     Version, offline greift die zuletzt gespeicherte. */
   event.respondWith(
     fetch(req)
       .then(res => {
@@ -52,7 +69,15 @@ self.addEventListener("fetch", event => {
         return res;
       })
       .catch(() =>
-        caches.match(req).then(cached => cached || caches.match("./index.html"))
+        caches.match(req).then(cached => {
+          if (cached) return cached;
+          /* Nur beim Aufruf der Seite selbst auf index.html ausweichen.
+             Früher galt das für JEDE fehlgeschlagene Anfrage – dann bekam
+             der Browser für eine fehlende JavaScript-Datei HTML zurück und
+             stürzte mit einem unverständlichen Syntaxfehler ab. */
+          if (req.mode === "navigate") return caches.match("./index.html");
+          return Response.error();
+        })
       )
   );
 });
