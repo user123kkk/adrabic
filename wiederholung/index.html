@@ -227,7 +227,6 @@
   .limit-row select { padding: 8px 10px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--card); color: var(--ink); font: inherit; }
   .limit-row select option { background: var(--card); color: var(--ink); }
 
-  /* Vorschau des Massen-Imports (E1) */
   .bulk-summary { margin-top: 14px; }
   .bulk-list { max-height: 320px; overflow-y: auto; background: var(--bg); border-radius: var(--radius); padding: 4px 12px; margin-top: 10px; }
   .bulk-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
@@ -546,16 +545,11 @@ let ui = {
   drillOpen: false,           // Auswahl für Übungsmodus sichtbar?
   drillSource: "stufen",      // "stufen" oder die ID einer Speicherkarte
   openSetId: null,            // Speicherkarte, deren Kartenliste aufgeklappt ist
-  bulkOpen: false,            // E1: Panel „Liste einfügen" sichtbar?
-  bulkSep: "auto",            // Trennzeichen: "auto" | "tab" | ";" | "," | "-"
-  bulkSwap: false,            // Spalten getauscht (Übersetzung zuerst)?
-  bulkSkipDupes: true,        // Duplikate beim Import überspringen?
-  bulkPreview: null           // Ergebnis der Vorschau: Array von Zeilen oder null
 };
 
 /* E1: Der eingefügte Text darf ein render() ueberleben - genau wie formDraft.
    Ein Cloud-Snapshot mitten im Einfuegen wuerde sonst 80 Vokabeln loeschen. */
-let bulkDraft = "";
+
 
 /* ---------- Formular-Entwurf ----------
    render() baut das gesamte DOM neu. Ohne diesen Zwischenspeicher waere jede
@@ -976,9 +970,6 @@ function selectBereich(idx) {
   ui.openSetId = null;
   /* Die Duplikatprüfung der Vorschau gilt immer für genau einen Bereich –
      nach dem Wechsel wäre sie falsch, also zurücksetzen. */
-  ui.bulkOpen = false;
-  ui.bulkPreview = null;
-  bulkDraft = "";
   render();
 }
 function renameBereich() {
@@ -1274,15 +1265,6 @@ function deleteCard(id) {
    ohne diese Funktion bleibt das Tool ein Werkzeug fuer Geduldige.
    Ablauf bewusst zweistufig: erst Vorschau, dann Import. Ein Import von 300
    Karten, der schweigend das Falsche anlegt, ist schlimmer als gar keiner. */
-function bulkTrenner(sep) {
-  if (sep === "tab") return ["\t"];
-  if (sep === ";") return [";"];
-  if (sep === ",") return [","];
-  if (sep === "-") return ["—", "–", " - "];
-  /* "auto": Reihenfolge ist Absicht. Tab und Gedankenstrich sind eindeutig,
-     das Komma steht zuletzt - es kommt in Uebersetzungen selbst haeufig vor. */
-  return ["\t", "—", "–", ";", "|", " - ", ","];
-}
 function splitBis3(line, t) {
   const i = line.indexOf(t);
   if (i < 0) return null;
@@ -1292,102 +1274,6 @@ function splitBis3(line, t) {
   if (j < 0) return [a, rest];
   return [a, rest.slice(0, j), rest.slice(j + t.length)];
 }
-function parseBulk(text, sep, swap) {
-  const trenner = bulkTrenner(sep);
-  const vorhandene = currentCards();
-  const inListe = new Set();
-  const rows = [];
-  for (const roh of String(text).split(/\r?\n/)) {
-    const line = roh.trim();
-    if (!line || line.startsWith("#")) continue;   // Leerzeilen und #-Kommentare überspringen
-    let teile = null;
-    for (const t of trenner) {
-      teile = splitBis3(line, t);
-      if (teile) break;
-    }
-    if (!teile) {
-      rows.push({ wort: line, ueb: "", extra: "", status: "fehler", grund: "kein Trennzeichen gefunden" });
-      continue;
-    }
-    let wort = (teile[0] || "").trim();
-    let ueb = (teile[1] || "").trim();
-    const extra = (teile[2] || "").trim();
-    if (swap) { const h = wort; wort = ueb; ueb = h; }
-    if (!wort || !ueb) {
-      rows.push({ wort: wort, ueb: ueb, extra: extra, status: "fehler", grund: "Wort oder Übersetzung fehlt" });
-      continue;
-    }
-    const key = vergleichsWort(wort);
-    if (inListe.has(key)) {
-      rows.push({ wort: wort, ueb: ueb, extra: extra, status: "dup-liste", grund: "steht in dieser Liste doppelt" });
-      continue;
-    }
-    inListe.add(key);
-    const dup = findeDuplikat(wort, null, vorhandene);
-    if (dup) {
-      rows.push({ wort: wort, ueb: ueb, extra: extra, status: "dup-bereich", grund: "schon im Bereich: „" + dup.uebersetzung + "“" });
-      continue;
-    }
-    rows.push({ wort: wort, ueb: ueb, extra: extra, status: "ok", grund: "" });
-  }
-  return rows;
-}
-function readBulkTextarea() {
-  const el = document.getElementById("bulk-text");
-  if (el) bulkDraft = el.value;
-}
-function openBulk() {
-  ui.bulkOpen = true;
-  ui.bulkPreview = null;
-  ui.editId = null;
-  render();
-  const el = document.getElementById("bulk-text");
-  if (el) el.focus();
-}
-function closeBulk() {
-  ui.bulkOpen = false;
-  ui.bulkPreview = null;
-  bulkDraft = "";
-  render();
-}
-function bulkPreview() {
-  readBulkTextarea();
-  if (!bulkDraft.trim()) {
-    alert("Bitte zuerst die Vokabelliste in das Feld einfügen.");
-    return;
-  }
-  ui.bulkPreview = parseBulk(bulkDraft, ui.bulkSep, ui.bulkSwap);
-  render();
-}
-function bulkImport() {
-  const rows = ui.bulkPreview;
-  if (!rows) return;
-  const nehmen = rows.filter(r => r.status === "ok" || (!ui.bulkSkipDupes && r.status.indexOf("dup") === 0));
-  if (nehmen.length === 0) {
-    alert("Es bleibt nichts zu importieren übrig.");
-    return;
-  }
-  if (!confirm(nehmen.length + " Karte(n) in „" + currentBereich().name + "“ anlegen?")) return;
-  const neue = nehmen.map(r => ({
-    id: genId(),
-    wort: r.wort,
-    uebersetzung: r.ueb,
-    extra: r.extra,
-    stufe: 0,
-    nextReview: todayStr(),
-    ersteBewertung: null
-  }));
-  currentCards().unshift(...neue);   // Reihenfolge der Liste bleibt erhalten
-  ui.bulkOpen = false;
-  ui.bulkPreview = null;
-  bulkDraft = "";
-  persist();
-  render();
-  alert(neue.length + " Karte(n) angelegt. Sie werden mit " + settings.neuProTag +
-    " neuen Karten pro Tag eingeführt – das dauert etwa " +
-    (settings.neuProTag > 0 ? Math.ceil(neue.length / settings.neuProTag) : "∞") + " Tag(e).");
-}
-
 /* ---------- Lern-Session ---------- */
 function startSession() {
   const due = dueCards();
@@ -1669,24 +1555,17 @@ function renderMain() {
         render();
       });
     }
-    /* E1: Der eingefuegte Text wird bei jedem Tastendruck in bulkDraft
        gespiegelt - genau wie beim Kartenformular, damit ein Cloud-Snapshot ihn
        nicht loeschen kann. Neu gerendert wird dabei bewusst nicht: eine Liste
-       mit 500 Zeilen bei jedem Zeichen neu aufzubauen waere unbenutzbar. */
-    const bulkEl = document.getElementById("bulk-text");
-    if (bulkEl) bulkEl.addEventListener("input", e => { bulkDraft = e.target.value; });
+       mit 500 Zeilen bei jedem Zeichen neu aufzubauen waere unbenutzbar. */);
     const sepEl = document.getElementById("bulk-sep");
     if (sepEl) sepEl.addEventListener("change", e => {
       readBulkTextarea();
-      ui.bulkSep = e.target.value;
-      if (ui.bulkPreview) ui.bulkPreview = parseBulk(bulkDraft, ui.bulkSep, ui.bulkSwap);
       render();
     });
     const swapEl = document.getElementById("bulk-swap");
     if (swapEl) swapEl.addEventListener("change", e => {
       readBulkTextarea();
-      ui.bulkSwap = e.target.checked;
-      if (ui.bulkPreview) ui.bulkPreview = parseBulk(bulkDraft, ui.bulkSep, ui.bulkSwap);
       render();
     });
     const skipEl = document.getElementById("bulk-skip");
@@ -1864,9 +1743,7 @@ function renderVerwalten() {
   }
   html += '<div class="form-actions">';
   html += '<button data-action="submit-card">' + (editing ? "Änderungen speichern" : "Karte hinzufügen") + '</button>';
-  if (editing) html += '<button class="secondary" data-action="cancel-edit">Abbrechen</button>';
-  if (!editing && !ui.bulkOpen) html += '<button class="secondary" data-action="open-bulk" title="Mehrere Vokabeln auf einmal aus einer Liste anlegen">📋 Liste einfügen</button>';
-  html += '</div></div>';
+  if (editing) html += '<button class="secondary" data-action="cancel-edit">Abbrechen</button>';html += '</div></div>';
 
   html += renderBulkPanel();
 
@@ -1980,7 +1857,6 @@ function renderVerwalten() {
 /* E1: Panel „Liste einfügen". Erscheint nur auf Anforderung, damit der
    Verwalten-Tab für den Alltag schlicht bleibt. */
 function renderBulkPanel() {
-  if (!ui.bulkOpen) return "";
   const seps = [
     ["auto", "automatisch erkennen"],
     ["tab", "Tabulator"],
@@ -1991,14 +1867,11 @@ function renderBulkPanel() {
   let html = '<div class="panel">';
   html += '<h2>📋 Vokabelliste einfügen</h2>';
   html += '<p class="hint" style="padding-top:0">Eine Vokabel pro Zeile, Wort und Übersetzung durch ein Trennzeichen getrennt. Eine dritte Spalte landet im Notizfeld. Zeilen mit <code>#</code> am Anfang werden übersprungen.</p>';
-  html += '<textarea id="bulk-text" rows="7" spellcheck="false" style="unicode-bidi:plaintext" placeholder="كِتَاب — Buch&#10;قَلَم — Stift&#10;بَاب — Tür">' + esc(bulkDraft) + '</textarea>';
 
   html += '<div class="limit-row" style="margin-top:12px">';
   html += '<label for="bulk-sep" style="margin:0">Trennzeichen</label>';
   html += '<select id="bulk-sep">' + seps.map(s =>
-    '<option value="' + s[0] + '"' + (ui.bulkSep === s[0] ? " selected" : "") + '>' + esc(s[1]) + '</option>').join("") + '</select>';
   html += '<label style="display:flex; align-items:center; gap:6px; margin:0; cursor:pointer">';
-  html += '<input type="checkbox" id="bulk-swap" style="width:18px;height:18px"' + (ui.bulkSwap ? " checked" : "") + '> Übersetzung steht zuerst';
   html += '</label>';
   html += '</div>';
 
@@ -2007,7 +1880,6 @@ function renderBulkPanel() {
   html += '<button class="secondary" data-action="close-bulk">Abbrechen</button>';
   html += '</div>';
 
-  const rows = ui.bulkPreview;
   if (rows) {
     const ok = rows.filter(r => r.status === "ok").length;
     const dupB = rows.filter(r => r.status === "dup-bereich").length;
@@ -2282,10 +2154,10 @@ app.addEventListener("click", e => {
     case "grade-known": gradeKnown(); break;
     case "grade-almost": gradeAlmost(); break;
     case "grade-unknown": gradeUnknown(); break;
-    case "open-bulk": openBulk(); break;
-    case "close-bulk": closeBulk(); break;
-    case "bulk-preview": bulkPreview(); break;
-    case "bulk-import": bulkImport(); break;
+    
+    
+    
+    
     case "undo-grade": undoLastGrade(); break;
     case "end-session": endSession(); break;
     case "submit-card": submitCardForm(); break;
