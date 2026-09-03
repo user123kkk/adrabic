@@ -209,12 +209,33 @@
     text-align: left;
   }
   .study-extra a { color: var(--accent-dark); }
-  .grade-row { display: flex; gap: 10px; margin-top: 22px; }
-  .grade-row button { flex: 1; padding: 14px; font-size: 1rem; }
+  /* Drei Tasten (B2) muessen auch auf einem schmalen Handy nebeneinander passen:
+     weniger Innenabstand, kleinere Schrift, Zusatzzeile in Kleinschrift. */
+  .grade-row { display: flex; gap: 8px; margin-top: 22px; }
+  .grade-row button { flex: 1; padding: 12px 4px; font-size: 0.98rem; line-height: 1.2; min-width: 0; }
+  .grade-row .sub { display: block; font-size: 0.66rem; font-weight: 400; opacity: 0.8; margin-top: 3px; }
   .btn-known { background: var(--green); }
   .btn-known:hover { background: #2f8f5c; }
+  .btn-almost { background: var(--accent); }
+  .btn-almost:hover { background: var(--accent-dark); }
   .btn-unknown { background: var(--red); }
   .btn-unknown:hover { background: #b8483d; }
+
+  /* Tageslimit für neue Karten (B3) */
+  .limit-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+  .limit-row input[type="number"] { width: 84px; }
+  .limit-row select { padding: 8px 10px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--card); color: var(--ink); font: inherit; }
+  .limit-row select option { background: var(--card); color: var(--ink); }
+
+  /* Vorschau des Massen-Imports (E1) */
+  .bulk-summary { margin-top: 14px; }
+  .bulk-list { max-height: 320px; overflow-y: auto; background: var(--bg); border-radius: var(--radius); padding: 4px 12px; margin-top: 10px; }
+  .bulk-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+  .bulk-row:last-child { border-bottom: none; }
+  .bulk-row .b-wort { flex: 1; min-width: 0; font-weight: 600; word-break: break-word; }
+  .bulk-row .b-ueb { flex: 1.3; min-width: 0; color: var(--ink-soft); word-break: break-word; }
+  .badge.ok { background: var(--green-soft); color: var(--green); }
+  .badge.warn { background: var(--red-soft); color: var(--red); }
   .progress-note { font-size: 0.85rem; color: var(--ink-soft); margin-bottom: 10px; }
 
   .done-box { text-align: center; padding: 36px 20px; }
@@ -309,7 +330,7 @@ const firebaseConfig = {
 
 /* Versionsnummer: bei jeder Veroeffentlichung hochzaehlen und denselben Wert
    als CACHE_NAME in sw.js eintragen, damit alte Dateien verworfen werden. */
-const APP_VERSION = "1.5.0";
+const APP_VERSION = "1.6.0";
 
 const CONFIGURED = firebaseConfig.apiKey !== "HIER_EINFUEGEN";
 const app = document.getElementById("app");
@@ -327,21 +348,53 @@ function fmtDate(d) {
     String(d.getMonth() + 1).padStart(2, "0") + "-" +
     String(d.getDate()).padStart(2, "0");
 }
-function todayStr() { return fmtDate(new Date()); }
-function dateInDays(n) {
+/* B5: Der Lerntag beginnt um 4 Uhr morgens, nicht um Mitternacht. Wer nach
+   ʿIshāʾ um 00:30 noch lernt, ist gefuehlt am selben Tag - technisch waere es
+   schon der naechste: die Streak risse und die Karten wuerden einen Tag zu weit
+   geplant. Anki legt die Tagesgrenze aus demselben Grund auf 4 Uhr.
+   Wichtig: JEDE Datumsrechnung der App geht ueber logicalToday(), sonst
+   widersprechen sich "heute faellig" und "in n Tagen" zwischen 0 und 4 Uhr. */
+const DAY_START_HOUR = 4;
+function logicalToday() {
   const d = new Date();
+  if (d.getHours() < DAY_START_HOUR) d.setDate(d.getDate() - 1);
+  return d;
+}
+function todayStr() { return fmtDate(logicalToday()); }
+function dateInDays(n) {
+  const d = logicalToday();
   d.setDate(d.getDate() + n);
   return fmtDate(d);
 }
-/* Hoechste erlaubte Stufe. Ohne Deckel ueberschreitet 2^(stufe-1) irgendwann den
-   gueltigen Datumsbereich von JavaScript: nextReview wird dann "NaN-NaN-NaN" und
-   die Karte gilt nie wieder als faellig - sie verschwindet stillschweigend. */
+/* Hoechste erlaubte Stufe. Ohne Deckel ueberschreitet die Intervallformel
+   irgendwann den gueltigen Datumsbereich von JavaScript: nextReview wird dann
+   "NaN-NaN-NaN" und die Karte gilt nie wieder als faellig - sie verschwindet
+   stillschweigend. */
 const MAX_STUFE = 12;
-/* Intervall-Formel: 2^(stufe-1) Tage. Stufe 1 → 1, 2 → 2, 3 → 4, 4 → 8 ...
-   Stufe 12 entspricht 2048 Tagen. */
+/* B1: Intervall mit Deckel. Frueher 2^(stufe-1) - das ergab ab Stufe 10 mehr als
+   ein Jahr Pause, die Karte war praktisch aus dem Leben verschwunden. Fuer
+   fluechtige Vokabeln geht das, fuer Grammatik und Quran-Inhalte, die man
+   BEHALTEN will, nicht. Mit Faktor 1,8 und Deckel bei 180 Tagen kommt jede Karte
+   mindestens zweimal im Jahr wieder:
+   Stufe 1→1, 2→2, 3→3, 4→6, 5→10, 6→19, 7→34, 8→61, 9→110, ab 10→180 Tage. */
+const MAX_INTERVAL_DAYS = 180;
 function intervalForStufe(stufe) {
   const s = Math.min(Math.max(stufe, 1), MAX_STUFE);
-  return Math.pow(2, s - 1);
+  return Math.min(MAX_INTERVAL_DAYS, Math.round(Math.pow(1.8, s - 1)));
+}
+/* B4: Jitter. Ohne ihn kommen alle Karten, die an einem Tag gelernt wurden, fuer
+   immer am selben Tag zurueck - 200er-Tage wechseln sich mit 0er-Tagen ab.
+   ±15 % streuen den Stapel auseinander, ohne den Rhythmus zu zerstoeren.
+   Nur beim Bewerten verwendet; beim manuellen Setzen einer Stufe im Formular
+   gilt bewusst das glatte Intervall, damit die Beschriftung dort stimmt. */
+function nextReviewForStufe(stufe) {
+  const tage = intervalForStufe(stufe);
+  const jitter = Math.round(tage * (Math.random() * 0.3 - 0.15));
+  /* Der Deckel bleibt hart: sonst haette die oberste Stufe mit Streuung
+     wieder bis zu 207 Tage und die Zusage "spaetestens nach einem halben
+     Jahr" waere nicht mehr wahr. Nach oben wird also gekappt, nach unten
+     streut es weiter. */
+  return dateInDays(Math.min(MAX_INTERVAL_DAYS, Math.max(1, tage + jitter)));
 }
 function genId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -356,16 +409,30 @@ function shuffled(arr) {
 }
 
 /* ---------- Datenvalidierung ---------- */
+/* B3: Damit ein Tageslimit fuer NEUE Karten ueberhaupt moeglich ist, muss "neu"
+   von "vergessen" unterscheidbar sein. Beides steht sonst auf Stufe 0.
+   ersteBewertung = null heisst: diese Karte wurde noch nie bewertet.
+   Fuer Karten aus der Zeit vor 1.6.0 gibt es das Feld nicht. Regel dafuer:
+   Stufe > 0 → wurde offensichtlich schon einmal bewertet, Datum aber unbekannt →
+   Platzhalter. Stufe 0 → gilt als neu und laeuft einmalig durch das Tageslimit.
+   Das ist gewollt: sonst braechte das Limit beim ersten grossen Import nichts. */
+const LEGACY_FIRST_GRADE = "1970-01-01"; // "schon bewertet, Datum unbekannt"
 function normCard(c) {
+  const stufe = Number.isInteger(c.stufe) && c.stufe >= 0 ? c.stufe : 0;
+  let erste = null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(c.ersteBewertung)) erste = c.ersteBewertung;
+  else if (c.ersteBewertung === undefined && stufe > 0) erste = LEGACY_FIRST_GRADE;
   return {
     id: typeof c.id === "string" && c.id ? c.id : genId(),
     wort: String(c.wort),
     uebersetzung: String(c.uebersetzung),
     extra: typeof c.extra === "string" ? c.extra : "",
-    stufe: Number.isInteger(c.stufe) && c.stufe >= 0 ? c.stufe : 0,
-    nextReview: /^\d{4}-\d{2}-\d{2}$/.test(c.nextReview) ? c.nextReview : todayStr()
+    stufe: stufe,
+    nextReview: /^\d{4}-\d{2}-\d{2}$/.test(c.nextReview) ? c.nextReview : todayStr(),
+    ersteBewertung: erste
   };
 }
+function istNeueKarte(c) { return !c.ersteBewertung; }
 /* Speicherkarte = benannte Merkliste. Sie speichert NUR Karten-IDs, keine Kopien
    der Karten. Dadurch bleibt jede Karte genau einmal im Bereich vorhanden:
    Änderungen am Wort oder an der Stufe wirken automatisch auch hier, und Üben
@@ -409,7 +476,7 @@ function bereicheArrayToMap(arr) {
   arr.forEach((b, bi) => {
     const kartenMap = {};
     b.karten.forEach((c, ci) => {
-      kartenMap[c.id] = { wort: c.wort, uebersetzung: c.uebersetzung, extra: c.extra, stufe: c.stufe, nextReview: c.nextReview, order: ci };
+      kartenMap[c.id] = { wort: c.wort, uebersetzung: c.uebersetzung, extra: c.extra, stufe: c.stufe, nextReview: c.nextReview, ersteBewertung: c.ersteBewertung === undefined ? null : c.ersteBewertung, order: ci };
     });
     const setsMap = {};
     (Array.isArray(b.sets) ? b.sets : []).forEach((s, si) => {
@@ -426,7 +493,7 @@ function bereicheMapToArray(mapObj) {
     const kartenMap = b.karten && typeof b.karten === "object" ? b.karten : {};
     const karten = Object.keys(kartenMap).map(cid => {
       const c = kartenMap[cid] || {};
-      return { card: normCard({ id: cid, wort: c.wort, uebersetzung: c.uebersetzung, extra: c.extra, stufe: c.stufe, nextReview: c.nextReview }), order: Number.isFinite(c.order) ? c.order : 0 };
+      return { card: normCard({ id: cid, wort: c.wort, uebersetzung: c.uebersetzung, extra: c.extra, stufe: c.stufe, nextReview: c.nextReview, ersteBewertung: c.ersteBewertung }), order: Number.isFinite(c.order) ? c.order : 0 };
     }).sort((x, y) => x.order - y.order).map(x => x.card);
     const setsMap = b.sets && typeof b.sets === "object" ? b.sets : {};
     const sets = Object.keys(setsMap).map(sid => {
@@ -445,6 +512,14 @@ function normStreak(s) {
     lastEvaluatedDate: /^\d{4}-\d{2}-\d{2}$/.test(s.lastEvaluatedDate) ? s.lastEvaluatedDate : null
   };
 }
+/* B3: Einstellungen liegen im selben Nutzerdokument. Aktuell nur das Tageslimit
+   fuer neue Karten - der Standard 20 ist derselbe wie bei Anki. */
+const NEU_PRO_TAG_STANDARD = 20;
+const NEU_PRO_TAG_MAX = 500;
+function normSettings(s) {
+  const n = s && Number.isInteger(s.neuProTag) ? s.neuProTag : NEU_PRO_TAG_STANDARD;
+  return { neuProTag: Math.min(Math.max(n, 0), NEU_PRO_TAG_MAX) };
+}
 
 /* ---------- Zustand ---------- */
 let currentUser = null;      // Firebase-User
@@ -453,6 +528,7 @@ let bereiche = null;         // Array [{name, karten:[]}] – null solange Cloud
 let cloudDocExists = false;
 let syncError = null;
 let streak = normStreak(null); // { count, lastCompletedDate, lastEvaluatedDate } – nur echte Lernsessions zählen, Üben nicht
+let settings = normSettings(null); // { neuProTag }
 
 let ui = {
   authMode: "login",         // "login" | "register" | "reset"
@@ -469,8 +545,17 @@ let ui = {
   selectedIds: new Set(),     // ausgewählte Karten-IDs
   drillOpen: false,           // Auswahl für Übungsmodus sichtbar?
   drillSource: "stufen",      // "stufen" oder die ID einer Speicherkarte
-  openSetId: null             // Speicherkarte, deren Kartenliste aufgeklappt ist
+  openSetId: null,            // Speicherkarte, deren Kartenliste aufgeklappt ist
+  bulkOpen: false,            // E1: Panel „Liste einfügen" sichtbar?
+  bulkSep: "auto",            // Trennzeichen: "auto" | "tab" | ";" | "," | "-"
+  bulkSwap: false,            // Spalten getauscht (Übersetzung zuerst)?
+  bulkSkipDupes: true,        // Duplikate beim Import überspringen?
+  bulkPreview: null           // Ergebnis der Vorschau: Array von Zeilen oder null
 };
+
+/* E1: Der eingefügte Text darf ein render() ueberleben - genau wie formDraft.
+   Ein Cloud-Snapshot mitten im Einfuegen wuerde sonst 80 Vokabeln loeschen. */
+let bulkDraft = "";
 
 /* ---------- Formular-Entwurf ----------
    render() baut das gesamte DOM neu. Ohne diesen Zwischenspeicher waere jede
@@ -539,6 +624,7 @@ async function initFirebase() {
     if (unsubscribeSnapshot) { unsubscribeSnapshot(); unsubscribeSnapshot = null; }
     bereiche = null;
     streak = normStreak(null);
+    settings = normSettings(null);
     cloudDocExists = false;
     ui.session = null;
     ui.editId = null;
@@ -552,6 +638,7 @@ async function initFirebase() {
         if (data) {
           cloudDocExists = true;
           if (typeof data.name === "string" && data.name) displayName = data.name;
+          settings = normSettings(data.settings);
           if (Array.isArray(data.bereiche)) {
             // Altes Format (vor der Konflikt-Absicherung) – einmalig ins neue Format überführen
             bereiche = normBereiche(data.bereiche);
@@ -589,7 +676,7 @@ async function initFirebase() {
 let saveWarned = false;
 function persist() {
   if (!userDocRef || bereiche === null) return;
-  fb.setDoc(userDocRef, { name: displayName, bereiche: bereicheArrayToMap(bereiche), streak: streak }).then(() => {
+  fb.setDoc(userDocRef, { name: displayName, bereiche: bereicheArrayToMap(bereiche), streak: streak, settings: settings }).then(() => {
     saveWarned = false;
   }).catch(e => {
     if (!saveWarned) {
@@ -608,6 +695,9 @@ function persistCardGrade(bereichId, cardId, fields) {
   const patch = {};
   patch[base + ".stufe"] = fields.stufe;
   patch[base + ".nextReview"] = fields.nextReview;
+  /* B3: gehoert zum Bewerten dazu - sonst gilt eine heute eingefuehrte Karte auf
+     dem naechsten Geraet wieder als neu und frisst das Tageslimit ein zweites Mal. */
+  patch[base + ".ersteBewertung"] = fields.ersteBewertung === undefined ? null : fields.ersteBewertung;
   fb.updateDoc(userDocRef, patch).catch(e => {
     if (!saveWarned) {
       saveWarned = true;
@@ -619,15 +709,33 @@ function persistStreak() {
   if (!userDocRef) return;
   fb.updateDoc(userDocRef, { streak: streak }).catch(() => {});
 }
+function persistSettings() {
+  if (!userDocRef) return;
+  fb.updateDoc(userDocRef, { settings: settings }).catch(() => {});
+}
 
 /* ---------- Streak: zählt nur echte, vollständig erledigte Lerntage (kein Üben) ---------- */
+/* A7: Die Streak zaehlt weiterhin fuer ALLE Bereiche gemeinsam - aber sie misst
+   ab jetzt genau das, was die App auch verlangt hat. Zwei Korrekturen:
+
+   1. Neue, noch nie bewertete Karten zaehlen nicht als "verpasst". Sie werden vom
+      Tageslimit absichtlich zurueckgehalten; wuerden sie zaehlen, koennte nach
+      einem Import von 500 Vokabeln nie wieder eine Streak entstehen.
+   2. "Fertig" heisst: in keinem Bereich ist noch etwas offen, das heute dran
+      gewesen waere - gemessen mit derselben Funktion, die auch die Lernsession
+      fuellt (offeneKarten), nicht mit einer eigenen, strengeren Regel.
+
+   Wer mehrere Bereiche hat, sieht auf dem Lernen-Tab jetzt ausserdem
+   ausdruecklich, welcher Bereich noch offen ist. Vorher blieb die Streak
+   kommentarlos aus. */
 function evaluateStreakForNewDay() {
   if (bereiche === null) return;
   const t = todayStr();
   if (streak.lastEvaluatedDate === t) return; // heute schon geprüft
-  // Gab es eine Karte, die schon VOR heute fällig war und nicht bearbeitet wurde?
-  // -> ein Tag wurde verpasst, die Streak reißt (Tage ganz ohne fällige Karten zählen nicht als verpasst)
-  const hadOverdue = bereiche.some(b => b.karten.some(c => c.nextReview < t));
+  // Gab es eine bereits eingeführte Karte, die schon VOR heute fällig war und
+  // liegen geblieben ist? -> ein Tag wurde verpasst, die Streak reißt.
+  // (Tage ganz ohne fällige Karten zählen nicht als verpasst.)
+  const hadOverdue = bereiche.some(b => b.karten.some(c => !istNeueKarte(c) && c.nextReview < t));
   if (hadOverdue && streak.lastCompletedDate !== t) {
     streak.count = 0;
   }
@@ -638,11 +746,18 @@ function checkStreakOnSessionComplete() {
   if (bereiche === null) return;
   const t = todayStr();
   if (streak.lastCompletedDate === t) return; // heute schon gezählt
-  const allClear = bereiche.every(b => !b.karten.some(c => c.nextReview <= t));
-  if (!allClear) return; // in einem anderen Bereich ist noch was fällig
+  if (bereicheMitOffenem().length > 0) return; // woanders ist noch etwas fällig
   streak.count += 1;
   streak.lastCompletedDate = t;
   persistStreak();
+}
+/* Alle Bereiche, in denen heute noch etwas zu tun ist – Grundlage für die
+   Streak-Prüfung UND für die Anzeige „Noch offen: …" auf dem Lernen-Tab. */
+function bereicheMitOffenem() {
+  if (bereiche === null) return [];
+  return bereiche
+    .map(b => ({ bereich: b, offen: dueCardsFor(b).length }))
+    .filter(x => x.offen > 0);
 }
 
 /* ---------- Auth-Aktionen ---------- */
@@ -726,9 +841,50 @@ function setCards(set) {
   const ids = new Set(set.cardIds);
   return currentCards().filter(c => ids.has(c.id));
 }
-function dueCards() {
+/* ---------- B3: Tageslimit für neue Karten ----------
+   Wer 500 Vokabeln importiert, hat sonst am ersten Tag 500 faellige Karten,
+   am naechsten Tag wieder 500 auf Stufe 1, dazu die des Vortags. Nach zwei
+   Wochen sind es Tausende und die App wird nie wieder geoeffnet. Das ist der
+   haeufigste Grund, warum Karteikarten-Apps aufgegeben werden.
+
+   Deshalb: Wiederholungen kommen IMMER dran (sie sind bereits Arbeit von
+   gestern), neue Karten nur, solange heute noch Plaetze frei sind. Gezaehlt
+   wird ueber alle Bereiche hinweg, damit drei Bereiche nicht dreimal das Limit
+   ergeben. Die Zaehlung steckt in den Karten selbst (ersteBewertung == heute)
+   und nicht in einem eigenen Zaehler - so stimmt sie auch dann noch, wenn
+   zwischendurch auf einem zweiten Geraet gelernt wurde. */
+function neueKartenHeute() {
+  if (bereiche === null) return 0;
   const t = todayStr();
-  return currentCards().filter(c => c.nextReview <= t);
+  let n = 0;
+  for (const b of bereiche) for (const c of b.karten) if (c.ersteBewertung === t) n++;
+  return n;
+}
+function freieNeuPlaetze() {
+  return Math.max(0, settings.neuProTag - neueKartenHeute());
+}
+function dueCardsFor(bereich) {
+  const b = bereich || currentBereich();
+  const t = todayStr();
+  const wiederholungen = b.karten.filter(c => !istNeueKarte(c) && c.nextReview <= t);
+  const neue = b.karten.filter(c => istNeueKarte(c) && c.nextReview <= t);
+  return wiederholungen.concat(neue.slice(0, freieNeuPlaetze()));
+}
+function dueCards() { return dueCardsFor(currentBereich()); }
+/* Wie viele neue Karten warten heute noch hinter dem Limit? (nur zur Anzeige) */
+function zurueckgehalteneNeue(bereich) {
+  const b = bereich || currentBereich();
+  const t = todayStr();
+  const neue = b.karten.filter(c => istNeueKarte(c) && c.nextReview <= t).length;
+  return Math.max(0, neue - freieNeuPlaetze());
+}
+function setNeuProTag(n) {
+  if (!Number.isInteger(n)) return;
+  const v = Math.min(Math.max(n, 0), NEU_PRO_TAG_MAX);
+  if (v === settings.neuProTag) return;
+  settings.neuProTag = v;
+  persistSettings();
+  render();
 }
 const LAST_BACKUP_KEY = "adrabic-last-backup";
 function daysSinceLastBackup() {
@@ -818,6 +974,11 @@ function selectBereich(idx) {
   ui.drillOpen = false;
   ui.drillSource = "stufen";
   ui.openSetId = null;
+  /* Die Duplikatprüfung der Vorschau gilt immer für genau einen Bereich –
+     nach dem Wechsel wäre sie falsch, also zurücksetzen. */
+  ui.bulkOpen = false;
+  ui.bulkPreview = null;
+  bulkDraft = "";
   render();
 }
 function renameBereich() {
@@ -1024,12 +1185,29 @@ function startDrillWithCards(cards, label, handwriting) {
 }
 
 /* ---------- Karten ---------- */
+/* D6: Vergleichsform fuer die Duplikatpruefung. Vokalzeichen und Tatweel werden
+   entfernt, weil كِتَاب und كتاب dasselbe Wort sind - ohne das findet die Pruefung
+   genau die Duplikate nicht, die man sich beim Abtippen einhandelt.
+   Nur zum Vergleichen; gespeichert wird selbstverstaendlich der Originaltext. */
+function vergleichsWort(w) {
+  return String(w).trim().toLowerCase()
+    .replace(/[\u064B-\u0652\u0670\u0640]/g, "")
+    .replace(/\s+/g, " ");
+}
+function findeDuplikat(wort, exceptId, cards) {
+  const key = vergleichsWort(wort);
+  return (cards || currentCards()).find(c => c.id !== exceptId && vergleichsWort(c.wort) === key) || null;
+}
 function submitCardForm() {
   const wort = val("f-wort").trim();
   const ueb = val("f-ueb").trim();
   const extra = val("f-extra").trim();
   if (!wort || !ueb) {
     alert("Bitte Wort und Übersetzung ausfüllen.");
+    return;
+  }
+  const dup = findeDuplikat(wort, ui.editId || null);
+  if (dup && !confirm('„' + wort + '" gibt es in diesem Bereich schon (Übersetzung: „' + dup.uebersetzung + '").\n\nTrotzdem speichern?')) {
     return;
   }
   if (ui.editId) {
@@ -1046,6 +1224,9 @@ function submitCardForm() {
         if (newStufe !== card.stufe) {
           card.stufe = newStufe;
           card.nextReview = newStufe === 0 ? todayStr() : dateInDays(intervalForStufe(newStufe));
+          /* Wer hier von Hand eine Stufe setzt, erklaert die Karte als bekannt.
+             Sie darf dann nicht mehr als "neu" durch das Tageslimit laufen. */
+          if (newStufe > 0 && istNeueKarte(card)) card.ersteBewertung = todayStr();
         }
       }
     }
@@ -1057,7 +1238,8 @@ function submitCardForm() {
       uebersetzung: ueb,
       extra: extra,
       stufe: 0,
-      nextReview: todayStr()
+      nextReview: todayStr(),
+      ersteBewertung: null   // B3: noch nie bewertet = neue Karte
     });
   }
   resetFormDraft();
@@ -1087,6 +1269,125 @@ function deleteCard(id) {
   render();
 }
 
+/* ---------- E1: Vokabeln als Liste einfügen ----------
+   Ein Buchkapitel sind 80 Vokabeln. Einzeln getippt macht das niemand zweimal;
+   ohne diese Funktion bleibt das Tool ein Werkzeug fuer Geduldige.
+   Ablauf bewusst zweistufig: erst Vorschau, dann Import. Ein Import von 300
+   Karten, der schweigend das Falsche anlegt, ist schlimmer als gar keiner. */
+function bulkTrenner(sep) {
+  if (sep === "tab") return ["\t"];
+  if (sep === ";") return [";"];
+  if (sep === ",") return [","];
+  if (sep === "-") return ["—", "–", " - "];
+  /* "auto": Reihenfolge ist Absicht. Tab und Gedankenstrich sind eindeutig,
+     das Komma steht zuletzt - es kommt in Uebersetzungen selbst haeufig vor. */
+  return ["\t", "—", "–", ";", "|", " - ", ","];
+}
+function splitBis3(line, t) {
+  const i = line.indexOf(t);
+  if (i < 0) return null;
+  const a = line.slice(0, i);
+  const rest = line.slice(i + t.length);
+  const j = rest.indexOf(t);
+  if (j < 0) return [a, rest];
+  return [a, rest.slice(0, j), rest.slice(j + t.length)];
+}
+function parseBulk(text, sep, swap) {
+  const trenner = bulkTrenner(sep);
+  const vorhandene = currentCards();
+  const inListe = new Set();
+  const rows = [];
+  for (const roh of String(text).split(/\r?\n/)) {
+    const line = roh.trim();
+    if (!line || line.startsWith("#")) continue;   // Leerzeilen und #-Kommentare überspringen
+    let teile = null;
+    for (const t of trenner) {
+      teile = splitBis3(line, t);
+      if (teile) break;
+    }
+    if (!teile) {
+      rows.push({ wort: line, ueb: "", extra: "", status: "fehler", grund: "kein Trennzeichen gefunden" });
+      continue;
+    }
+    let wort = (teile[0] || "").trim();
+    let ueb = (teile[1] || "").trim();
+    const extra = (teile[2] || "").trim();
+    if (swap) { const h = wort; wort = ueb; ueb = h; }
+    if (!wort || !ueb) {
+      rows.push({ wort: wort, ueb: ueb, extra: extra, status: "fehler", grund: "Wort oder Übersetzung fehlt" });
+      continue;
+    }
+    const key = vergleichsWort(wort);
+    if (inListe.has(key)) {
+      rows.push({ wort: wort, ueb: ueb, extra: extra, status: "dup-liste", grund: "steht in dieser Liste doppelt" });
+      continue;
+    }
+    inListe.add(key);
+    const dup = findeDuplikat(wort, null, vorhandene);
+    if (dup) {
+      rows.push({ wort: wort, ueb: ueb, extra: extra, status: "dup-bereich", grund: "schon im Bereich: „" + dup.uebersetzung + "“" });
+      continue;
+    }
+    rows.push({ wort: wort, ueb: ueb, extra: extra, status: "ok", grund: "" });
+  }
+  return rows;
+}
+function readBulkTextarea() {
+  const el = document.getElementById("bulk-text");
+  if (el) bulkDraft = el.value;
+}
+function openBulk() {
+  ui.bulkOpen = true;
+  ui.bulkPreview = null;
+  ui.editId = null;
+  render();
+  const el = document.getElementById("bulk-text");
+  if (el) el.focus();
+}
+function closeBulk() {
+  ui.bulkOpen = false;
+  ui.bulkPreview = null;
+  bulkDraft = "";
+  render();
+}
+function bulkPreview() {
+  readBulkTextarea();
+  if (!bulkDraft.trim()) {
+    alert("Bitte zuerst die Vokabelliste in das Feld einfügen.");
+    return;
+  }
+  ui.bulkPreview = parseBulk(bulkDraft, ui.bulkSep, ui.bulkSwap);
+  render();
+}
+function bulkImport() {
+  const rows = ui.bulkPreview;
+  if (!rows) return;
+  const nehmen = rows.filter(r => r.status === "ok" || (!ui.bulkSkipDupes && r.status.indexOf("dup") === 0));
+  if (nehmen.length === 0) {
+    alert("Es bleibt nichts zu importieren übrig.");
+    return;
+  }
+  if (!confirm(nehmen.length + " Karte(n) in „" + currentBereich().name + "“ anlegen?")) return;
+  const neue = nehmen.map(r => ({
+    id: genId(),
+    wort: r.wort,
+    uebersetzung: r.ueb,
+    extra: r.extra,
+    stufe: 0,
+    nextReview: todayStr(),
+    ersteBewertung: null
+  }));
+  currentCards().unshift(...neue);   // Reihenfolge der Liste bleibt erhalten
+  ui.bulkOpen = false;
+  ui.bulkPreview = null;
+  bulkDraft = "";
+  persist();
+  render();
+  alert(neue.length + " Karte(n) angelegt. Sie werden mit " + settings.neuProTag +
+    " neuen Karten pro Tag eingeführt – das dauert etwa " +
+    (settings.neuProTag > 0 ? Math.ceil(neue.length / settings.neuProTag) : "∞") + " Tag(e).");
+}
+
 /* ---------- Lern-Session ---------- */
 function startSession() {
   const due = dueCards();
@@ -1096,48 +1397,58 @@ function startSession() {
 }
 function revealAnswer() { ui.session.revealed = true; render(); }
 function toggleExtra() { ui.session.extraOpen = !ui.session.extraOpen; render(); }
-function gradeKnown() {
+/* B2: drei Tasten statt zwei.
+   „Nicht gewusst" warf bisher jede Karte auf Stufe 0 zurueck - auch eine, die
+   acht Wochen sicher sass und heute einmal verpatzt wurde. Das demotiviert und
+   blaeht die Tagesmenge auf. Anki und aehnliche Systeme haben aus demselben
+   Grund drei Stufen:
+     Nicht   → zwei Stufen zurueck, kommt in DIESER Runde wieder
+     Fast    → eine Stufe zurueck, morgen wieder (nicht mehr heute)
+     Sicher  → eine Stufe hoch, naechstes Intervall mit Streuung */
+function gradeCard(kind) {
   const s = ui.session;
+  if (!s || s.queue.length === 0) return;
+  /* card kann fehlen, wenn die Karte auf einem anderen Geraet geloescht wurde,
+     waehrend diese Session offen ist. Frueher stuerzte hier card.id ab. */
   const card = findCard(s.queue[0]);
   if (card && !s.isDrill) {
-    s.lastAction = { cardId: card.id, prevStufe: card.stufe, prevNextReview: card.nextReview, prevQueue: s.queue.slice() };
-    card.stufe = Math.min(card.stufe + 1, MAX_STUFE);
-    card.nextReview = dateInDays(intervalForStufe(card.stufe));
+    s.lastAction = {
+      cardId: card.id,
+      prevStufe: card.stufe,
+      prevNextReview: card.nextReview,
+      prevErsteBewertung: card.ersteBewertung,
+      prevQueue: s.queue.slice()
+    };
+    // B3: ab jetzt gilt die Karte als eingeführt und zählt gegen das Tageslimit
+    if (istNeueKarte(card)) card.ersteBewertung = todayStr();
+    if (kind === "known") {
+      card.stufe = Math.min(card.stufe + 1, MAX_STUFE);
+      card.nextReview = nextReviewForStufe(card.stufe);
+    } else if (kind === "almost") {
+      card.stufe = Math.max(0, card.stufe - 1);
+      card.nextReview = dateInDays(1);
+    } else {
+      card.stufe = Math.max(0, card.stufe - 2);
+      card.nextReview = todayStr();
+    }
   }
-  s.queue.shift();
+  const id = s.queue.shift();
+  // Nur „Nicht" hängt die Karte wieder hinten an. „Fast" ist morgen dran –
+  // stünde sie auch heute noch einmal an, würde die Session nie enden.
+  if (kind === "unknown" && card) s.queue.push(id);
   if (s.isDrill && s.queue.length === 0) s.queue = shuffled(s.drillIds);
   s.revealed = false;
   s.extraOpen = false;
   hwStrokes = [];
   if (!s.isDrill) {
-    /* card kann fehlen, wenn die Karte auf einem anderen Geraet geloescht wurde,
-       waehrend diese Session offen ist. Frueher stuerzte hier card.id ab. */
-    if (card) persistCardGrade(s.bereichId, card.id, { stufe: card.stufe, nextReview: card.nextReview });
+    if (card) persistCardGrade(s.bereichId, card.id, { stufe: card.stufe, nextReview: card.nextReview, ersteBewertung: card.ersteBewertung });
     if (s.queue.length === 0) checkStreakOnSessionComplete();
   }
   render();
 }
-function gradeUnknown() {
-  const s = ui.session;
-  const card = findCard(s.queue[0]);
-  if (card && !s.isDrill) {
-    s.lastAction = { cardId: card.id, prevStufe: card.stufe, prevNextReview: card.nextReview, prevQueue: s.queue.slice() };
-    card.stufe = 0;
-    card.nextReview = todayStr();
-  }
-  const id = s.queue.shift();
-  if (card) {
-    s.queue.push(id);
-  }
-  s.revealed = false;
-  s.extraOpen = false;
-  hwStrokes = [];
-  if (!s.isDrill) {
-    if (card) persistCardGrade(s.bereichId, card.id, { stufe: card.stufe, nextReview: card.nextReview });
-    if (s.queue.length === 0) checkStreakOnSessionComplete();
-  }
-  render();
-}
+function gradeKnown() { gradeCard("known"); }
+function gradeAlmost() { gradeCard("almost"); }
+function gradeUnknown() { gradeCard("unknown"); }
 function undoLastGrade() {
   const s = ui.session;
   if (!s || !s.lastAction) return;
@@ -1145,12 +1456,14 @@ function undoLastGrade() {
   if (card) {
     card.stufe = s.lastAction.prevStufe;
     card.nextReview = s.lastAction.prevNextReview;
+    // sonst bliebe eine irrtümlich bewertete neue Karte für heute verbraucht
+    card.ersteBewertung = s.lastAction.prevErsteBewertung;
   }
   s.queue = s.lastAction.prevQueue;
   s.lastAction = null;
   s.revealed = true;
   s.extraOpen = false;
-  if (card) persistCardGrade(s.bereichId, card.id, { stufe: card.stufe, nextReview: card.nextReview });
+  if (card) persistCardGrade(s.bereichId, card.id, { stufe: card.stufe, nextReview: card.nextReview, ersteBewertung: card.ersteBewertung });
   render();
 }
 function endSession() { ui.session = null; hwStrokes = []; hwFullscreen = false; render(); }
@@ -1165,9 +1478,11 @@ document.addEventListener("keydown", e => {
   if (e.key === " ") {
     e.preventDefault();
     if (!s.revealed) revealAnswer();
-  } else if (e.key === "ArrowRight") {
+  } else if (e.key === "ArrowRight" || e.key === "3") {
     if (s.revealed) gradeKnown();
-  } else if (e.key === "ArrowLeft") {
+  } else if (e.key === "ArrowDown" || e.key === "2") {
+    if (s.revealed) gradeAlmost();
+  } else if (e.key === "ArrowLeft" || e.key === "1") {
     if (s.revealed) gradeUnknown();
   }
 });
@@ -1354,6 +1669,42 @@ function renderMain() {
         render();
       });
     }
+    /* E1: Der eingefuegte Text wird bei jedem Tastendruck in bulkDraft
+       gespiegelt - genau wie beim Kartenformular, damit ein Cloud-Snapshot ihn
+       nicht loeschen kann. Neu gerendert wird dabei bewusst nicht: eine Liste
+       mit 500 Zeilen bei jedem Zeichen neu aufzubauen waere unbenutzbar. */
+    const bulkEl = document.getElementById("bulk-text");
+    if (bulkEl) bulkEl.addEventListener("input", e => { bulkDraft = e.target.value; });
+    const sepEl = document.getElementById("bulk-sep");
+    if (sepEl) sepEl.addEventListener("change", e => {
+      readBulkTextarea();
+      ui.bulkSep = e.target.value;
+      if (ui.bulkPreview) ui.bulkPreview = parseBulk(bulkDraft, ui.bulkSep, ui.bulkSwap);
+      render();
+    });
+    const swapEl = document.getElementById("bulk-swap");
+    if (swapEl) swapEl.addEventListener("change", e => {
+      readBulkTextarea();
+      ui.bulkSwap = e.target.checked;
+      if (ui.bulkPreview) ui.bulkPreview = parseBulk(bulkDraft, ui.bulkSep, ui.bulkSwap);
+      render();
+    });
+    const skipEl = document.getElementById("bulk-skip");
+    if (skipEl) skipEl.addEventListener("change", e => {
+      readBulkTextarea();
+      ui.bulkSkipDupes = e.target.checked;
+      render();
+    });
+  }
+
+  if (ui.tab === "lernen") {
+    /* B3: "change" statt "input" - sonst wuerde bei jeder getippten Ziffer
+       einmal in die Cloud geschrieben (aus "20" wird sonst kurz "2"). */
+    const limitEl = document.getElementById("f-neu-pro-tag");
+    if (limitEl) limitEl.addEventListener("change", e => {
+      const n = parseInt(e.target.value, 10);
+      setNeuProTag(Number.isInteger(n) ? n : NEU_PRO_TAG_STANDARD);
+    });
   }
 }
 
@@ -1365,16 +1716,42 @@ function renderLernen() {
   if (streak.count > 0) {
     html += '<p class="hint" style="margin-bottom:10px">🔥 <strong>' + streak.count + '</strong> Tag' + (streak.count === 1 ? "" : "e") + ' am Stück</p>';
   }
+  const neuImStapel = due.filter(istNeueKarte).length;
+  const wartend = zurueckgehalteneNeue();
   html += '<div class="panel">';
   if (cards.length === 0) {
     html += '<p class="hint">Noch keine Karten in diesem Bereich – leg welche unter <strong>Verwalten</strong> an. 📝</p>';
   } else if (due.length === 0) {
     html += '<p class="hint">🎉 Für heute nichts mehr fällig in „' + esc(currentBereich().name) + '". Schau morgen wieder rein!</p>';
   } else {
-    html += '<p class="due-info">Heute fällig: <strong>' + due.length + '</strong> von ' + cards.length + ' Karten</p>';
+    html += '<p class="due-info">Heute fällig: <strong>' + due.length + '</strong> von ' + cards.length + ' Karten' +
+      (neuImStapel > 0 ? ' <span class="badge">' + neuImStapel + ' neu</span>' : '') + '</p>';
     html += '<button data-action="start-session">Lernsession starten (' + due.length + ')</button>';
   }
+  /* B3: Das Tageslimit muss sichtbar sein. Sonst wirkt es wie ein Fehler,
+     wenn nach einem Import von 500 Vokabeln nur 20 Karten auftauchen. */
+  if (wartend > 0) {
+    html += '<p class="hint" style="margin-top:12px">⏳ <strong>' + wartend + '</strong> neue Karte' + (wartend === 1 ? '' : 'n') +
+      ' warten – heute sind ' + settings.neuProTag + ' neue vorgesehen und davon schon ' + neueKartenHeute() + ' vergeben. ' +
+      'Der Rest kommt an den nächsten Tagen automatisch dazu.</p>';
+  }
+  html += '<div class="limit-row">';
+  html += '<label for="f-neu-pro-tag" style="margin:0">Neue Karten pro Tag</label>';
+  html += '<input type="number" id="f-neu-pro-tag" min="0" max="' + NEU_PRO_TAG_MAX + '" step="5" value="' + settings.neuProTag + '">';
+  html += '<span class="hint" style="padding:0">heute ' + neueKartenHeute() + ' eingeführt (gilt für alle Bereiche zusammen)</span>';
   html += '</div>';
+  html += '</div>';
+
+  /* A7: Wer drei Bereiche hat und heute nur einen lernt, bekam nie eine Streak
+     und erfuhr nirgends, warum. Jetzt steht es hier. */
+  const offen = bereicheMitOffenem().filter(x => x.bereich.id !== currentBereich().id);
+  if (offen.length > 0) {
+    html += '<p class="hint" style="margin-top:-4px">📌 Noch offen für die Streak: ' +
+      offen.map(x => esc(x.bereich.name) + ' (' + x.offen + ')').join(", ") +
+      '</p>';
+  } else if (due.length === 0 && streak.lastCompletedDate === todayStr()) {
+    html += '<p class="hint" style="margin-top:-4px">✅ Heute ist in allen Bereichen alles erledigt.</p>';
+  }
   return html;
 }
 
@@ -1430,8 +1807,9 @@ function renderSession() {
       }
     }
     html += '<div class="grade-row">';
-    html += '<button class="btn-unknown" data-action="grade-unknown">Wusste ich nicht</button>';
-    html += '<button class="btn-known" data-action="grade-known">Wusste ich</button>';
+    html += '<button class="btn-unknown" data-action="grade-unknown" aria-label="Nicht gewusst – zwei Stufen zurück, kommt gleich noch einmal">Nicht<span class="sub">kommt gleich wieder</span></button>';
+    html += '<button class="btn-almost" data-action="grade-almost" aria-label="Fast gewusst – eine Stufe zurück, morgen wieder">Fast<span class="sub">' + (s.isDrill ? "nur Übung" : "morgen wieder") + '</span></button>';
+    html += '<button class="btn-known" data-action="grade-known" aria-label="Sicher gewusst – eine Stufe weiter">Sicher<span class="sub">' + (s.isDrill ? "nur Übung" : "in ~" + intervalForStufe(Math.min(card.stufe + 1, MAX_STUFE)) + " Tagen") + '</span></button>';
     html += '</div>';
   }
   if (s.lastAction) {
@@ -1479,13 +1857,18 @@ function renderVerwalten() {
   html += '<label for="f-extra">Optional: Beispielsatz, Bild-Link oder Notiz</label>';
   html += '<textarea id="f-extra" rows="2">' + esc(formDraft.extra) + '</textarea>';
   if (editing) {
-    html += '<label for="f-stufe">Wiederholungsstufe (0 = sofort fällig, 1 = morgen fällig, 2 = in 2 Tagen, usw.)</label>';
+    html += '<label for="f-stufe">Wiederholungsstufe (0 = sofort fällig, sonst ' +
+      [1, 2, 3, 4, 5, 6].map(s => s + " → " + intervalForStufe(s)).join(", ") +
+      ' Tage … höchstens ' + MAX_INTERVAL_DAYS + ')</label>';
     html += '<input type="number" id="f-stufe" min="0" max="' + MAX_STUFE + '" step="1" value="' + editing.stufe + '">';
   }
   html += '<div class="form-actions">';
   html += '<button data-action="submit-card">' + (editing ? "Änderungen speichern" : "Karte hinzufügen") + '</button>';
   if (editing) html += '<button class="secondary" data-action="cancel-edit">Abbrechen</button>';
+  if (!editing && !ui.bulkOpen) html += '<button class="secondary" data-action="open-bulk" title="Mehrere Vokabeln auf einmal aus einer Liste anlegen">📋 Liste einfügen</button>';
   html += '</div></div>';
+
+  html += renderBulkPanel();
 
   html += '<div class="panel">';
   html += '<div class="bereich-manage-row">';
@@ -1588,6 +1971,86 @@ function renderVerwalten() {
         }
         html += '</div>';
       }
+    }
+  }
+  html += '</div>';
+  return html;
+}
+
+/* E1: Panel „Liste einfügen". Erscheint nur auf Anforderung, damit der
+   Verwalten-Tab für den Alltag schlicht bleibt. */
+function renderBulkPanel() {
+  if (!ui.bulkOpen) return "";
+  const seps = [
+    ["auto", "automatisch erkennen"],
+    ["tab", "Tabulator"],
+    ["-", "Gedankenstrich  —"],
+    [";", "Semikolon  ;"],
+    [",", "Komma  ,"]
+  ];
+  let html = '<div class="panel">';
+  html += '<h2>📋 Vokabelliste einfügen</h2>';
+  html += '<p class="hint" style="padding-top:0">Eine Vokabel pro Zeile, Wort und Übersetzung durch ein Trennzeichen getrennt. Eine dritte Spalte landet im Notizfeld. Zeilen mit <code>#</code> am Anfang werden übersprungen.</p>';
+  html += '<textarea id="bulk-text" rows="7" spellcheck="false" style="unicode-bidi:plaintext" placeholder="كِتَاب — Buch&#10;قَلَم — Stift&#10;بَاب — Tür">' + esc(bulkDraft) + '</textarea>';
+
+  html += '<div class="limit-row" style="margin-top:12px">';
+  html += '<label for="bulk-sep" style="margin:0">Trennzeichen</label>';
+  html += '<select id="bulk-sep">' + seps.map(s =>
+    '<option value="' + s[0] + '"' + (ui.bulkSep === s[0] ? " selected" : "") + '>' + esc(s[1]) + '</option>').join("") + '</select>';
+  html += '<label style="display:flex; align-items:center; gap:6px; margin:0; cursor:pointer">';
+  html += '<input type="checkbox" id="bulk-swap" style="width:18px;height:18px"' + (ui.bulkSwap ? " checked" : "") + '> Übersetzung steht zuerst';
+  html += '</label>';
+  html += '</div>';
+
+  html += '<div class="form-actions">';
+  html += '<button data-action="bulk-preview">Vorschau</button>';
+  html += '<button class="secondary" data-action="close-bulk">Abbrechen</button>';
+  html += '</div>';
+
+  const rows = ui.bulkPreview;
+  if (rows) {
+    const ok = rows.filter(r => r.status === "ok").length;
+    const dupB = rows.filter(r => r.status === "dup-bereich").length;
+    const dupL = rows.filter(r => r.status === "dup-liste").length;
+    const fehler = rows.filter(r => r.status === "fehler").length;
+    html += '<div class="bulk-summary">';
+    html += '<span class="badge ok">' + ok + ' neu</span>';
+    if (dupB + dupL > 0) html += ' <span class="badge">' + (dupB + dupL) + ' Duplikat' + (dupB + dupL === 1 ? "" : "e") + '</span>';
+    if (fehler > 0) html += ' <span class="badge warn">' + fehler + ' unlesbar</span>';
+    html += '</div>';
+
+    if (rows.length === 0) {
+      html += '<p class="hint">In dem Text ist keine einzige verwertbare Zeile. Stimmt das Trennzeichen?</p>';
+    } else {
+      html += '<div class="bulk-list">';
+      const zeigen = rows.slice(0, 200);
+      for (const r of zeigen) {
+        const cls = r.status === "ok" ? "ok" : r.status === "fehler" ? "warn" : "";
+        const text = r.status === "ok" ? "neu" : r.status === "fehler" ? "Fehler" : "Duplikat";
+        html += '<div class="bulk-row">';
+        html += '<span class="b-wort arabic" lang="ar">' + esc(r.wort) + '</span>';
+        html += '<span class="b-ueb">' + esc(r.ueb) + (r.grund ? ' <em style="opacity:0.7">(' + esc(r.grund) + ')</em>' : '') + '</span>';
+        html += '<span class="badge ' + cls + '">' + text + '</span>';
+        html += '</div>';
+      }
+      if (rows.length > zeigen.length) {
+        html += '<p class="hint">… und ' + (rows.length - zeigen.length) + ' weitere Zeilen (werden mit importiert).</p>';
+      }
+      html += '</div>';
+    }
+
+    if (dupB + dupL > 0) {
+      html += '<label style="display:flex; align-items:center; gap:6px; margin-top:12px; cursor:pointer; color:var(--ink)">';
+      html += '<input type="checkbox" id="bulk-skip" style="width:18px;height:18px"' + (ui.bulkSkipDupes ? " checked" : "") + '> Duplikate überspringen';
+      html += '</label>';
+    }
+    const anzahl = ok + (ui.bulkSkipDupes ? 0 : dupB + dupL);
+    html += '<div class="form-actions">';
+    html += '<button data-action="bulk-import"' + (anzahl === 0 ? " disabled" : "") + '>' + anzahl + ' Karte(n) anlegen</button>';
+    html += '</div>';
+    if (anzahl > settings.neuProTag && settings.neuProTag > 0) {
+      html += '<p class="hint">Bei ' + settings.neuProTag + ' neuen Karten pro Tag dauert es rund ' +
+        Math.ceil(anzahl / settings.neuProTag) + ' Tage, bis alle eingeführt sind. Das ist gewollt – das Tageslimit lässt sich auf dem Lernen-Tab ändern.</p>';
     }
   }
   html += '</div>';
@@ -1817,7 +2280,12 @@ app.addEventListener("click", e => {
     case "reveal": revealAnswer(); break;
     case "toggle-extra": toggleExtra(); break;
     case "grade-known": gradeKnown(); break;
+    case "grade-almost": gradeAlmost(); break;
     case "grade-unknown": gradeUnknown(); break;
+    case "open-bulk": openBulk(); break;
+    case "close-bulk": closeBulk(); break;
+    case "bulk-preview": bulkPreview(); break;
+    case "bulk-import": bulkImport(); break;
     case "undo-grade": undoLastGrade(); break;
     case "end-session": endSession(); break;
     case "submit-card": submitCardForm(); break;
