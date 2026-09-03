@@ -253,6 +253,38 @@
   .set-row .set-name { flex: 1; min-width: 0; font-weight: 600; word-break: break-word; }
   .set-cards { background: var(--bg); border-radius: var(--radius); padding: 4px 12px; margin: 0 0 10px; }
   .set-cards .card-row { padding: 8px 0; }
+  /* E4/D10: Fortschritt sichtbar. Balken und Saeulen bestehen bewusst aus
+     einfachen div-Elementen statt aus einer Diagramm-Bibliothek - die App soll
+     eine einzige Datei ohne Build-Schritt bleiben. Alles hier ist reine
+     Anzeige: es wird nichts gespeichert und nichts berechnet, was den
+     Lernfortschritt veraendert. */
+  .stat-kennzahlen { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
+  .stat-kennzahl { flex: 1; min-width: 90px; background: var(--bg); border-radius: var(--radius); padding: 10px 12px; }
+  .stat-kennzahl .zahl { font-size: 1.35rem; font-weight: 700; color: var(--accent-dark); line-height: 1.2; }
+  .stat-kennzahl .was { font-size: 0.75rem; color: var(--ink-soft); }
+
+  .stat-block { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border); }
+  .stat-block h3 { font-size: 0.98rem; font-weight: 600; margin-bottom: 2px; }
+  .stat-block .stat-sub { font-size: 0.78rem; color: var(--ink-soft); margin-bottom: 12px; }
+
+  .stat-bar { display: flex; height: 18px; border-radius: 999px; overflow: hidden; background: var(--border); }
+  .stat-seg { height: 100%; }
+  .stat-legend { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 12px; font-size: 0.82rem; color: var(--ink-soft); }
+  .stat-legend .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
+  .stat-legend strong { color: var(--ink); }
+
+  .spark { display: flex; align-items: flex-end; gap: 3px; height: 92px; }
+  .spark.fein { gap: 2px; height: 70px; }
+  .spark-fill { flex: 1; background: var(--accent-soft); border: 1px solid var(--accent-dark); border-top-left-radius: 4px; border-top-right-radius: 4px; min-height: 2px; }
+  .spark-fill.leer { background: transparent; border-color: var(--border); }
+  .spark-fill.heute { background: var(--accent); border-color: var(--accent); }
+  .spark-reihe { display: flex; gap: 3px; font-size: 0.7rem; color: var(--ink-soft); }
+  .spark-reihe.fein { gap: 2px; }
+  .spark-reihe span { flex: 1; text-align: center; }
+  .spark-reihe.oben { margin-bottom: 5px; }
+  .spark-reihe.unten { margin-top: 6px; }
+  .spark-spanne { display: flex; justify-content: space-between; margin-top: 6px; font-size: 0.7rem; color: var(--ink-soft); }
+
   .setup-steps { font-size: 0.92rem; color: var(--ink-soft); }
   .setup-steps li { margin: 8px 0 8px 18px; }
   code { background: var(--bg); padding: 2px 6px; border-radius: 6px; font-size: 0.85em; }
@@ -295,6 +327,9 @@
     .container { padding: 12px; }
     .panel { padding: 16px; }
     .study-word { font-size: 1.4rem; }
+    /* Seit 1.7.0 gibt es drei Tabs statt zwei - "Fortschritt" ist das
+       laengste Wort und braucht auf einem 360-px-Handy weniger Polster. */
+    .tab { padding: 12px 4px; font-size: 0.9rem; }
   }
 </style>
 </head>
@@ -529,7 +564,8 @@ let ui = {
   authInfo: null,
   authBusy: false,
   bereichIdx: 0,
-  tab: "lernen",
+  tab: "lernen",             // "lernen" | "fortschritt" | "verwalten"
+  statsScope: "alle",        // "alle" = alle Bereiche zusammen, "bereich" = nur der offene
   session: null,
   editId: null,
   askImport: false,          // alte lokale Daten anbieten
@@ -874,6 +910,82 @@ function setNeuProTag(n) {
   persistSettings();
   render();
 }
+/* ---------- E4/D10: Zahlen für den Fortschritts-Tab ----------
+   Alles hier wird bei jedem Aufruf frisch aus den vorhandenen Karten
+   ausgerechnet. Es gibt bewusst KEIN neues Feld in der Cloud: eine Statistik,
+   die selbst Daten schreibt, kann auch falsche Daten schreiben - und ein
+   zusaetzlicher Schreibvorgang bei jeder Bewertung ist genau die Stelle, an
+   der A4 (Vollueberschreiben) noch offen ist. Was sich nicht ableiten laesst,
+   steht deshalb hier auch nicht. */
+
+/* Welche Karten zaehlen: alle Bereiche zusammen oder nur der offene? */
+function statsCards() {
+  if (bereiche === null) return [];
+  if (ui.statsScope === "bereich") return currentCards().slice();
+  return bereiche.reduce((alle, b) => alle.concat(b.karten), []);
+}
+
+/* Die vier Gruppen der Stufenverteilung. Die Grenzen folgen den Intervallen:
+   Stufe 3 = 3 Tage, Stufe 6 = 19 Tage. "Sitzt" heisst also: kommt fruehestens
+   in gut zwei Wochen wieder. "Neu" laeuft ueber ersteBewertung und nicht ueber
+   die Stufe - sonst stuende eine vergessene Karte auf Stufe 0 in derselben
+   Gruppe wie eine nie gesehene. */
+const STAT_GRUPPEN = [
+  { label: "neu",       erklaerung: "noch nie bewertet", farbe: "var(--ink-soft)",   test: c => istNeueKarte(c) },
+  { label: "wackelig",  erklaerung: "Stufe 0–2",          farbe: "var(--red)",        test: c => !istNeueKarte(c) && c.stufe <= 2 },
+  { label: "im Aufbau", erklaerung: "Stufe 3–5",          farbe: "var(--accent-dark)", test: c => !istNeueKarte(c) && c.stufe >= 3 && c.stufe <= 5 },
+  { label: "sitzt",     erklaerung: "Stufe 6+",           farbe: "var(--green)",      test: c => !istNeueKarte(c) && c.stufe >= 6 }
+];
+function stufenVerteilung(cards) {
+  return STAT_GRUPPEN.map(g => ({ ...g, anzahl: cards.filter(g.test).length }));
+}
+
+function wochentagKurz(iso) {
+  const p = iso.split("-");
+  const d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+  return ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"][d.getDay()];
+}
+function tagKurz(iso) {
+  const p = iso.split("-");
+  return Number(p[2]) + "." + Number(p[1]) + ".";
+}
+
+/* Vorschau auf die naechsten sieben Tage. Gezaehlt werden nur Wiederholungen:
+   Wann eine neue Karte drankommt, entscheidet das Tageslimit und nicht ihr
+   Faelligkeitsdatum - sie hier mitzuzaehlen ergaebe eine Zahl, die nie eintritt.
+   Der heutige Balken enthaelt auch alles Ueberfaellige aus der Vergangenheit. */
+function vorschau7(cards) {
+  const t = todayStr();
+  const out = [];
+  for (let i = 0; i < 7; i++) {
+    const tag = dateInDays(i);
+    const anzahl = cards.filter(c =>
+      !istNeueKarte(c) && (i === 0 ? c.nextReview <= t : c.nextReview === tag)
+    ).length;
+    out.push({ tag: tag, anzahl: anzahl, label: i === 0 ? "heute" : (i === 1 ? "morgen" : wochentagKurz(tag)) });
+  }
+  return out;
+}
+
+/* Wie viele Karten wurden an den letzten n Tagen zum ersten Mal bewertet?
+   Das ist die einzige zeitliche Spur, die in den Daten wirklich steckt
+   (ersteBewertung). Karten aus der Zeit vor 1.6.0 tragen den Platzhalter
+   1970-01-01 und fallen dadurch von selbst aus dem Zeitfenster heraus. */
+function neuVerlauf(cards, tage) {
+  const proTag = {};
+  for (const c of cards) {
+    if (c.ersteBewertung && c.ersteBewertung !== LEGACY_FIRST_GRADE) {
+      proTag[c.ersteBewertung] = (proTag[c.ersteBewertung] || 0) + 1;
+    }
+  }
+  const out = [];
+  for (let i = tage - 1; i >= 0; i--) {
+    const tag = dateInDays(-i);
+    out.push({ tag: tag, anzahl: proTag[tag] || 0 });
+  }
+  return out;
+}
+
 const LAST_BACKUP_KEY = "adrabic-last-backup";
 function daysSinceLastBackup() {
   const raw = localStorage.getItem(LAST_BACKUP_KEY);
@@ -1471,10 +1583,13 @@ function renderMain() {
 
   html += '<div class="tabs">';
   html += '<button class="tab' + (ui.tab === "lernen" ? " active" : "") + '" data-action="tab-lernen">Lernen</button>';
+  html += '<button class="tab' + (ui.tab === "fortschritt" ? " active" : "") + '" data-action="tab-fortschritt">Fortschritt</button>';
   html += '<button class="tab' + (ui.tab === "verwalten" ? " active" : "") + '" data-action="tab-verwalten">Verwalten</button>';
   html += '</div>';
 
-  html += ui.tab === "lernen" ? renderLernen() : renderVerwalten();
+  html += ui.tab === "lernen" ? renderLernen()
+        : ui.tab === "fortschritt" ? renderFortschritt()
+        : renderVerwalten();
   html += '<p style="text-align:center; font-size:0.72rem; color:var(--ink-soft); opacity:0.6; margin:18px 0 8px">Version ' + APP_VERSION + '</p>';
 
   /* Vor dem Neuaufbau merken, in welchem Feld der Cursor stand - sonst springt
@@ -1592,6 +1707,111 @@ function renderLernen() {
   } else if (due.length === 0 && streak.lastCompletedDate === todayStr()) {
     html += '<p class="hint" style="margin-top:-4px">✅ Heute ist in allen Bereichen alles erledigt.</p>';
   }
+  return html;
+}
+
+/* E4/D10: der Fortschritts-Tab.
+   Ohne sichtbaren Fortschritt fehlt der Grund weiterzumachen - und die
+   Vorschau warnt vor einem 300er-Tag, bevor er da ist. */
+function renderFortschritt() {
+  const cards = statsCards();
+  const nurBereich = ui.statsScope === "bereich";
+  let html = "";
+
+  html += '<div class="pills" style="margin-bottom:12px">';
+  html += '<button class="pill' + (nurBereich ? "" : " active") + '" data-action="stats-scope" data-scope="alle">Alle Bereiche</button>';
+  html += '<button class="pill' + (nurBereich ? " active" : "") + '" data-action="stats-scope" data-scope="bereich">Nur „' + esc(currentBereich().name) + '"</button>';
+  html += '</div>';
+
+  html += '<div class="panel">';
+  if (cards.length === 0) {
+    html += '<p class="hint">Noch keine Karten – sobald du welche anlegst und bewertest, steht hier dein Fortschritt.</p>';
+    html += '</div>';
+    return html;
+  }
+
+  /* --- Kennzahlen --- */
+  const t = todayStr();
+  const faellig = cards.filter(c => !istNeueKarte(c) && c.nextReview <= t).length;
+  const heuteNeu = cards.filter(c => c.ersteBewertung === t).length;
+  html += '<div class="stat-kennzahlen">';
+  html += '<div class="stat-kennzahl"><div class="zahl">' + cards.length + '</div><div class="was">Karten insgesamt</div></div>';
+  html += '<div class="stat-kennzahl"><div class="zahl">' + faellig + '</div><div class="was">heute zu wiederholen</div></div>';
+  html += '<div class="stat-kennzahl"><div class="zahl">' + heuteNeu + '</div><div class="was">heute neu gelernt</div></div>';
+  html += '<div class="stat-kennzahl"><div class="zahl">' + streak.count + '</div><div class="was">Tage am Stück</div></div>';
+  html += '</div>';
+
+  /* --- Stufenverteilung --- */
+  const gruppen = stufenVerteilung(cards);
+  const gesamt = cards.length;
+  html += '<div class="stat-block" style="border-top:none; padding-top:0; margin-top:0">';
+  html += '<h3>Wie fest sitzt der Stoff?</h3>';
+  html += '<p class="stat-sub">' + gesamt + ' Karten' + (nurBereich ? ' in „' + esc(currentBereich().name) + '"' : ' über alle Bereiche') + '</p>';
+  html += '<div class="stat-bar" role="img" aria-label="' +
+    esc(gruppen.map(g => g.anzahl + " " + g.label).join(", ")) + '">';
+  gruppen.forEach(g => {
+    if (g.anzahl === 0) return;
+    const p = (g.anzahl / gesamt) * 100;
+    html += '<div class="stat-seg" style="width:' + p.toFixed(2) + '%; background:' + g.farbe + '" title="' +
+      esc(g.label + ": " + g.anzahl + " Karten (" + g.erklaerung + ")") + '"></div>';
+  });
+  html += '</div>';
+  html += '<div class="stat-legend">';
+  gruppen.forEach(g => {
+    html += '<span><span class="dot" style="background:' + g.farbe + '"></span><strong>' + g.anzahl + '</strong> ' +
+      esc(g.label) + ' <span style="opacity:0.7">(' + esc(g.erklaerung) + ')</span></span>';
+  });
+  html += '</div>';
+  html += '</div>';
+
+  /* --- Vorschau auf die nächsten sieben Tage --- */
+  const tage = vorschau7(cards);
+  const maxTag = Math.max(1, ...tage.map(x => x.anzahl));
+  html += '<div class="stat-block">';
+  html += '<h3>Die nächsten 7 Tage</h3>';
+  html += '<p class="stat-sub">nur Wiederholungen – neue Karten kommen über das Tageslimit dazu (heute: ' + settings.neuProTag + ')</p>';
+  html += '<div class="spark-reihe oben">';
+  tage.forEach(x => { html += '<span>' + (x.anzahl > 0 ? x.anzahl : "") + '</span>'; });
+  html += '</div>';
+  html += '<div class="spark">';
+  tage.forEach((x, i) => {
+    const h = x.anzahl === 0 ? 2 : Math.max(4, Math.round((x.anzahl / maxTag) * 100));
+    html += '<div class="spark-fill' + (x.anzahl === 0 ? " leer" : "") + (i === 0 ? " heute" : "") +
+      '" style="height:' + h + '%" title="' + esc(tagKurz(x.tag) + ": " + x.anzahl + " Wiederholungen") + '"></div>';
+  });
+  html += '</div>';
+  html += '<div class="spark-reihe unten">';
+  tage.forEach(x => { html += '<span>' + esc(x.label) + '</span>'; });
+  html += '</div>';
+  const spitze = tage.slice(1).reduce((a, b) => b.anzahl > a.anzahl ? b : a, tage[1]);
+  if (spitze && spitze.anzahl >= 60) {
+    html += '<p class="hint" style="padding-bottom:0">⚠ Am ' + esc(tagKurz(spitze.tag)) + ' stehen ' + spitze.anzahl +
+      ' Wiederholungen an. Wenn du das Tageslimit für neue Karten bis dahin senkst, wird der Tag kleiner.</p>';
+  }
+  html += '</div>';
+
+  /* --- 30-Tage-Verlauf --- */
+  const verlauf = neuVerlauf(cards, 30);
+  const summe = verlauf.reduce((a, x) => a + x.anzahl, 0);
+  const maxV = Math.max(1, ...verlauf.map(x => x.anzahl));
+  html += '<div class="stat-block">';
+  html += '<h3>Neu eingeführt (letzte 30 Tage)</h3>';
+  html += '<p class="stat-sub">' + summe + ' Karten zum ersten Mal bewertet, im Schnitt ' +
+    (summe / 30).toFixed(1).replace(".", ",") + ' pro Tag</p>';
+  html += '<div class="spark fein">';
+  verlauf.forEach(x => {
+    const h = x.anzahl === 0 ? 2 : Math.max(4, Math.round((x.anzahl / maxV) * 100));
+    html += '<div class="spark-fill' + (x.anzahl === 0 ? " leer" : "") +
+      '" style="height:' + h + '%" title="' + esc(tagKurz(x.tag) + ": " + x.anzahl + " neue Karten") + '"></div>';
+  });
+  html += '</div>';
+  html += '<div class="spark-spanne"><span>' + esc(tagKurz(verlauf[0].tag)) + '</span><span>heute</span></div>';
+  html += '<p class="hint" style="padding-bottom:0">Gezählt wird die <strong>erste</strong> Bewertung einer Karte. ' +
+    'Wie viele Wiederholungen du an einem Tag gemacht hast, steht in den Daten bisher nicht – ' +
+    'dafür bräuchte es einen eigenen Zähler.</p>';
+  html += '</div>';
+
+  html += '</div>';
   return html;
 }
 
@@ -2031,6 +2251,8 @@ app.addEventListener("click", e => {
     case "rename-bereich": renameBereich(); break;
     case "delete-bereich": deleteBereich(); break;
     case "tab-lernen": ui.tab = "lernen"; ui.editId = null; resetFormDraft(); ui.searchQuery = ""; ui.selectMode = false; ui.selectedIds = new Set(); ui.drillOpen = false; render(); break;
+    case "tab-fortschritt": ui.tab = "fortschritt"; ui.session = null; ui.editId = null; resetFormDraft(); ui.drillOpen = false; render(); break;
+    case "stats-scope": ui.statsScope = btn.dataset.scope === "bereich" ? "bereich" : "alle"; render(); break;
     case "tab-verwalten": ui.tab = "verwalten"; ui.session = null; render(); break;
     case "start-session": startSession(); break;
     case "reveal": revealAnswer(); break;
