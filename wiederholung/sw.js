@@ -7,7 +7,7 @@
    WICHTIG: Bei jeder neuen Version CACHE_NAME hochzählen (v2 → v3 → ...),
    sonst behalten Nutzer:innen alte Dateien im Cache. */
 
-const CACHE_NAME = "adrabic-1.5.0";
+const CACHE_NAME = "adrabic-1.6.0";
 
 const APP_SHELL = [
   "./",
