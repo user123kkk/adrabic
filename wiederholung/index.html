@@ -227,14 +227,8 @@
   .limit-row select { padding: 8px 10px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--card); color: var(--ink); font: inherit; }
   .limit-row select option { background: var(--card); color: var(--ink); }
 
-  .bulk-summary { margin-top: 14px; }
-  .bulk-list { max-height: 320px; overflow-y: auto; background: var(--bg); border-radius: var(--radius); padding: 4px 12px; margin-top: 10px; }
-  .bulk-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
-  .bulk-row:last-child { border-bottom: none; }
-  .bulk-row .b-wort { flex: 1; min-width: 0; font-weight: 600; word-break: break-word; }
-  .bulk-row .b-ueb { flex: 1.3; min-width: 0; color: var(--ink-soft); word-break: break-word; }
-  .badge.ok { background: var(--green-soft); color: var(--green); }
-  .badge.warn { background: var(--red-soft); color: var(--red); }
+
+
   .progress-note { font-size: 0.85rem; color: var(--ink-soft); margin-bottom: 10px; }
 
   .done-box { text-align: center; padding: 36px 20px; }
@@ -1260,20 +1254,6 @@ function deleteCard(id) {
   render();
 }
 
-/* ---------- E1: Vokabeln als Liste einfügen ----------
-   Ein Buchkapitel sind 80 Vokabeln. Einzeln getippt macht das niemand zweimal;
-   ohne diese Funktion bleibt das Tool ein Werkzeug fuer Geduldige.
-   Ablauf bewusst zweistufig: erst Vorschau, dann Import. Ein Import von 300
-   Karten, der schweigend das Falsche anlegt, ist schlimmer als gar keiner. */
-function splitBis3(line, t) {
-  const i = line.indexOf(t);
-  if (i < 0) return null;
-  const a = line.slice(0, i);
-  const rest = line.slice(i + t.length);
-  const j = rest.indexOf(t);
-  if (j < 0) return [a, rest];
-  return [a, rest.slice(0, j), rest.slice(j + t.length)];
-}
 /* ---------- Lern-Session ---------- */
 function startSession() {
   const due = dueCards();
@@ -1555,25 +1535,6 @@ function renderMain() {
         render();
       });
     }
-       gespiegelt - genau wie beim Kartenformular, damit ein Cloud-Snapshot ihn
-       nicht loeschen kann. Neu gerendert wird dabei bewusst nicht: eine Liste
-       mit 500 Zeilen bei jedem Zeichen neu aufzubauen waere unbenutzbar. */);
-    const sepEl = document.getElementById("bulk-sep");
-    if (sepEl) sepEl.addEventListener("change", e => {
-      readBulkTextarea();
-      render();
-    });
-    const swapEl = document.getElementById("bulk-swap");
-    if (swapEl) swapEl.addEventListener("change", e => {
-      readBulkTextarea();
-      render();
-    });
-    const skipEl = document.getElementById("bulk-skip");
-    if (skipEl) skipEl.addEventListener("change", e => {
-      readBulkTextarea();
-      ui.bulkSkipDupes = e.target.checked;
-      render();
-    });
   }
 
   if (ui.tab === "lernen") {
@@ -1745,8 +1706,6 @@ function renderVerwalten() {
   html += '<button data-action="submit-card">' + (editing ? "Änderungen speichern" : "Karte hinzufügen") + '</button>';
   if (editing) html += '<button class="secondary" data-action="cancel-edit">Abbrechen</button>';html += '</div></div>';
 
-  html += renderBulkPanel();
-
   html += '<div class="panel">';
   html += '<div class="bereich-manage-row">';
   html += '<h2 style="margin-bottom:0">Karten in „' + esc(currentBereich().name) + '" (' + cards.length + ')</h2>';
@@ -1848,81 +1807,6 @@ function renderVerwalten() {
         }
         html += '</div>';
       }
-    }
-  }
-  html += '</div>';
-  return html;
-}
-
-/* E1: Panel „Liste einfügen". Erscheint nur auf Anforderung, damit der
-   Verwalten-Tab für den Alltag schlicht bleibt. */
-function renderBulkPanel() {
-  const seps = [
-    ["auto", "automatisch erkennen"],
-    ["tab", "Tabulator"],
-    ["-", "Gedankenstrich  —"],
-    [";", "Semikolon  ;"],
-    [",", "Komma  ,"]
-  ];
-  let html = '<div class="panel">';
-  html += '<h2>📋 Vokabelliste einfügen</h2>';
-  html += '<p class="hint" style="padding-top:0">Eine Vokabel pro Zeile, Wort und Übersetzung durch ein Trennzeichen getrennt. Eine dritte Spalte landet im Notizfeld. Zeilen mit <code>#</code> am Anfang werden übersprungen.</p>';
-
-  html += '<div class="limit-row" style="margin-top:12px">';
-  html += '<label for="bulk-sep" style="margin:0">Trennzeichen</label>';
-  html += '<select id="bulk-sep">' + seps.map(s =>
-  html += '<label style="display:flex; align-items:center; gap:6px; margin:0; cursor:pointer">';
-  html += '</label>';
-  html += '</div>';
-
-  html += '<div class="form-actions">';
-  html += '<button data-action="bulk-preview">Vorschau</button>';
-  html += '<button class="secondary" data-action="close-bulk">Abbrechen</button>';
-  html += '</div>';
-
-  if (rows) {
-    const ok = rows.filter(r => r.status === "ok").length;
-    const dupB = rows.filter(r => r.status === "dup-bereich").length;
-    const dupL = rows.filter(r => r.status === "dup-liste").length;
-    const fehler = rows.filter(r => r.status === "fehler").length;
-    html += '<div class="bulk-summary">';
-    html += '<span class="badge ok">' + ok + ' neu</span>';
-    if (dupB + dupL > 0) html += ' <span class="badge">' + (dupB + dupL) + ' Duplikat' + (dupB + dupL === 1 ? "" : "e") + '</span>';
-    if (fehler > 0) html += ' <span class="badge warn">' + fehler + ' unlesbar</span>';
-    html += '</div>';
-
-    if (rows.length === 0) {
-      html += '<p class="hint">In dem Text ist keine einzige verwertbare Zeile. Stimmt das Trennzeichen?</p>';
-    } else {
-      html += '<div class="bulk-list">';
-      const zeigen = rows.slice(0, 200);
-      for (const r of zeigen) {
-        const cls = r.status === "ok" ? "ok" : r.status === "fehler" ? "warn" : "";
-        const text = r.status === "ok" ? "neu" : r.status === "fehler" ? "Fehler" : "Duplikat";
-        html += '<div class="bulk-row">';
-        html += '<span class="b-wort arabic" lang="ar">' + esc(r.wort) + '</span>';
-        html += '<span class="b-ueb">' + esc(r.ueb) + (r.grund ? ' <em style="opacity:0.7">(' + esc(r.grund) + ')</em>' : '') + '</span>';
-        html += '<span class="badge ' + cls + '">' + text + '</span>';
-        html += '</div>';
-      }
-      if (rows.length > zeigen.length) {
-        html += '<p class="hint">… und ' + (rows.length - zeigen.length) + ' weitere Zeilen (werden mit importiert).</p>';
-      }
-      html += '</div>';
-    }
-
-    if (dupB + dupL > 0) {
-      html += '<label style="display:flex; align-items:center; gap:6px; margin-top:12px; cursor:pointer; color:var(--ink)">';
-      html += '<input type="checkbox" id="bulk-skip" style="width:18px;height:18px"' + (ui.bulkSkipDupes ? " checked" : "") + '> Duplikate überspringen';
-      html += '</label>';
-    }
-    const anzahl = ok + (ui.bulkSkipDupes ? 0 : dupB + dupL);
-    html += '<div class="form-actions">';
-    html += '<button data-action="bulk-import"' + (anzahl === 0 ? " disabled" : "") + '>' + anzahl + ' Karte(n) anlegen</button>';
-    html += '</div>';
-    if (anzahl > settings.neuProTag && settings.neuProTag > 0) {
-      html += '<p class="hint">Bei ' + settings.neuProTag + ' neuen Karten pro Tag dauert es rund ' +
-        Math.ceil(anzahl / settings.neuProTag) + ' Tage, bis alle eingeführt sind. Das ist gewollt – das Tageslimit lässt sich auf dem Lernen-Tab ändern.</p>';
     }
   }
   html += '</div>';
