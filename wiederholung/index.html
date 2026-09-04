@@ -211,7 +211,7 @@
   .study-extra a { color: var(--accent-dark); }
   /* Drei Tasten (B2) muessen auch auf einem schmalen Handy nebeneinander passen:
      weniger Innenabstand, kleinere Schrift, Zusatzzeile in Kleinschrift. */
-  .grade-row { display: flex; gap: 8px; margin-top: 22px; }
+  .grade-row { display: flex; gap: 8px; margin-top: 22px; scroll-margin-bottom: 18px; }
   .grade-row button { flex: 1; padding: 12px 4px; font-size: 0.98rem; line-height: 1.2; min-width: 0; }
   .grade-row .sub { display: block; font-size: 0.66rem; font-weight: 400; opacity: 0.8; margin-top: 3px; }
   .btn-known { background: var(--green); }
@@ -1562,7 +1562,7 @@ function revealAnswer() {
   ui.session.revealed = true;
   hwFullscreen = false;
   render();
-  scrollAnswerIntoView();
+  scrollGradeRowIntoView();
 }
 /* E5 (1.8.0): nur so weit scrollen, dass die Loesung ins Bild kommt - die
    eigene Zeichnung darueber soll sichtbar bleiben, sonst muesste man zum
@@ -1571,21 +1571,31 @@ function revealAnswer() {
    die Zeichnung oben aus dem Bild).
    requestAnimationFrame: erst wenn der Browser das neue DOM gesetzt hat,
    sonst gibt es das Element noch gar nicht. */
-function scrollAnswerIntoView() {
+/* Allgemeines Werkzeug, kein Einzelfall fuer "Aufdecken": Immer wenn
+   innerhalb einer laufenden Karte neuer Inhalt dazukommt und dadurch die
+   Bewertungszeile aus dem Bild rutschen koennte, ruft die jeweilige Stelle
+   diese eine Funktion auf. Heute sind das revealAnswer() und das Oeffnen
+   der Beispielsaetze (toggleExtra) - jede kuenftige Stelle mit demselben
+   Problem (weiteres Aufklappen, eine neue Karten-Zusatzinfo, etc.) bindet
+   sich genauso an, ohne dass die Scroll-Logik dort neu erfunden wird.
+
+   block:"nearest" bewegt nur das noetige Minimum - ist die Bewertungszeile
+   schon sichtbar, passiert nichts, kein unnoetiges Ruckeln. scroll-margin-
+   bottom auf .grade-row (siehe CSS) sorgt dabei automatisch fuer etwas Luft
+   zum unteren Bildschirmrand, wie man es aus Karteikarten-Apps kennt - die
+   Knoepfe kleben nicht direkt an der Kante, sie haben spuerbar Abstand. */
+function scrollGradeRowIntoView() {
   requestAnimationFrame(() => {
-    /* Nachbesserung: Vorher zielte das Scrollen nur auf die Loesung
-       (.study-answer). Die Bewertungsknoepfe darunter (Nicht/Fast/Sicher
-       bzw. im Uebungsmodus Nochmal/Weiter) blieben oft ausserhalb des
-       Bildschirms - man musste nach dem Vergleichen noch einmal von Hand
-       nachscrollen, um ueberhaupt bewerten zu koennen. Jetzt ist die
-       Bewertungszeile selbst das Ziel: block:"nearest" bewegt weiterhin nur
-       das noetige Minimum (kein Sprung, wenn schon alles sichtbar ist),
-       aber sie ist niedrig, daher passt meist auch die Loesung mit ins Bild. */
     const el = document.querySelector(".grade-row") || document.querySelector(".study-answer");
     if (el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "nearest" });
   });
 }
-function toggleExtra() { ui.session.extraOpen = !ui.session.extraOpen; render(); }
+function toggleExtra() {
+  ui.session.extraOpen = !ui.session.extraOpen;
+  render();
+  // nur beim Aufklappen: Zuklappen macht die Seite kuerzer, kein Nachschub noetig
+  if (ui.session.extraOpen) scrollGradeRowIntoView();
+}
 /* B2: drei Tasten statt zwei.
    „Nicht gewusst" warf bisher jede Karte auf Stufe 0 zurueck - auch eine, die
    acht Wochen sicher sass und heute einmal verpatzt wurde. Das demotiviert und
