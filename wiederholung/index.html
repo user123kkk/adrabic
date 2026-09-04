@@ -421,7 +421,7 @@ const firebaseConfig = {
 
 /* Versionsnummer: bei jeder Veroeffentlichung hochzaehlen und denselben Wert
    als CACHE_NAME in sw.js eintragen, damit alte Dateien verworfen werden. */
-const APP_VERSION = "1.9.0";
+const APP_VERSION = "2.0.0";
 
 const CONFIGURED = firebaseConfig.apiKey !== "HIER_EINFUEGEN";
 const app = document.getElementById("app");
@@ -594,11 +594,6 @@ function bereichFelder(b, order) {
   });
   return { name: b.name, order: order, karten: kartenMap, sets: setsMap };
 }
-function bereicheArrayToMap(arr) {
-  const out = {};
-  arr.forEach((b, bi) => { out[b.id] = bereichFelder(b, bi); });
-  return out;
-}
 function bereicheMapToArray(mapObj) {
   const ids = Object.keys(mapObj || {});
   const list = ids.map(id => {
@@ -702,6 +697,7 @@ let ui = {
   searchQuery: "",           // Suchtext im Verwalten-Tab (nicht gespeichert, nur UI-Zustand)
   searchAll: false,          // D7: false = nur dieser Bereich, true = alle Bereiche
   kartenSeite: 0,            // C2: angezeigte Seite der Kartenliste (nur UI-Zustand)
+  umzug: null,               // C1: { backupGemacht, laeuft, fertig, gesamt, fehler } waehrend des Datenumzugs
   dialog: null,              // D2: { kind, title, text, value, okLabel, danger, resolve }
   selectMode: false,          // Mehrfachauswahl im Verwalten-Tab aktiv?
   selectedIds: new Set(),     // ausgewählte Karten-IDs
@@ -756,8 +752,114 @@ function importOldProfile(name) {
 }
 
 /* ---------- Firebase ---------- */
-let auth = null, db = null, userDocRef = null, unsubscribeSnapshot = null;
+/* C1 (2.0.0): Karten liegen nicht mehr als Unterfelder IM Nutzerdokument,
+   sondern jede Karte als eigenes Dokument in users/{uid}/karten. Grund: Ein
+   Firestore-Dokument darf hoechstens 1 MiB gross werden - bei etwa 5.000 bis
+   7.000 Karten war Schluss, und zwar hart: ab da liesse sich keine Karte mehr
+   anlegen. Als eigene Dokumente gibt es diese Grenze nicht mehr.
+
+   Aufbau ab jetzt:
+     users/{uid}                     name, streak, settings, schemaVersion
+     users/{uid}/bereiche/{bid}      name, order, sets
+     users/{uid}/karten/{cid}        bereichId + die Felder der Karte
+
+   Die Karten liegen FLACH, mit dem Bereich als Feld - nicht unterhalb des
+   Bereichs. Dadurch ist die Suche ueber alle Bereiche eine einzige Abfrage,
+   und das Verschieben einer Karte aendert nur ein Feld statt Kopieren und
+   Loeschen.
+
+   Geladen werden weiterhin alle Karten des Nutzers auf einmal. Nur die
+   faelligen zu laden waere erst bei Zehntausenden Karten ein Gewinn und
+   muesste Fortschritt, Suche, Duplikatpruefung und Export mit umbauen. Die
+   Struktur laesst das jederzeit nachtraeglich zu, ohne die Daten noch einmal
+   umzuziehen. */
+const SCHEMA_VERSION = 2;
+
+let auth = null, db = null, userDocRef = null;
+let bereicheColRef = null, kartenColRef = null;
+let unsubscribeSnapshot = null, unsubBereicheSnap = null, unsubKartenSnap = null;
 let fb = {}; // Firestore-/Auth-Funktionen nach dem Laden
+
+/* Rohstaende der beiden Sammlungen. Die Anzeige braucht beide, deshalb wird
+   erst zusammengesetzt, wenn von jeder mindestens ein Stand da ist - sonst
+   blitzte kurz eine Liste ohne Karten auf. */
+let rohBereiche = null;
+let rohKarten = null;
+let sammlungenGestartet = false;
+let umzugBereiche = null;   // alter Datenstand, nur waehrend des Umzugs
+
+function listenerLoesen() {
+  if (unsubscribeSnapshot) { unsubscribeSnapshot(); unsubscribeSnapshot = null; }
+  if (unsubBereicheSnap) { unsubBereicheSnap(); unsubBereicheSnap = null; }
+  if (unsubKartenSnap) { unsubKartenSnap(); unsubKartenSnap = null; }
+}
+
+function snapFehler(err) {
+  syncError = err && err.code === "permission-denied"
+    ? "Zugriff verweigert – bitte Sicherheitsregeln in Firebase prüfen."
+    : "Verbindungsproblem beim Laden der Daten.";
+  render();
+}
+
+/* Setzt aus den beiden Sammlungen die Liste zusammen, mit der die App
+   arbeitet - dieselbe Form wie bisher, damit Lernen, Fortschritt, Suche und
+   Export unveraendert weiterlaufen. */
+function bereicheAusSammlungen(bDocs, kDocs) {
+  const nachBereich = new Map();
+  for (const b of bDocs) nachBereich.set(b.id, []);
+  for (const k of kDocs) {
+    const liste = nachBereich.get(k.bereichId);
+    /* Karten, deren Bereich es nicht mehr gibt, werden nicht angezeigt. Das
+       kann vorkommen, wenn das Loeschen eines Bereichs mittendrin abbricht -
+       sie tauchen sonst nirgends auf und wuerden nur die Zaehlung verfaelschen. */
+    if (liste) liste.push(k);
+  }
+  const list = bDocs.map(b => {
+    const karten = (nachBereich.get(b.id) || [])
+      .map(k => ({ card: normCard(k), ord: Number.isFinite(k.order) ? k.order : 0 }))
+      .sort((x, y) => x.ord - y.ord).map(x => x.card);
+    const setsMap = b.sets && typeof b.sets === "object" ? b.sets : {};
+    const sets = Object.keys(setsMap).map(sid => {
+      const st = setsMap[sid] || {};
+      return { set: normSet({ id: sid, name: st.name, cardIds: st.cardIds }), ord: Number.isFinite(st.order) ? st.order : 0 };
+    }).sort((x, y) => x.ord - y.ord).map(x => x.set);
+    return {
+      id: b.id,
+      name: typeof b.name === "string" && b.name ? b.name.slice(0, 40) : "Vokabeln",
+      karten: karten, sets: sets,
+      order: Number.isFinite(b.order) ? b.order : 0
+    };
+  }).sort((x, y) => x.order - y.order).map(({ order, ...rest }) => rest);
+  return list.length ? list : [{ id: genId(), name: "Vokabeln", karten: [], sets: [] }];
+}
+
+function datenZusammenbauen() {
+  if (rohBereiche === null || rohKarten === null) return;
+  bereiche = bereicheAusSammlungen(rohBereiche, rohKarten);
+  /* A3: nur zuruecksetzen, wenn der offene Bereich wirklich weg ist. */
+  if (!bereiche.some(b => b.id === ui.bereichId)) ui.bereichId = bereiche[0].id;
+  syncError = null;
+  evaluateStreakForNewDay();
+  render();
+}
+
+function sammlungenStarten() {
+  if (sammlungenGestartet || !bereicheColRef) return;
+  sammlungenGestartet = true;
+  /* Anders als beim Nutzerdokument werden hier auch Staende mit eigenen,
+     noch nicht bestaetigten Schreibvorgaengen uebernommen. Sie enthalten
+     genau die Aenderung, die gerade lokal gemacht wurde - wuerde man sie
+     ueberspringen, verschwaende eine gerade angelegte Karte kurz wieder aus
+     der Liste, sobald die andere Sammlung einen Stand meldet. */
+  unsubBereicheSnap = fb.onSnapshot(bereicheColRef, snap => {
+    rohBereiche = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    datenZusammenbauen();
+  }, snapFehler);
+  unsubKartenSnap = fb.onSnapshot(kartenColRef, snap => {
+    rohKarten = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    datenZusammenbauen();
+  }, snapFehler);
+}
 
 async function initFirebase() {
   const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
@@ -775,57 +877,58 @@ async function initFirebase() {
 
   fb.onAuthStateChanged(auth, user => {
     currentUser = user;
-    if (unsubscribeSnapshot) { unsubscribeSnapshot(); unsubscribeSnapshot = null; }
+    listenerLoesen();
     bereiche = null;
+    rohBereiche = null;
+    rohKarten = null;
+    sammlungenGestartet = false;
+    umzugBereiche = null;
     streak = normStreak(null);
     settings = normSettings(null);
     cloudDocExists = false;
     ui.session = null;
     ui.editId = null;
     ui.askImport = false;
+    ui.umzug = null;
     if (user) {
       displayName = user.displayName || (user.email ? user.email.split("@")[0] : "Lernende:r");
       userDocRef = fb.doc(db, "users", user.uid);
+      bereicheColRef = fb.collection(userDocRef, "bereiche");
+      kartenColRef = fb.collection(userDocRef, "karten");
       unsubscribeSnapshot = fb.onSnapshot(userDocRef, snap => {
         if (snap.metadata.hasPendingWrites) return; // eigenes Echo ignorieren
         const data = snap.data();
-        if (data) {
-          cloudDocExists = true;
-          if (typeof data.name === "string" && data.name) displayName = data.name;
-          settings = normSettings(data.settings);
-          if (Array.isArray(data.bereiche)) {
-            // Altes Format (vor der Konflikt-Absicherung) – einmalig ins neue Format überführen
-            bereiche = normBereiche(data.bereiche);
-            streak = normStreak(data.streak);
-            persistAll();
-          } else if (data.bereiche && typeof data.bereiche === "object") {
-            bereiche = bereicheMapToArray(data.bereiche);
-            streak = normStreak(data.streak);
-          } else {
-            bereiche = normBereiche(null);
-            streak = normStreak(null);
-          }
-          /* A3: nur zuruecksetzen, wenn der offene Bereich wirklich weg ist.
-             Frueher stand hier eine Positionspruefung - loeschte jemand auf
-             einem zweiten Geraet einen Bereich, blieb der Index gueltig und
-             zeigte danach auf einen anderen Bereich. */
-          if (!bereiche.some(b => b.id === ui.bereichId)) ui.bereichId = bereiche[0].id;
-        } else {
+        syncError = null;
+        if (!data) {
           cloudDocExists = false;
           bereiche = normBereiche(null);
           streak = normStreak(null);
           ui.askImport = oldLocalProfiles().length > 0;
           if (!ui.askImport) persistAll(); // leeres Startdokument anlegen
+          evaluateStreakForNewDay();
+          render();
+          return;
         }
-        syncError = null;
-        evaluateStreakForNewDay();
+        cloudDocExists = true;
+        if (typeof data.name === "string" && data.name) displayName = data.name;
+        settings = normSettings(data.settings);
+        streak = normStreak(data.streak);
+        if (data.schemaVersion === SCHEMA_VERSION) {
+          ui.umzug = null;
+          sammlungenStarten();
+          evaluateStreakForNewDay();
+          render();
+          return;
+        }
+        /* Daten liegen noch im alten Format. Ab hier wird nichts geschrieben,
+           bis der Umzug durch ist - sonst entstuenden zwei Staende, von denen
+           keiner vollstaendig ist. */
+        umzugBereiche = Array.isArray(data.bereiche)
+          ? normBereiche(data.bereiche)
+          : (data.bereiche && typeof data.bereiche === "object" ? bereicheMapToArray(data.bereiche) : normBereiche(null));
+        if (!ui.umzug) ui.umzug = { backupGemacht: false, laeuft: false, fertig: 0, gesamt: 0, fehler: null };
         render();
-      }, err => {
-        syncError = err && err.code === "permission-denied"
-          ? "Zugriff verweigert – bitte Sicherheitsregeln in Firebase prüfen."
-          : "Verbindungsproblem beim Laden der Daten.";
-        render();
-      });
+      }, snapFehler);
     }
     render();
   });
@@ -885,47 +988,181 @@ function ordnungPatch(b, patch, ausser) {
    normalisiert ordnungPatch() ohnehin wieder auf 0, 1, 2, ... */
 function ordnungVorn() { return -Date.now(); }
 
-function patchDoc(patch) {
-  if (!userDocRef || bereiche === null) return;
-  if (!patch || Object.keys(patch).length === 0) return;
-  fb.updateDoc(userDocRef, patch).then(() => {
-    saveWarned = false;
-  }).catch(e => {
-    /* Es gibt nichts zu patchen, weil es das Dokument (noch) nicht gibt -
-       etwa direkt nach dem Anlegen des Kontos oder wenn es von Hand in der
-       Firebase-Konsole geloescht wurde. Dann einmal komplett anlegen. */
-    if (e && e.code === "not-found") { persistAll(); return; }
-    saveFehler(e);
-  });
+/* C1: Die Aufrufer oben bauen weiterhin Feldpfade wie
+   "bereiche.<bid>.karten.<cid>.stufe". patchDoc uebersetzt sie in
+   Schreibvorgaenge auf die richtigen Dokumente. Bewusst so herum: Damit
+   bleiben rund vierzig Aufrufstellen unveraendert, und der Umbau steckt an
+   einer Stelle, die sich pruefen laesst. */
+const LOESCHEN = { __loeschen: true };   // Ersatz fuer deleteField() in Patches
+function istLoeschung(w) { return w === LOESCHEN; }
+
+function bereichRef(bid) { return fb.doc(bereicheColRef, bid); }
+function karteRef(cid) { return fb.doc(kartenColRef, cid); }
+
+/* Setzt einen gepunkteten Feldpfad in ein verschachteltes Objekt. Wird nur
+   gebraucht, wenn im selben Patch ein Bereich komplett geschrieben UND ein
+   einzelnes Unterfeld gesetzt wird - dann muss das Unterfeld ins Objekt,
+   nicht als Pfad daneben, weil ein set() Punkte nicht auswertet. */
+function tiefSetzen(obj, pfad, wert) {
+  const teile = pfad.split(".");
+  let ziel = obj;
+  for (let i = 0; i < teile.length - 1; i++) {
+    if (!ziel[teile[i]] || typeof ziel[teile[i]] !== "object") ziel[teile[i]] = {};
+    ziel = ziel[teile[i]];
+  }
+  ziel[teile[teile.length - 1]] = wert;
 }
 
-/* Vollstaendiges Ueberschreiben. Bewusst nur noch drei Aufrufer, alle mit
-   demselben Merkmal: Es gibt noch keinen fremden Stand, der verloren gehen
-   koennte. Neuer Aufruf hier heisst: sehr genau begruenden. */
-function persistAll() {
+async function patchDoc(patch) {
   if (!userDocRef || bereiche === null) return;
-  fb.setDoc(userDocRef, { name: displayName, bereiche: bereicheArrayToMap(bereiche), streak: streak, settings: settings }).then(() => {
+  if (!patch || Object.keys(patch).length === 0) return;
+
+  /* Ein Dokument darf im selben Schwung nur einmal vorkommen. Beim
+     Verschieben einer Karte steht im Patch erst ein Loeschen im Quellbereich
+     und dann ein Schreiben im Zielbereich - fuer dasselbe Dokument. Der
+     letzte Eintrag gewinnt, und das ist genau richtig: die Karte wird
+     geschrieben, mit dem neuen bereichId. */
+  const ops = new Map();
+  const bereichLoeschungen = [];
+
+  const merken = (schluessel, ref, art, daten) => {
+    const da = ops.get(schluessel);
+    if (art === "update" && da && (da.art === "set" || da.art === "update")) {
+      for (const k of Object.keys(daten)) {
+        if (da.art === "set") tiefSetzen(da.daten, k, daten[k]);
+        else da.daten[k] = daten[k];
+      }
+      return;
+    }
+    ops.set(schluessel, { ref: ref, art: art, daten: daten });
+  };
+
+  for (const schluessel of Object.keys(patch)) {
+    const wert = patch[schluessel];
+    const teile = schluessel.split(".");
+    if (teile[0] !== "bereiche" || teile.length < 2) continue;
+    const bid = teile[1];
+
+    if (teile.length === 2) {                       // ganzer Bereich
+      if (istLoeschung(wert)) {
+        bereichLoeschungen.push(bid);
+        ops.set("b/" + bid, { ref: bereichRef(bid), art: "delete", daten: null });
+        continue;
+      }
+      const { karten, ...rest } = (wert || {});
+      merken("b/" + bid, bereichRef(bid), "set", rest);
+      const km = karten && typeof karten === "object" ? karten : {};
+      for (const cid of Object.keys(km)) {
+        merken("k/" + cid, karteRef(cid), "set", { ...km[cid], bereichId: bid });
+      }
+      continue;
+    }
+
+    if (teile[2] === "karten" && teile.length >= 4) {
+      const cid = teile[3];
+      if (teile.length === 4) {
+        if (istLoeschung(wert)) { ops.set("k/" + cid, { ref: karteRef(cid), art: "delete", daten: null }); continue; }
+        merken("k/" + cid, karteRef(cid), "set", { ...wert, bereichId: bid });
+      } else {
+        merken("k/" + cid, karteRef(cid), "update", { [teile.slice(4).join(".")]: wert });
+      }
+      continue;
+    }
+
+    if (teile[2] === "sets" && teile.length >= 4) {
+      /* Speicherkarten bleiben Unterfelder IM Bereichsdokument - sie
+         enthalten nur Karten-IDs und werden nie gross. */
+      const feldpfad = teile.slice(2).join(".");
+      merken("b/" + bid, bereichRef(bid), "update", { [feldpfad]: istLoeschung(wert) ? fb.deleteField() : wert });
+      continue;
+    }
+
+    if (teile.length === 3) {                       // z.B. bereiche.<bid>.name
+      merken("b/" + bid, bereichRef(bid), "update", { [teile[2]]: istLoeschung(wert) ? fb.deleteField() : wert });
+    }
+  }
+
+  const liste = [...ops.values()];
+  try {
+    /* Ein Stapel fasst hoechstens 500 Vorgaenge. 400 laesst Luft. */
+    for (let i = 0; i < liste.length; i += 400) {
+      const stapel = fb.writeBatch(db);
+      for (const op of liste.slice(i, i + 400)) {
+        if (op.art === "delete") stapel.delete(op.ref);
+        else if (op.art === "set") stapel.set(op.ref, op.daten);
+        else stapel.update(op.ref, op.daten);
+      }
+      await stapel.commit();
+    }
+    /* Firestore loescht Unter-Sammlungen NICHT mit. Die Karten eines
+       geloeschten Bereichs muessen einzeln weg, sonst bleiben sie fuer immer
+       liegen und zaehlen bei jedem Start als Leseeinheit mit. */
+    for (const bid of bereichLoeschungen) await kartenEinesBereichsLoeschen(bid);
     saveWarned = false;
-  }).catch(e => { saveFehler(e); });
+  } catch (e) {
+    /* Es gibt nichts zu aendern, weil das Dokument (noch) nicht existiert -
+       etwa direkt nach dem Anlegen des Kontos. Dann einmal komplett anlegen. */
+    if (e && e.code === "not-found") { persistAll(); return; }
+    saveFehler(e);
+  }
 }
-/* Gezieltes Speichern für's Lernen: ändert in der Cloud NUR die Stufe/das Fälligkeitsdatum
-   dieser einen Karte, statt (wie persist()) den kompletten Kartenbestand zu überschreiben.
-   Dadurch kann ein Gerät nie mehr den Fortschritt eines anderen Geräts auslöschen –
-   auch nicht, wenn eine Karte offline bewertet und die Änderung erst später hochgeladen wird. */
+
+async function kartenEinesBereichsLoeschen(bid) {
+  if (!kartenColRef) return;
+  try {
+    const treffer = await fb.getDocs(fb.query(kartenColRef, fb.where("bereichId", "==", bid)));
+    const docs = treffer.docs;
+    for (let i = 0; i < docs.length; i += 400) {
+      const stapel = fb.writeBatch(db);
+      docs.slice(i, i + 400).forEach(d => stapel.delete(d.ref));
+      await stapel.commit();
+    }
+  } catch (e) { saveFehler(e); }
+}
+
+/* Vollstaendiges Schreiben. Bewusst nur wenige Aufrufer, alle mit demselben
+   Merkmal: Es gibt noch keinen fremden Stand, der verloren gehen koennte.
+   Das Nutzerdokument wird mit merge geschrieben - damit bleibt das alte Feld
+   "bereiche" als Sicherheitsnetz liegen, bis es in einer spaeteren Version
+   entfernt wird. */
+async function persistAll() {
+  if (!userDocRef || bereiche === null) return;
+  try {
+    await fb.setDoc(userDocRef, {
+      name: displayName, streak: streak, settings: settings, schemaVersion: SCHEMA_VERSION
+    }, { merge: true });
+    const ops = [];
+    bereiche.forEach((b, bi) => {
+      const felder = bereichFelder(b, bi);
+      ops.push({ ref: bereichRef(b.id), daten: { name: felder.name, order: felder.order, sets: felder.sets } });
+      b.karten.forEach((c, ci) => ops.push({ ref: karteRef(c.id), daten: { ...kartenFelder(c, ci), bereichId: b.id } }));
+    });
+    for (let i = 0; i < ops.length; i += 400) {
+      const stapel = fb.writeBatch(db);
+      ops.slice(i, i + 400).forEach(o => stapel.set(o.ref, o.daten));
+      await stapel.commit();
+    }
+    saveWarned = false;
+  } catch (e) { saveFehler(e); }
+}
+
+/* Gezieltes Speichern fuers Lernen: aendert nur die Stufe und das
+   Faelligkeitsdatum dieser einen Karte. Dadurch kann ein Geraet nie den
+   Fortschritt eines anderen ausloeschen - auch nicht, wenn eine Karte offline
+   bewertet und die Aenderung erst spaeter hochgeladen wird. */
 function persistCardGrade(bereichId, cardId, fields) {
-  if (!userDocRef) return;
-  const base = "bereiche." + bereichId + ".karten." + cardId;
-  const patch = {};
-  patch[base + ".stufe"] = fields.stufe;
-  patch[base + ".nextReview"] = fields.nextReview;
-  /* B3: gehoert zum Bewerten dazu - sonst gilt eine heute eingefuehrte Karte auf
-     dem naechsten Geraet wieder als neu und frisst das Tageslimit ein zweites Mal. */
-  patch[base + ".ersteBewertung"] = fields.ersteBewertung === undefined ? null : fields.ersteBewertung;
-  /* E6: gehoert zum selben Schreibvorgang. Ein eigener Aufruf waere ein
-     zweiter Schreibzugriff pro Bewertung - und koennte einzeln fehlschlagen,
-     sodass Stufe und Rueckfallzaehler auseinanderlaufen. */
-  patch[base + ".rueckfaelle"] = Number.isInteger(fields.rueckfaelle) ? fields.rueckfaelle : 0;
-  fb.updateDoc(userDocRef, patch).catch(e => { saveFehler(e); });
+  if (!kartenColRef) return;
+  fb.updateDoc(karteRef(cardId), {
+    stufe: fields.stufe,
+    nextReview: fields.nextReview,
+    /* B3: gehoert zum Bewerten dazu - sonst gilt eine heute eingefuehrte Karte
+       auf dem naechsten Geraet wieder als neu und frisst das Tageslimit ein
+       zweites Mal. */
+    ersteBewertung: fields.ersteBewertung === undefined ? null : fields.ersteBewertung,
+    /* E6: gehoert in denselben Schreibvorgang, sonst koennen Stufe und
+       Rueckfallzaehler auseinanderlaufen. */
+    rueckfaelle: Number.isInteger(fields.rueckfaelle) ? fields.rueckfaelle : 0
+  }).catch(e => { saveFehler(e); });
 }
 function persistStreak() {
   if (!userDocRef) return;
@@ -1388,7 +1625,7 @@ async function deleteBereich() {
   ui.editId = null;
   /* A4: nur diesen einen Bereich entfernen. deleteField() loescht genau
      dieses Feld, alles daneben bleibt so, wie es in der Cloud steht. */
-  patchDoc({ [pfadBereich(b.id)]: fb.deleteField() });
+  patchDoc({ [pfadBereich(b.id)]: LOESCHEN });
   render();
 }
 
@@ -1445,7 +1682,7 @@ async function deleteSelectedCards() {
      stehen - es entstehen Luecken (0, 1, 3, ...), und das ist in Ordnung:
      sortiert wird nach dem Wert, nicht nach luekenloser Zaehlung. */
   const patch = {};
-  geloescht.forEach(id => { patch[pfadKarte(b.id, id)] = fb.deleteField(); });
+  geloescht.forEach(id => { patch[pfadKarte(b.id, id)] = LOESCHEN; });
   purgeFromSets(geloescht).forEach(st => {
     patch[pfadSet(b.id, st.id) + ".cardIds"] = st.cardIds;
   });
@@ -1480,7 +1717,7 @@ function moveSelectedCardsTo(targetId) {
      sind deshalb von ordnungPatch ausgenommen - Firestore lehnt eine
      Aktualisierung ab, in der ein Feldpfad in einem anderen steckt. */
   const bewegt = new Set(moved.map(c => c.id));
-  moved.forEach(c => { patch[pfadKarte(quelle.id, c.id)] = fb.deleteField(); });
+  moved.forEach(c => { patch[pfadKarte(quelle.id, c.id)] = LOESCHEN; });
   moved.forEach((c, i) => { patch[pfadKarte(target.id, c.id)] = kartenFelder(c, i); });
   ordnungPatch(target, patch, bewegt);
   purgeFromSets(ui.selectedIds).forEach(st => {
@@ -1565,7 +1802,7 @@ async function deleteSet(id) {
   sets.splice(idx, 1);
   if (ui.openSetId === id) ui.openSetId = null;
   if (ui.drillSource === id) ui.drillSource = "stufen";
-  patchDoc({ [pfadSet(currentBereich().id, id)]: fb.deleteField() });
+  patchDoc({ [pfadSet(currentBereich().id, id)]: LOESCHEN });
   render();
 }
 function removeCardFromSet(setId, cardId) {
@@ -1742,7 +1979,7 @@ async function deleteCard(id) {
   const b = currentBereich();
   b.karten.splice(b.karten.findIndex(c => c.id === id), 1);
   const patch = {};
-  patch[pfadKarte(b.id, id)] = fb.deleteField();
+  patch[pfadKarte(b.id, id)] = LOESCHEN;
   purgeFromSets([id]).forEach(st => {
     patch[pfadSet(b.id, st.id) + ".cardIds"] = st.cardIds;
   });
@@ -1912,6 +2149,10 @@ function render() {
   /* C4: E-Mail muss bestätigt sein, bevor der Rest der App zugreifbar ist.
      Ohne das kann sich jeder mit einer erfundenen Adresse registrieren. */
   if (!currentUser.emailVerified) { renderPendingVerification(); return; }
+  /* C1: Liegen die Daten noch im alten Format, gibt es genau einen
+     Bildschirm - den Umzug. Vorher darf nichts geschrieben werden, sonst
+     entstehen zwei halbe Staende. */
+  if (ui.umzug) { renderUmzug(); return; }
   if (bereiche === null) {
     app.innerHTML = '<div class="panel" style="text-align:center; margin-top:40px">Daten werden geladen…' +
       (syncError ? '<div class="error-box">' + esc(syncError) + '</div>' : '') + '</div>';
@@ -1919,6 +2160,119 @@ function render() {
   }
   if (ui.askImport) { renderImport(); return; }
   renderMain();
+}
+
+/* ---------- C1: einmaliger Umzug ins neue Datenformat ---------- */
+function renderUmzug() {
+  const u = ui.umzug;
+  const anzahl = umzugBereiche ? umzugBereiche.reduce((n, b) => n + b.karten.length, 0) : 0;
+  let html = '<div style="padding-top:32px">';
+  html += '<h1>🌱 Adrabic-Wiederholung</h1>';
+  html += '<p class="subtitle">Einmaliger Umzug der Daten</p>';
+  html += '<div class="panel">';
+  html += '<p class="hint" style="padding-top:0">Deine Karten liegen bisher alle zusammen in einem einzigen Datensatz. Der hat eine feste Obergrenze – bei etwa 5.000 bis 7.000 Karten ließe sich keine neue mehr anlegen. Nach dem Umzug bekommt jede Karte ihren eigenen Datensatz und diese Grenze fällt weg.</p>';
+  html += '<p class="hint">Gefunden: <strong>' + (umzugBereiche ? umzugBereiche.length : 0) + '</strong> Bereich(e) mit <strong>' + anzahl + '</strong> Karte(n).</p>';
+  html += '<p class="hint">Der alte Datensatz bleibt als Sicherheitsnetz stehen und wird nicht gelöscht.</p>';
+
+  if (u.laeuft) {
+    html += '<p class="hint"><strong>Umzug läuft… ' + u.fertig + ' von ' + u.gesamt + '</strong></p>';
+    html += '<p class="hint">Bitte diese Seite offen lassen und nicht neu laden.</p>';
+  } else {
+    html += '<div class="form-actions">';
+    html += '<button class="secondary" data-action="umzug-backup">⬇️ Backup herunterladen</button>';
+    html += '<button data-action="umzug-start"' + (u.backupGemacht ? '' : ' disabled') + '>Umzug starten</button>';
+    html += '</div>';
+    if (!u.backupGemacht) html += '<p class="hint">Erst das Backup herunterladen – danach lässt sich der Umzug starten.</p>';
+  }
+  if (u.fehler) html += '<div class="error-box">' + esc(u.fehler) + '</div>';
+  html += '</div>';
+
+  html += '<div class="panel">';
+  html += '<p class="hint" style="padding-top:0"><strong>Wichtig:</strong> Mach den Umzug auf einem Gerät. Ist die App auf einem anderen Gerät noch offen, schreibt sie dort weiter ins alte Format – diese Änderungen wären verloren. Alle anderen Geräte danach einmal neu laden.</p>';
+  html += '<div class="form-actions"><button class="secondary" data-action="logout">Abmelden</button></div>';
+  html += '</div></div>';
+  app.innerHTML = html;
+  app.style.setProperty("--arab-scale", String(arabFaktor()));
+}
+
+/* Das Backup wird aus dem ALTEN Stand gebaut, nicht aus bereiche - das ist
+   waehrend des Umzugs noch null. Gleiches Dateiformat wie das normale
+   Backup, laesst sich also ganz normal wieder einspielen. */
+function umzugBackup() {
+  const data = {
+    exportedAt: new Date().toISOString(),
+    profil: displayName,
+    bereiche: umzugBereiche || []
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "lernkarten-backup-vor-umzug-" + todayStr() + ".json";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  ui.umzug.backupGemacht = true;
+  render();
+}
+
+async function umzugStarten() {
+  if (!ui.umzug || ui.umzug.laeuft || !umzugBereiche || !userDocRef) return;
+
+  /* Karten-IDs waren bisher nur INNERHALB eines Bereichs eindeutig. In einer
+     gemeinsamen Sammlung muessen sie es ueberall sein - sonst wuerde eine
+     Karte eine gleichnamige aus einem anderen Bereich ueberschreiben. Bei
+     einer Dopplung bekommt die zweite Karte eine neue ID; Speicherkarten, die
+     auf die alte zeigen, werden mitgezogen. */
+  const gesehen = new Set();
+  for (const b of umzugBereiche) {
+    for (const c of b.karten) {
+      if (gesehen.has(c.id)) {
+        const alteId = c.id;
+        c.id = genId();
+        (b.sets || []).forEach(st => {
+          st.cardIds = st.cardIds.map(x => (x === alteId ? c.id : x));
+        });
+      }
+      gesehen.add(c.id);
+    }
+  }
+
+  const ops = [];
+  umzugBereiche.forEach((b, bi) => {
+    const felder = bereichFelder(b, bi);
+    ops.push({ ref: bereichRef(b.id), daten: { name: felder.name, order: felder.order, sets: felder.sets } });
+    b.karten.forEach((c, ci) => ops.push({ ref: karteRef(c.id), daten: { ...kartenFelder(c, ci), bereichId: b.id } }));
+  });
+
+  ui.umzug.laeuft = true;
+  ui.umzug.fehler = null;
+  ui.umzug.gesamt = ops.length;
+  ui.umzug.fertig = 0;
+  render();
+
+  try {
+    for (let i = 0; i < ops.length; i += 400) {
+      const stapel = fb.writeBatch(db);
+      ops.slice(i, i + 400).forEach(o => stapel.set(o.ref, o.daten));
+      await stapel.commit();
+      ui.umzug.fertig = Math.min(i + 400, ops.length);
+      render();
+    }
+    /* Ganz zum Schluss die Markierung setzen. Bricht der Umzug vorher ab,
+       bleibt das alte Format massgeblich und beim naechsten Start beginnt
+       er einfach von vorn - doppelt geschriebene Karten sind harmlos, weil
+       sie unter derselben ID landen. */
+    await fb.updateDoc(userDocRef, { schemaVersion: SCHEMA_VERSION });
+    ui.umzug = null;
+    umzugBereiche = null;
+    render();
+  } catch (e) {
+    ui.umzug.laeuft = false;
+    ui.umzug.fehler = "Umzug fehlgeschlagen (" + (e && e.code ? e.code : "Fehler") + "). Es wurde nichts kaputtgemacht – der alte Stand ist unverändert. Nochmal versuchen oder die Seite neu laden.";
+    render();
+  }
 }
 
 function renderPendingVerification() {
@@ -3025,6 +3379,8 @@ app.addEventListener("click", e => {
        mitten in der neuen Seite, ohne zu sehen, dass sie gewechselt hat. */
     case "seite-zurueck": ui.kartenSeite = Math.max(0, ui.kartenSeite - 1); window.scrollTo(0, 0); render(); break;
     case "seite-vor": ui.kartenSeite = ui.kartenSeite + 1; window.scrollTo(0, 0); render(); break;
+    case "umzug-backup": umzugBackup(); break;
+    case "umzug-start": umzugStarten(); break;
     case "toggle-card-select": toggleCardSelected(btn.dataset.id); break;
     case "delete-selected": deleteSelectedCards(); break;
     case "move-selected": {
