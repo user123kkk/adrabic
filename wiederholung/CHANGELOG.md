@@ -2,6 +2,27 @@
 
 Neueste Version oben. Einträge werden **ergänzt**, nie ersetzt.
 
+## 1.8.1 – 4. September 2026
+
+### Entfernt
+
+- Die Grafik **„Neu eingeführt (letzte 30 Tage)"** im Fortschritts-Tab ist raus.
+
+  Sie zählte, wie viele Karten an einem Tag zum ersten Mal bewertet wurden.
+  Für bestehende Sammlungen konnte sie nie etwas anzeigen: Karten aus der Zeit
+  vor 1.6.0 haben kein bekanntes Datum der ersten Bewertung und fallen aus dem
+  Zeitfenster. Wer gerade keine neuen Karten anlegt, sah dauerhaft eine leere
+  Grafik – das sieht wie ein Fehler aus, obwohl nichts kaputt war. Und was man
+  täglich wirklich tut, nämlich wiederholen, konnte sie prinzipiell nicht
+  zeigen.
+
+  Mitentfernt: die Rechenfunktion `neuVerlauf()` und die nur dort benutzten
+  Stile. Die 7-Tage-Vorschau ist davon nicht berührt.
+
+Der Rest des Fortschritts-Tabs bleibt unverändert: Kennzahlen, „Wie fest sitzt
+der Stoff?", die Liste der Karten, die nicht klappen, und die nächsten 7 Tage.
+Alle vier rechnen bei jedem Aufruf aus vorhandenen Feldern und speichern nichts.
+
 ## 1.8.0 – 4. September 2026
 
 ### Schreiben (E5)
