@@ -1573,7 +1573,15 @@ function revealAnswer() {
    sonst gibt es das Element noch gar nicht. */
 function scrollAnswerIntoView() {
   requestAnimationFrame(() => {
-    const el = document.querySelector(".study-answer");
+    /* Nachbesserung: Vorher zielte das Scrollen nur auf die Loesung
+       (.study-answer). Die Bewertungsknoepfe darunter (Nicht/Fast/Sicher
+       bzw. im Uebungsmodus Nochmal/Weiter) blieben oft ausserhalb des
+       Bildschirms - man musste nach dem Vergleichen noch einmal von Hand
+       nachscrollen, um ueberhaupt bewerten zu koennen. Jetzt ist die
+       Bewertungszeile selbst das Ziel: block:"nearest" bewegt weiterhin nur
+       das noetige Minimum (kein Sprung, wenn schon alles sichtbar ist),
+       aber sie ist niedrig, daher passt meist auch die Loesung mit ins Bild. */
+    const el = document.querySelector(".grade-row") || document.querySelector(".study-answer");
     if (el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "nearest" });
   });
 }
@@ -2131,9 +2139,20 @@ function renderSession() {
       }
     }
     html += '<div class="grade-row">';
-    html += '<button class="btn-unknown" data-action="grade-unknown" aria-label="Nicht gewusst – zwei Stufen zurück, kommt gleich noch einmal">Nicht<span class="sub">kommt gleich wieder</span></button>';
-    html += '<button class="btn-almost" data-action="grade-almost" aria-label="Fast gewusst – eine Stufe zurück, morgen wieder">Fast<span class="sub">' + (s.isDrill ? "nur Übung" : "morgen wieder") + '</span></button>';
-    html += '<button class="btn-known" data-action="grade-known" aria-label="Sicher gewusst – eine Stufe weiter">Sicher<span class="sub">' + (s.isDrill ? "nur Übung" : "in ~" + intervalForStufe(Math.min(card.stufe + 1, MAX_STUFE)) + " Tagen") + '</span></button>';
+    if (s.isDrill) {
+      /* Nachbesserung: Im Uebungsmodus gibt es keine Wiederholungsstufe, die
+         sich aendern koennte - "Fast" und "Sicher" taten bislang exakt
+         dasselbe (Karte weiter, keine Wiederholung in dieser Runde). Nur
+         "Nicht" unterschied sich wirklich: die Karte kam in derselben Runde
+         gleich noch einmal. Echte Unterschiede zeigen sich als echte
+         Knoepfe - eine Auswahl, die nichts bewirkt, ist keine Auswahl. */
+      html += '<button class="btn-unknown" data-action="grade-unknown" aria-label="Nochmal – kommt in dieser Runde gleich wieder dran">Nochmal<span class="sub">kommt gleich wieder</span></button>';
+      html += '<button class="btn-known" data-action="grade-weiter" aria-label="Weiter – nächste Karte">Weiter<span class="sub">nächste Karte</span></button>';
+    } else {
+      html += '<button class="btn-unknown" data-action="grade-unknown" aria-label="Nicht gewusst – zwei Stufen zurück, kommt gleich noch einmal">Nicht<span class="sub">kommt gleich wieder</span></button>';
+      html += '<button class="btn-almost" data-action="grade-almost" aria-label="Fast gewusst – eine Stufe zurück, morgen wieder">Fast<span class="sub">morgen wieder</span></button>';
+      html += '<button class="btn-known" data-action="grade-known" aria-label="Sicher gewusst – eine Stufe weiter">Sicher<span class="sub">in ~' + intervalForStufe(Math.min(card.stufe + 1, MAX_STUFE)) + ' Tagen</span></button>';
+    }
     html += '</div>';
   }
   if (s.lastAction) {
@@ -2681,6 +2700,7 @@ app.addEventListener("click", e => {
     case "grade-known": gradeKnown(); break;
     case "grade-almost": gradeAlmost(); break;
     case "grade-unknown": gradeUnknown(); break;
+    case "grade-weiter": gradeCard("weiter"); break;   // Nachbesserung: nur im Übungsmodus sichtbar
     case "undo-grade": undoLastGrade(); break;
     case "end-session": endSession(); break;
     case "submit-card": submitCardForm(); break;
