@@ -655,6 +655,27 @@ function normSettings(s) {
   };
 }
 
+/* ---------- C2 (2.0.0): lange Kartenlisten ----------
+   Jede Aktion baut das komplette DOM neu (app.innerHTML = html). Bei wenigen
+   Dutzend Karten faellt das nicht auf, bei mehreren hundert Zeilen ruckelt
+   jeder Haken und jeder Tastendruck in der Suche spuerbar.
+
+   Drei Gegenmittel, alle nur in der Liste im Verwalten-Tab:
+     1. Suche zeichnet erst neu, wenn kurz nichts mehr getippt wurde
+     2. ein Haken im Auswahlmodus aendert nur seine eigene Zeile
+     3. ab SEITEN_SCHWELLE Karten wird die Liste seitenweise gezeigt
+
+   Unterhalb der Schwelle bleibt alles genau wie bisher - wer 40 Vokabeln
+   hat, sieht keinen Unterschied und keine Seitenleiste. */
+const SEITEN_SCHWELLE = 150;   // ab so vielen Karten ueberhaupt Seiten
+const SEITE_GROESSE = 100;     // Karten pro Seite
+const SUCH_VERZOEGERUNG = 150; // Millisekunden Ruhe, bevor die Suche neu zeichnet
+let sucheTimer = null;
+/* Welcher Ausschnitt der Gesamtliste gerade zu sehen ist. endDrag() braucht
+   das, um eine umsortierte Seite an der richtigen Stelle zurueckzuschreiben
+   statt die Karten der anderen Seiten zu verlieren. */
+let listenFenster = { start: 0, anzahl: 0 };
+
 /* ---------- Zustand ---------- */
 let currentUser = null;      // Firebase-User
 let displayName = "";
@@ -680,6 +701,7 @@ let ui = {
   askImport: false,          // alte lokale Daten anbieten
   searchQuery: "",           // Suchtext im Verwalten-Tab (nicht gespeichert, nur UI-Zustand)
   searchAll: false,          // D7: false = nur dieser Bereich, true = alle Bereiche
+  kartenSeite: 0,            // C2: angezeigte Seite der Kartenliste (nur UI-Zustand)
   dialog: null,              // D2: { kind, title, text, value, okLabel, danger, resolve }
   selectMode: false,          // Mehrfachauswahl im Verwalten-Tab aktiv?
   selectedIds: new Set(),     // ausgewählte Karten-IDs
@@ -1211,6 +1233,7 @@ function editCardInBereich(bereichId, cardId) {
   ui.tab = "verwalten";
   ui.session = null;
   ui.searchQuery = "";
+  ui.kartenSeite = 0;
   ui.selectMode = false;
   ui.selectedIds = new Set();
   editCard(cardId);
@@ -1326,6 +1349,7 @@ function selectBereich(bereichId) {
   ui.editId = null;
   resetFormDraft();
   ui.searchQuery = "";
+  ui.kartenSeite = 0;
   ui.selectMode = false;
   ui.selectedIds = new Set();
   ui.drillOpen = false;
@@ -1387,9 +1411,23 @@ function toggleSelectMode() {
   render();
 }
 function toggleCardSelected(id) {
+  const vorher = ui.selectedIds.size;
   if (ui.selectedIds.has(id)) ui.selectedIds.delete(id);
   else ui.selectedIds.add(id);
-  render();
+  const nachher = ui.selectedIds.size;
+  /* C2: Ein Haken soll nicht die ganze Liste neu bauen. Komplett neu
+     gezeichnet wird nur, wenn die Aktionsleiste dabei erscheint oder
+     verschwindet - also beim Sprung von 0 auf 1 und zurueck. Sonst reicht
+     es, das Kaestchen und die Zahl in der Leiste zu aendern.
+     Findet sich eine der beiden Stellen nicht, wird sicherheitshalber doch
+     neu gezeichnet: lieber einmal ruckeln als eine Anzeige, die luegt. */
+  if (vorher === 0 || nachher === 0) { render(); return; }
+  const zeile = app.querySelector('[data-action="toggle-card-select"][data-id="' + CSS.escape(id) + '"]');
+  const kasten = zeile ? zeile.querySelector('input[type="checkbox"]') : null;
+  const zaehler = app.querySelector(".select-actionbar strong");
+  if (!kasten || !zaehler) { render(); return; }
+  kasten.checked = ui.selectedIds.has(id);
+  zaehler.textContent = String(nachher);
 }
 async function deleteSelectedCards() {
   const n = ui.selectedIds.size;
@@ -1865,6 +1903,10 @@ document.addEventListener("keydown", e => {
 
 /* ---------- Rendering ---------- */
 function render() {
+  /* C2: Wird aus anderem Anlass neu gezeichnet (Klick, Tabwechsel, Daten aus
+     der Cloud), ist ein noch wartender Such-Timer gegenstandslos - der
+     Suchtext steht bereits in ui.searchQuery. */
+  if (sucheTimer) { clearTimeout(sucheTimer); sucheTimer = null; }
   if (!CONFIGURED) { renderSetup(); return; }
   if (currentUser === null) { renderAuth(); return; }
   /* C4: E-Mail muss bestätigt sein, bevor der Rest der App zugreifbar ist.
@@ -2068,8 +2110,15 @@ function renderMain() {
     const searchEl = document.getElementById("f-search");
     if (searchEl) {
       searchEl.addEventListener("input", e => {
+        /* Der Suchtext wird sofort uebernommen - im Feld steht er ohnehin
+           schon, und ein render() aus anderer Richtung darf ihn nicht
+           verlieren. Nur das Neuzeichnen der Liste wartet, bis der Finger
+           kurz still steht. Ohne das rechnet jeder Tastendruck die Treffer
+           aus und baut alle Zeilen neu. */
         ui.searchQuery = e.target.value;
-        render();
+        ui.kartenSeite = 0;
+        if (sucheTimer) clearTimeout(sucheTimer);
+        sucheTimer = setTimeout(() => { sucheTimer = null; render(); }, SUCH_VERZOEGERUNG);
       });
     }
   }
@@ -2496,9 +2545,24 @@ function renderVerwalten() {
       html += '<p class="hint">' + (q ? 'Keine Treffer für „' + esc(ui.searchQuery) + '".' : "Noch keine Karten vorhanden.") + '</p>';
     } else {
       const draggable = !q && !ui.selectMode;
-      if (draggable) html += '<p class="hint" style="margin-bottom:10px">↕ Ziehe eine Karte am ⠿-Griff, um die Reihenfolge zu ändern.</p>';
-      for (let i = 0; i < shownCards.length; i++) {
-        const c = shownCards[i];
+      /* C2: Seiten erst ab SEITEN_SCHWELLE. Darunter ist shownCards die ganze
+         Liste und es erscheint keine Seitenleiste. */
+      const seiten = shownCards.length > SEITEN_SCHWELLE ? Math.ceil(shownCards.length / SEITE_GROESSE) : 1;
+      if (ui.kartenSeite > seiten - 1) ui.kartenSeite = seiten - 1;
+      if (ui.kartenSeite < 0) ui.kartenSeite = 0;
+      const start = seiten > 1 ? ui.kartenSeite * SEITE_GROESSE : 0;
+      const seitenKarten = seiten > 1 ? shownCards.slice(start, start + SEITE_GROESSE) : shownCards;
+      /* Beim Ziehen wird nur die sichtbare Seite umsortiert. endDrag() muss
+         wissen, an welcher Stelle der Gesamtliste dieser Ausschnitt sitzt -
+         sonst wuerde es die Reihenfolge der uebrigen Seiten ueberschreiben.
+         Ziehen ist ohnehin nur ohne Suche moeglich, deshalb entspricht der
+         Ausschnitt dann genau currentCards().slice(start, ...). */
+      listenFenster = { start: start, anzahl: seitenKarten.length };
+      if (draggable) html += '<p class="hint" style="margin-bottom:10px">↕ Ziehe eine Karte am ⠿-Griff, um die Reihenfolge zu ändern.' +
+        (seiten > 1 ? ' Verschieben über die Seitengrenze hinaus geht nicht – dafür „↪ Verschieben" im Auswahlmodus.' : '') + '</p>';
+      if (seiten > 1) html += seitenLeiste(ui.kartenSeite, seiten, shownCards.length);
+      for (let i = 0; i < seitenKarten.length; i++) {
+        const c = seitenKarten[i];
         const fremd = fremdeBereiche.get(c.id) || null;
         if (ui.selectMode && !fremd) {
           const checked = ui.selectedIds.has(c.id);
@@ -2527,10 +2591,22 @@ function renderVerwalten() {
         }
         html += '</div>';
       }
+      /* Zweite Leiste unten: nach 100 Zeilen ist die obere aus dem Bild. */
+      if (seiten > 1) html += seitenLeiste(ui.kartenSeite, seiten, shownCards.length);
     }
   }
   html += '</div>';
   return html;
+}
+
+/* C2: Blaettern zwischen den Seiten der Kartenliste. */
+function seitenLeiste(seite, seiten, gesamt) {
+  let h = '<div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:12px 0">';
+  h += '<button class="ghost" data-action="seite-zurueck"' + (seite === 0 ? ' disabled' : '') + ' aria-label="Vorherige Seite">‹ Zurück</button>';
+  h += '<span class="hint" style="padding:0">Seite ' + (seite + 1) + ' von ' + seiten + ' · ' + gesamt + ' Karten</span>';
+  h += '<button class="ghost" data-action="seite-vor"' + (seite === seiten - 1 ? ' disabled' : '') + ' aria-label="Nächste Seite">Weiter ›</button>';
+  h += '</div>';
+  return h;
 }
 
 /* Liste der Speicherkarten. Wird nur gezeigt, wenn es welche gibt – solange
@@ -2639,9 +2715,12 @@ function endDrag() {
     const cards = currentCards();
     const byId = new Map(cards.map(c => [c.id, c]));
     const reordered = newOrderIds.map(cid => byId.get(cid)).filter(Boolean);
-    if (reordered.length === cards.length) {
-      cards.length = 0;
-      cards.push(...reordered);
+    /* C2: Gezogen wurde innerhalb der sichtbaren Seite. Die neue Reihenfolge
+       ersetzt genau diesen Ausschnitt der Gesamtliste; die Karten davor und
+       dahinter bleiben, wo sie sind. Ohne Seiten ist das Fenster die ganze
+       Liste, dann ist es dasselbe wie vorher. */
+    if (listenFenster.anzahl > 0 && reordered.length === listenFenster.anzahl) {
+      cards.splice(listenFenster.start, listenFenster.anzahl, ...reordered);
       /* A4: nur die Ordnungszahlen dieses Bereichs, nichts sonst. */
       patchDoc(ordnungPatch(currentBereich()));
     }
@@ -2916,7 +2995,7 @@ app.addEventListener("click", e => {
     case "add-bereich": addBereich(); break;
     case "rename-bereich": renameBereich(); break;
     case "delete-bereich": deleteBereich(); break;
-    case "tab-lernen": ui.tab = "lernen"; ui.editId = null; resetFormDraft(); ui.searchQuery = ""; ui.searchAll = false; ui.selectMode = false; ui.selectedIds = new Set(); ui.drillOpen = false; render(); break;
+    case "tab-lernen": ui.tab = "lernen"; ui.editId = null; resetFormDraft(); ui.searchQuery = ""; ui.kartenSeite = 0; ui.searchAll = false; ui.selectMode = false; ui.selectedIds = new Set(); ui.drillOpen = false; render(); break;
     case "tab-fortschritt": ui.tab = "fortschritt"; ui.session = null; ui.editId = null; resetFormDraft(); ui.drillOpen = false; render(); break;
     case "stats-scope": ui.statsScope = btn.dataset.scope === "bereich" ? "bereich" : "alle"; render(); break;
     case "edit-leech": editCardInBereich(btn.dataset.bid, btn.dataset.id); break;
@@ -2937,11 +3016,15 @@ app.addEventListener("click", e => {
        Fortschritts-Tab - dort wechselt sie schon seit 1.7.0 den Bereich,
        oeffnet Verwalten und fuellt das Formular. */
     case "edit-card-in-bereich": editCardInBereich(btn.dataset.bereich, btn.dataset.id); break;
-    case "search-scope": ui.searchAll = btn.dataset.scope === "alle"; ui.selectMode = false; ui.selectedIds = new Set(); render(); break;
+    case "search-scope": ui.searchAll = btn.dataset.scope === "alle"; ui.kartenSeite = 0; ui.selectMode = false; ui.selectedIds = new Set(); render(); break;
     case "cancel-edit": cancelEdit(); break;
     case "delete-card": deleteCard(btn.dataset.id); break;
     case "reverse-order": reverseOrder(); break;
     case "toggle-select-mode": toggleSelectMode(); break;
+    /* C2: Blaettern. Nach oben scrollen, sonst steht man nach dem Klick
+       mitten in der neuen Seite, ohne zu sehen, dass sie gewechselt hat. */
+    case "seite-zurueck": ui.kartenSeite = Math.max(0, ui.kartenSeite - 1); window.scrollTo(0, 0); render(); break;
+    case "seite-vor": ui.kartenSeite = ui.kartenSeite + 1; window.scrollTo(0, 0); render(); break;
     case "toggle-card-select": toggleCardSelected(btn.dataset.id); break;
     case "delete-selected": deleteSelectedCards(); break;
     case "move-selected": {
