@@ -1,22 +1,3 @@
-# CHANGELOG.md – vollständig, Stand 4. September 2026
-
-**Wichtiger Hinweis zur Herkunft, bevor du das einsetzt:**
-
-- **1.8.0 und 1.8.1** sind Wort für Wort das, was ich dir in diesem Chat schon
-  als Einfüge-Blöcke gegeben habe – exakt, nicht rekonstruiert.
-- **1.5.0 bis 1.7.0** habe ich aus den Kurzbeschreibungen in der Projektakte
-  zusammengesetzt. Ich habe keinen Zugriff auf deine tatsächliche
-  `wiederholung/CHANGELOG.md` auf GitHub und kenne den Wortlaut nicht, den du
-  damals wirklich eingetragen hast. Bitte gegenlesen, bevor du das komplett
-  ersetzt – im Zweifel dein bestehendes File behalten und nur das übernehmen,
-  was hier fehlt.
-- Die Akte erwähnt außerdem, dass der ursprüngliche 1.5.0-Eintrag einmal durch
-  ein Versehen überschrieben und über die GitHub-History zurückgeholt wurde.
-  Was hier bei 1.5.0 steht, ist meine Rekonstruktion aus der Akte, nicht diese
-  wiederhergestellte Originalfassung.
-
----
-
 ## 1.8.1 – 4. September 2026
 
 ### Entfernt
