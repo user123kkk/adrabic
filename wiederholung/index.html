@@ -272,16 +272,13 @@
   .stat-legend strong { color: var(--ink); }
 
   .spark { display: flex; align-items: flex-end; gap: 3px; height: 92px; }
-  .spark.fein { gap: 2px; height: 70px; }
   .spark-fill { flex: 1; background: var(--accent-soft); border: 1px solid var(--accent-dark); border-top-left-radius: 4px; border-top-right-radius: 4px; min-height: 2px; }
   .spark-fill.leer { background: transparent; border-color: var(--border); }
   .spark-fill.heute { background: var(--accent); border-color: var(--accent); }
   .spark-reihe { display: flex; gap: 3px; font-size: 0.7rem; color: var(--ink-soft); }
-  .spark-reihe.fein { gap: 2px; }
   .spark-reihe span { flex: 1; text-align: center; }
   .spark-reihe.oben { margin-bottom: 5px; }
   .spark-reihe.unten { margin-top: 6px; }
-  .spark-spanne { display: flex; justify-content: space-between; margin-top: 6px; font-size: 0.7rem; color: var(--ink-soft); }
 
   /* E6: Hinweis auf eine Karte, die immer wieder zurückfällt. Bewusst in Rot
      und nicht in Gold - es ist keine Auszeichnung, sondern eine Aufforderung,
@@ -424,7 +421,7 @@ const firebaseConfig = {
 
 /* Versionsnummer: bei jeder Veroeffentlichung hochzaehlen und denselben Wert
    als CACHE_NAME in sw.js eintragen, damit alte Dateien verworfen werden. */
-const APP_VERSION = "1.8.0";
+const APP_VERSION = "1.8.1";
 
 const CONFIGURED = firebaseConfig.apiKey !== "HIER_EINFUEGEN";
 const app = document.getElementById("app");
@@ -1090,24 +1087,6 @@ function vorschau7(cards) {
   return out;
 }
 
-/* Wie viele Karten wurden an den letzten n Tagen zum ersten Mal bewertet?
-   Das ist die einzige zeitliche Spur, die in den Daten wirklich steckt
-   (ersteBewertung). Karten aus der Zeit vor 1.6.0 tragen den Platzhalter
-   1970-01-01 und fallen dadurch von selbst aus dem Zeitfenster heraus. */
-function neuVerlauf(cards, tage) {
-  const proTag = {};
-  for (const c of cards) {
-    if (c.ersteBewertung && c.ersteBewertung !== LEGACY_FIRST_GRADE) {
-      proTag[c.ersteBewertung] = (proTag[c.ersteBewertung] || 0) + 1;
-    }
-  }
-  const out = [];
-  for (let i = tage - 1; i >= 0; i--) {
-    const tag = dateInDays(-i);
-    out.push({ tag: tag, anzahl: proTag[tag] || 0 });
-  }
-  return out;
-}
 
 /* E6: alle verbrannten Karten im gewaehlten Umfang, die schlimmste zuerst.
    Der Bereich wird mitgegeben, weil die Liste im Fortschritts-Tab auch
@@ -2083,27 +2062,6 @@ function renderFortschritt() {
     html += '<p class="hint" style="padding-bottom:0">⚠ Am ' + esc(tagKurz(spitze.tag)) + ' stehen ' + spitze.anzahl +
       ' Wiederholungen an. Wenn du das Tageslimit für neue Karten bis dahin senkst, wird der Tag kleiner.</p>';
   }
-  html += '</div>';
-
-  /* --- 30-Tage-Verlauf --- */
-  const verlauf = neuVerlauf(cards, 30);
-  const summe = verlauf.reduce((a, x) => a + x.anzahl, 0);
-  const maxV = Math.max(1, ...verlauf.map(x => x.anzahl));
-  html += '<div class="stat-block">';
-  html += '<h3>Neu eingeführt (letzte 30 Tage)</h3>';
-  html += '<p class="stat-sub">' + summe + ' Karten zum ersten Mal bewertet, im Schnitt ' +
-    (summe / 30).toFixed(1).replace(".", ",") + ' pro Tag</p>';
-  html += '<div class="spark fein">';
-  verlauf.forEach(x => {
-    const h = x.anzahl === 0 ? 2 : Math.max(4, Math.round((x.anzahl / maxV) * 100));
-    html += '<div class="spark-fill' + (x.anzahl === 0 ? " leer" : "") +
-      '" style="height:' + h + '%" title="' + esc(tagKurz(x.tag) + ": " + x.anzahl + " neue Karten") + '"></div>';
-  });
-  html += '</div>';
-  html += '<div class="spark-spanne"><span>' + esc(tagKurz(verlauf[0].tag)) + '</span><span>heute</span></div>';
-  html += '<p class="hint" style="padding-bottom:0">Gezählt wird die <strong>erste</strong> Bewertung einer Karte. ' +
-    'Wie viele Wiederholungen du an einem Tag gemacht hast, steht in den Daten bisher nicht – ' +
-    'dafür bräuchte es einen eigenen Zähler.</p>';
   html += '</div>';
 
   html += '</div>';
