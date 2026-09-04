@@ -697,7 +697,7 @@ let ui = {
   searchQuery: "",           // Suchtext im Verwalten-Tab (nicht gespeichert, nur UI-Zustand)
   searchAll: false,          // D7: false = nur dieser Bereich, true = alle Bereiche
   kartenSeite: 0,            // C2: angezeigte Seite der Kartenliste (nur UI-Zustand)
-  umzug: null,               // C1: { backupGemacht, laeuft, fertig, gesamt, fehler } waehrend des Datenumzugs
+  umzug: null,               // C1: { laeuft, fertig, gesamt, fehler } waehrend des Datenumzugs
   dialog: null,              // D2: { kind, title, text, value, okLabel, danger, resolve }
   selectMode: false,          // Mehrfachauswahl im Verwalten-Tab aktiv?
   selectedIds: new Set(),     // ausgewählte Karten-IDs
@@ -926,7 +926,19 @@ async function initFirebase() {
         umzugBereiche = Array.isArray(data.bereiche)
           ? normBereiche(data.bereiche)
           : (data.bereiche && typeof data.bereiche === "object" ? bereicheMapToArray(data.bereiche) : normBereiche(null));
-        if (!ui.umzug) ui.umzug = { backupGemacht: false, laeuft: false, fertig: 0, gesamt: 0, fehler: null };
+        /* Der Umzug laeuft von selbst los. Ein Knopf mit Erklaerung davor
+           haette bedeutet, dass jeder, der die App benutzt, erst verstehen
+           muss, was ein Datenformat ist. Ein erzwungenes Backup ist auch
+           nicht noetig: Der alte Datensatz wird nicht angeruehrt und liegt
+           danach unveraendert daneben.
+           ui.umzug dient zugleich als Sperre - der Schnappschuss kann
+           mehrfach kommen, gestartet wird trotzdem nur einmal. */
+        if (!ui.umzug) {
+          ui.umzug = { laeuft: false, fertig: 0, gesamt: 0, fehler: null };
+          render();
+          umzugStarten();
+          return;
+        }
         render();
       }, snapFehler);
     }
@@ -2163,58 +2175,26 @@ function render() {
 }
 
 /* ---------- C1: einmaliger Umzug ins neue Datenformat ---------- */
+/* Bewusst fast textlos. Wer die App benutzt, muss nicht wissen, was ein
+   Datensatz ist - er soll nur sehen, dass gerade etwas laeuft und er warten
+   soll. Die Begruendung steht im Changelog, nicht auf dem Bildschirm. */
 function renderUmzug() {
   const u = ui.umzug;
-  const anzahl = umzugBereiche ? umzugBereiche.reduce((n, b) => n + b.karten.length, 0) : 0;
   let html = '<div style="padding-top:32px">';
   html += '<h1>🌱 Adrabic-Wiederholung</h1>';
-  html += '<p class="subtitle">Einmaliger Umzug der Daten</p>';
-  html += '<div class="panel">';
-  html += '<p class="hint" style="padding-top:0">Deine Karten liegen bisher alle zusammen in einem einzigen Datensatz. Der hat eine feste Obergrenze – bei etwa 5.000 bis 7.000 Karten ließe sich keine neue mehr anlegen. Nach dem Umzug bekommt jede Karte ihren eigenen Datensatz und diese Grenze fällt weg.</p>';
-  html += '<p class="hint">Gefunden: <strong>' + (umzugBereiche ? umzugBereiche.length : 0) + '</strong> Bereich(e) mit <strong>' + anzahl + '</strong> Karte(n).</p>';
-  html += '<p class="hint">Der alte Datensatz bleibt als Sicherheitsnetz stehen und wird nicht gelöscht.</p>';
-
-  if (u.laeuft) {
-    html += '<p class="hint"><strong>Umzug läuft… ' + u.fertig + ' von ' + u.gesamt + '</strong></p>';
-    html += '<p class="hint">Bitte diese Seite offen lassen und nicht neu laden.</p>';
+  html += '<div class="panel" style="text-align:center">';
+  if (u.fehler) {
+    html += '<p class="hint" style="padding-top:0">Das hat nicht geklappt. Deine Karten sind unverändert.</p>';
+    html += '<div class="error-box">' + esc(u.fehler) + '</div>';
+    html += '<div class="form-actions" style="justify-content:center"><button data-action="umzug-start">Nochmal versuchen</button></div>';
   } else {
-    html += '<div class="form-actions">';
-    html += '<button class="secondary" data-action="umzug-backup">⬇️ Backup herunterladen</button>';
-    html += '<button data-action="umzug-start"' + (u.backupGemacht ? '' : ' disabled') + '>Umzug starten</button>';
-    html += '</div>';
-    if (!u.backupGemacht) html += '<p class="hint">Erst das Backup herunterladen – danach lässt sich der Umzug starten.</p>';
+    html += '<p class="hint" style="padding-top:0">Deine Karten werden einmalig umgestellt. Das dauert ein paar Sekunden.</p>';
+    if (u.gesamt > 0) html += '<p class="hint"><strong>' + u.fertig + ' von ' + u.gesamt + '</strong></p>';
+    html += '<p class="hint">Bitte die Seite offen lassen.</p>';
   }
-  if (u.fehler) html += '<div class="error-box">' + esc(u.fehler) + '</div>';
-  html += '</div>';
-
-  html += '<div class="panel">';
-  html += '<p class="hint" style="padding-top:0"><strong>Wichtig:</strong> Mach den Umzug auf einem Gerät. Ist die App auf einem anderen Gerät noch offen, schreibt sie dort weiter ins alte Format – diese Änderungen wären verloren. Alle anderen Geräte danach einmal neu laden.</p>';
-  html += '<div class="form-actions"><button class="secondary" data-action="logout">Abmelden</button></div>';
   html += '</div></div>';
   app.innerHTML = html;
   app.style.setProperty("--arab-scale", String(arabFaktor()));
-}
-
-/* Das Backup wird aus dem ALTEN Stand gebaut, nicht aus bereiche - das ist
-   waehrend des Umzugs noch null. Gleiches Dateiformat wie das normale
-   Backup, laesst sich also ganz normal wieder einspielen. */
-function umzugBackup() {
-  const data = {
-    exportedAt: new Date().toISOString(),
-    profil: displayName,
-    bereiche: umzugBereiche || []
-  };
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "lernkarten-backup-vor-umzug-" + todayStr() + ".json";
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-  ui.umzug.backupGemacht = true;
-  render();
 }
 
 async function umzugStarten() {
@@ -2267,10 +2247,18 @@ async function umzugStarten() {
     await fb.updateDoc(userDocRef, { schemaVersion: SCHEMA_VERSION });
     ui.umzug = null;
     umzugBereiche = null;
+    /* Nicht auf den naechsten Schnappschuss des Nutzerdokuments warten - der
+       kommt nicht. Firestore meldet nur Aenderungen am INHALT; hier hat
+       dieses Geraet den neuen Inhalt selbst geschrieben, und der bestaetigte
+       Stand unterscheidet sich davon nur in den Metadaten. Solche Meldungen
+       liefert onSnapshot ohne includeMetadataChanges nicht aus - die App
+       blieb dann auf "Daten werden geladen..." stehen, bis jemand neu lud.
+       Also hier direkt weiterschalten. */
+    sammlungenStarten();
     render();
   } catch (e) {
     ui.umzug.laeuft = false;
-    ui.umzug.fehler = "Umzug fehlgeschlagen (" + (e && e.code ? e.code : "Fehler") + "). Es wurde nichts kaputtgemacht – der alte Stand ist unverändert. Nochmal versuchen oder die Seite neu laden.";
+    ui.umzug.fehler = e && e.code ? e.code : "Fehler";
     render();
   }
 }
@@ -3379,7 +3367,6 @@ app.addEventListener("click", e => {
        mitten in der neuen Seite, ohne zu sehen, dass sie gewechselt hat. */
     case "seite-zurueck": ui.kartenSeite = Math.max(0, ui.kartenSeite - 1); window.scrollTo(0, 0); render(); break;
     case "seite-vor": ui.kartenSeite = ui.kartenSeite + 1; window.scrollTo(0, 0); render(); break;
-    case "umzug-backup": umzugBackup(); break;
     case "umzug-start": umzugStarten(); break;
     case "toggle-card-select": toggleCardSelected(btn.dataset.id); break;
     case "delete-selected": deleteSelectedCards(); break;
