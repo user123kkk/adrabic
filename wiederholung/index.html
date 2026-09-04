@@ -325,6 +325,48 @@
   }
   input.arabic { text-align: right; }
 
+  /* D2 (1.8.0): eigene Dialoge statt alert/confirm/prompt. Die System-Kaesten
+     sind auf dem Handy fremd, zeigen statt eines Titels die Seiten-Adresse,
+     und prompt() wird von manchen Browsern schlicht ignoriert - dann passierte
+     gar nichts und niemand wusste, warum. */
+  .dlg-backdrop {
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .dlg {
+    background: var(--card); color: var(--ink);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 20px 20px 16px; width: 100%; max-width: 420px; text-align: left;
+  }
+  .dlg h3 { font-size: 1.02rem; margin-bottom: 8px; }
+  .dlg .dlg-text { color: var(--ink-soft); font-size: 0.94rem; white-space: pre-wrap; word-break: break-word; }
+  .dlg input { margin-top: 12px; }
+  .dlg-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; flex-wrap: wrap; }
+  .dlg-actions button.danger { background: var(--red); color: #fff; }
+  .dlg-actions button.danger:hover { background: var(--red); opacity: 0.85; }
+
+  /* E7 (1.8.0): Schriftgroesse fuer Arabisch. Der Faktor haengt an #app.
+     Die Grundgroessen stehen bewusst an jeder Stelle einzeln - ein
+     schlichtes calc(1em * f) in .arabic wuerde sich auf die ELTERN-Groesse
+     beziehen und die 1,7 rem der Lernkarte verschlucken. */
+  .study-word.arabic { font-size: calc(1.7rem * var(--arab-scale, 1)); }
+  .study-answer.arabic { font-size: calc(1.3rem * var(--arab-scale, 1)); }
+  .card-row .wort.arabic { font-size: calc(1rem * var(--arab-scale, 1)); }
+  input.arabic { font-size: calc(1rem * var(--arab-scale, 1)); }
+
+  /* Dreiteiliger Umschalter, benutzt von E7 (Schriftgroesse) und D7 (Suche) */
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .seg button {
+    border-radius: 0; padding: 7px 13px; font-size: 0.84rem;
+    background: transparent; color: var(--ink-soft);
+  }
+  .seg button:hover { background: var(--accent-soft); color: var(--ink); }
+  .seg button.active { background: var(--accent-soft); color: var(--accent-dark); font-weight: 600; }
+  .seg-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+
   .hw-canvas-wrap { background: var(--bg); border-radius: var(--radius); padding: 10px; margin: 18px 0; }
   .hw-canvas-wrap canvas {
     display: block;
@@ -350,6 +392,7 @@
     .container { padding: 12px; }
     .panel { padding: 16px; }
     .study-word { font-size: 1.4rem; }
+    .study-word.arabic { font-size: calc(1.4rem * var(--arab-scale, 1)); }
     /* Seit 1.7.0 gibt es drei Tabs statt zwei - "Fortschritt" ist das
        laengste Wort und braucht auf einem 360-px-Handy weniger Polster. */
     .tab { padding: 12px 4px; font-size: 0.9rem; }
@@ -381,7 +424,7 @@ const firebaseConfig = {
 
 /* Versionsnummer: bei jeder Veroeffentlichung hochzaehlen und denselben Wert
    als CACHE_NAME in sw.js eintragen, damit alte Dateien verworfen werden. */
-const APP_VERSION = "1.7.0";
+const APP_VERSION = "1.8.0";
 
 const CONFIGURED = firebaseConfig.apiKey !== "HIER_EINFUEGEN";
 const app = document.getElementById("app");
@@ -577,9 +620,30 @@ function normStreak(s) {
    fuer neue Karten - der Standard 20 ist derselbe wie bei Anki. */
 const NEU_PRO_TAG_STANDARD = 20;
 const NEU_PRO_TAG_MAX = 500;
+/* E7 (1.8.0): drei feste Stufen statt eines Zahlenfeldes. Fatha, Kasra und
+   Sukuun sind bei 1,7 rem auf dem Handy kaum auseinanderzuhalten - und genau
+   die entscheiden, ob richtig gelesen wird. */
+const ARAB_STUFEN = [
+  { id: "klein",  label: "klein",  faktor: 0.85 },
+  { id: "normal", label: "normal", faktor: 1 },
+  { id: "gross",  label: "groß",   faktor: 1.3 }
+];
+function arabFaktor() {
+  const st = ARAB_STUFEN.find(x => x.id === settings.arabGroesse);
+  return st ? st.faktor : 1;
+}
 function normSettings(s) {
   const n = s && Number.isInteger(s.neuProTag) ? s.neuProTag : NEU_PRO_TAG_STANDARD;
-  return { neuProTag: Math.min(Math.max(n, 0), NEU_PRO_TAG_MAX) };
+  const g = s && ARAB_STUFEN.some(x => x.id === s.arabGroesse) ? s.arabGroesse : "normal";
+  /* D5 (1.8.0): Datum des letzten Voll-Backups. Lag frueher in localStorage
+     und war damit geraetelokal - auf einem neuen Handy hiess es immer "noch
+     nie gesichert", was aussieht, als waeren die Daten weg. */
+  const b = s && /^\d{4}-\d{2}-\d{2}$/.test(s.lastBackup) ? s.lastBackup : null;
+  return {
+    neuProTag: Math.min(Math.max(n, 0), NEU_PRO_TAG_MAX),
+    arabGroesse: g,
+    lastBackup: b
+  };
 }
 
 /* ---------- Zustand ---------- */
@@ -589,7 +653,7 @@ let bereiche = null;         // Array [{name, karten:[]}] – null solange Cloud
 let cloudDocExists = false;
 let syncError = null;
 let streak = normStreak(null); // { count, lastCompletedDate, lastEvaluatedDate } – nur echte Lernsessions zählen, Üben nicht
-let settings = normSettings(null); // { neuProTag }
+let settings = normSettings(null); // { neuProTag, arabGroesse, lastBackup }
 
 let ui = {
   authMode: "login",         // "login" | "register" | "reset"
@@ -603,6 +667,8 @@ let ui = {
   editId: null,
   askImport: false,          // alte lokale Daten anbieten
   searchQuery: "",           // Suchtext im Verwalten-Tab (nicht gespeichert, nur UI-Zustand)
+  searchAll: false,          // D7: false = nur dieser Bereich, true = alle Bereiche
+  dialog: null,              // D2: { kind, title, text, value, okLabel, danger, resolve }
   selectMode: false,          // Mehrfachauswahl im Verwalten-Tab aktiv?
   selectedIds: new Set(),     // ausgewählte Karten-IDs
   drillOpen: false,           // Auswahl für Übungsmodus sichtbar?
@@ -734,7 +800,7 @@ function persist() {
   }).catch(e => {
     if (!saveWarned) {
       saveWarned = true;
-      alert("Speichern in der Cloud fehlgeschlagen (" + (e && e.code ? e.code : "Fehler") + "). Änderungen werden erneut versucht, sobald die Verbindung steht.");
+      dlgAlert("Speichern in der Cloud fehlgeschlagen (" + (e && e.code ? e.code : "Fehler") + "). Änderungen werden erneut versucht, sobald die Verbindung steht.", "Cloud nicht erreichbar");
     }
   });
 }
@@ -758,7 +824,7 @@ function persistCardGrade(bereichId, cardId, fields) {
   fb.updateDoc(userDocRef, patch).catch(e => {
     if (!saveWarned) {
       saveWarned = true;
-      alert("Speichern in der Cloud fehlgeschlagen (" + (e && e.code ? e.code : "Fehler") + "). Änderungen werden erneut versucht, sobald die Verbindung steht.");
+      dlgAlert("Speichern in der Cloud fehlgeschlagen (" + (e && e.code ? e.code : "Fehler") + "). Änderungen werden erneut versucht, sobald die Verbindung steht.", "Cloud nicht erreichbar");
     }
   });
 }
@@ -951,6 +1017,14 @@ function zurueckgehalteneNeue(bereich) {
   const neue = b.karten.filter(c => istNeueKarte(c) && c.nextReview <= t).length;
   return Math.max(0, neue - freieNeuPlaetze());
 }
+/* E7 (1.8.0) */
+function setArabGroesse(id) {
+  if (!ARAB_STUFEN.some(x => x.id === id)) return;
+  if (id === settings.arabGroesse) return;
+  settings.arabGroesse = id;
+  persistSettings();
+  render();
+}
 function setNeuProTag(n) {
   if (!Number.isInteger(n)) return;
   const v = Math.min(Math.max(n, 0), NEU_PRO_TAG_MAX);
@@ -1072,9 +1146,24 @@ function editCardInBereich(bereichId, cardId) {
 }
 
 const LAST_BACKUP_KEY = "adrabic-last-backup";
+/* D5 (1.8.0): Das Datum liegt jetzt in den Einstellungen und damit in der
+   Cloud. Vorher stand es nur im localStorage des jeweiligen Geraets - auf
+   einem neuen Handy hiess es deshalb immer "noch nie gesichert", was aussieht,
+   als waeren die Daten weg.
+   Der localStorage wird weiter GELESEN, damit ein altes Datum nicht verloren
+   geht, aber nur als Rueckfallebene. Geschrieben wird es beim naechsten
+   Backup ohnehin in die Cloud - eine eigene Umzugsroutine waere zusaetzlicher
+   Schreibzugriff fuer einen einzigen Wert. */
+function lastBackupDate() {
+  if (settings.lastBackup) return settings.lastBackup;
+  try {
+    const raw = localStorage.getItem(LAST_BACKUP_KEY);
+    return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : null;
+  } catch (e) { return null; }
+}
 function daysSinceLastBackup() {
-  const raw = localStorage.getItem(LAST_BACKUP_KEY);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null; // noch nie exportiert
+  const raw = lastBackupDate();
+  if (!raw) return null; // noch nie exportiert
   const last = new Date(raw + "T00:00:00");
   const now = new Date(todayStr() + "T00:00:00");
   return Math.round((now - last) / 86400000);
@@ -1096,6 +1185,10 @@ function exportBackup(onlyCurrent) {
   a.remove();
   URL.revokeObjectURL(url);
   if (!onlyCurrent) {
+    /* Nur das Voll-Backup zaehlt - ein Export eines einzelnen Bereichs
+       sichert eben nicht alles. */
+    settings.lastBackup = todayStr();
+    persistSettings();
     try { localStorage.setItem(LAST_BACKUP_KEY, todayStr()); } catch (e) {}
   }
   render();
@@ -1103,16 +1196,16 @@ function exportBackup(onlyCurrent) {
 function importBackupFile(file) {
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = () => {
+  reader.onload = async () => {
     let data;
     try {
       data = JSON.parse(reader.result);
     } catch (e) {
-      alert("Diese Datei ist keine gültige Backup-Datei (kein lesbares JSON).");
+      await dlgAlert("Diese Datei ist keine gültige Backup-Datei (kein lesbares JSON).", "Import nicht möglich");
       return;
     }
     if (!data || !Array.isArray(data.bereiche)) {
-      alert("Diese Datei ist keine gültige Lernkarten-Backup-Datei.");
+      await dlgAlert("Diese Datei ist keine gültige Lernkarten-Backup-Datei.", "Import nicht möglich");
       return;
     }
     const imported = normBereiche(data.bereiche);
@@ -1127,14 +1220,14 @@ function importBackupFile(file) {
     }
     persist();
     render();
-    alert(imported.length + " Bereich(e) mit insgesamt " + imported.reduce((sum, b) => sum + b.karten.length, 0) + " Karte(n) importiert.");
+    dlgAlert(imported.length + " Bereich(e) mit insgesamt " + imported.reduce((sum, b) => sum + b.karten.length, 0) + " Karte(n) importiert.", "Import fertig");
   };
   reader.readAsText(file);
 }
 
 /* ---------- Bereiche ---------- */
-function addBereich() {
-  const name = prompt("Name des neuen Bereichs:");
+async function addBereich() {
+  const name = await dlgPrompt("Wie soll der neue Bereich heißen?", "", { title: "Neuer Bereich", okLabel: "Anlegen" });
   if (!name || !name.trim()) return;
   const n = name.trim().slice(0, 40);
   let idx = bereiche.findIndex(b => b.name === n);
@@ -1161,27 +1254,30 @@ function selectBereich(idx) {
   ui.openSetId = null;
   render();
 }
-function renameBereich() {
+async function renameBereich() {
   const b = currentBereich();
-  const name = prompt("Neuer Name für den Bereich:", b.name);
+  const name = await dlgPrompt("Neuer Name für den Bereich:", b.name, { title: "Bereich umbenennen", okLabel: "Speichern" });
   if (!name || !name.trim()) return;
   const n = name.trim().slice(0, 40);
   if (n === b.name) return;
   if (bereiche.some(x => x !== b && x.name === n)) {
-    alert('Ein Bereich namens "' + n + '" existiert schon.');
+    await dlgAlert('Ein Bereich namens „' + n + '" existiert schon.', "Name schon vergeben");
     return;
   }
   b.name = n;
   persist();
   render();
 }
-function deleteBereich() {
+async function deleteBereich() {
   if (bereiche.length <= 1) {
-    alert("Der letzte verbleibende Bereich kann nicht gelöscht werden.");
+    await dlgAlert("Der letzte verbleibende Bereich kann nicht gelöscht werden.", "Nicht möglich");
     return;
   }
   const b = currentBereich();
-  if (!confirm('Bereich "' + b.name + '" mit ' + b.karten.length + ' Karte(n) endgültig löschen? Das kann nicht rückgängig gemacht werden.')) return;
+  const ok = await dlgConfirm('Der Bereich „' + b.name + '" und alle ' + b.karten.length +
+    ' Karte(n) darin werden endgültig gelöscht. Das lässt sich nicht rückgängig machen.',
+    { title: "Bereich löschen?", okLabel: "Endgültig löschen", danger: true });
+  if (!ok) return;
   bereiche.splice(ui.bereichIdx, 1);
   ui.bereichIdx = Math.max(0, Math.min(ui.bereichIdx, bereiche.length - 1));
   ui.session = null;
@@ -1191,10 +1287,13 @@ function deleteBereich() {
 }
 
 /* ---------- Mehrfachauswahl ---------- */
-function reverseOrder() {
+async function reverseOrder() {
   const cards = currentCards();
   if (cards.length < 2) return;
-  if (!confirm('Reihenfolge aller ' + cards.length + ' Karten in „' + currentBereich().name + '" einmalig umkehren?')) return;
+  const ok = await dlgConfirm('Die Reihenfolge aller ' + cards.length + ' Karten in „' +
+    currentBereich().name + '" wird einmalig umgekehrt.',
+    { title: "Reihenfolge umkehren?", okLabel: "Umkehren" });
+  if (!ok) return;
   cards.reverse();
   persist();
   render();
@@ -1210,10 +1309,12 @@ function toggleCardSelected(id) {
   else ui.selectedIds.add(id);
   render();
 }
-function deleteSelectedCards() {
+async function deleteSelectedCards() {
   const n = ui.selectedIds.size;
   if (n === 0) return;
-  if (!confirm(n + " Karte(n) endgültig löschen? Das kann nicht rückgängig gemacht werden.")) return;
+  const ok = await dlgConfirm(n + " Karte(n) werden endgültig gelöscht. Das lässt sich nicht rückgängig machen.",
+    { title: "Karten löschen?", okLabel: "Endgültig löschen", danger: true });
+  if (!ok) return;
   const cards = currentCards();
   for (let i = cards.length - 1; i >= 0; i--) {
     if (ui.selectedIds.has(cards[i].id)) cards.splice(i, 1);
@@ -1251,16 +1352,17 @@ function purgeFromSets(ids) {
   const idSet = ids instanceof Set ? ids : new Set(ids);
   currentSets().forEach(s => { s.cardIds = s.cardIds.filter(id => !idSet.has(id)); });
 }
-function saveSelectedToSet(targetId) {
+async function saveSelectedToSet(targetId) {
   const ids = [...ui.selectedIds];
   if (ids.length === 0) return;
   let set;
   if (targetId === "__new__") {
-    const name = prompt("Name der neuen Speicherkarte:", "Schwierige Wörter");
+    const name = await dlgPrompt("Wie soll die neue Speicherkarte heißen?", "Schwierige Wörter",
+      { title: "Neue Speicherkarte", okLabel: "Anlegen" });
     if (!name || !name.trim()) return;
     const n = name.trim().slice(0, 40);
     if (currentSets().some(s => s.name === n)) {
-      alert('Eine Speicherkarte namens „' + n + '" existiert schon.');
+      await dlgAlert('Eine Speicherkarte namens „' + n + '" existiert schon.', "Name schon vergeben");
       return;
     }
     set = { id: genId(), name: n, cardIds: [] };
@@ -1277,26 +1379,30 @@ function saveSelectedToSet(targetId) {
   persist();
   render();
 }
-function renameSet(id) {
+async function renameSet(id) {
   const set = findSet(id);
   if (!set) return;
-  const name = prompt("Neuer Name für die Speicherkarte:", set.name);
+  const name = await dlgPrompt("Neuer Name für die Speicherkarte:", set.name,
+    { title: "Speicherkarte umbenennen", okLabel: "Speichern" });
   if (!name || !name.trim()) return;
   const n = name.trim().slice(0, 40);
   if (n === set.name) return;
   if (currentSets().some(s => s !== set && s.name === n)) {
-    alert('Eine Speicherkarte namens „' + n + '" existiert schon.');
+    await dlgAlert('Eine Speicherkarte namens „' + n + '" existiert schon.', "Name schon vergeben");
     return;
   }
   set.name = n;
   persist();
   render();
 }
-function deleteSet(id) {
+async function deleteSet(id) {
   const sets = currentSets();
   const idx = sets.findIndex(s => s.id === id);
   if (idx === -1) return;
-  if (!confirm('Speicherkarte „' + sets[idx].name + '" löschen? Die Vokabeln selbst bleiben erhalten.')) return;
+  const ok = await dlgConfirm('Die Speicherkarte „' + sets[idx].name +
+    '" wird gelöscht. Die Vokabeln selbst bleiben erhalten.',
+    { title: "Speicherkarte löschen?", okLabel: "Löschen", danger: true });
+  if (!ok) return;
   sets.splice(idx, 1);
   if (ui.openSetId === id) ui.openSetId = null;
   if (ui.drillSource === id) ui.drillSource = "stufen";
@@ -1326,20 +1432,20 @@ function openDrillPicker(source) {
   ui.drillSource = source && findSet(source) ? source : "stufen";
   render();
 }
-function startDrill(min, max, handwriting) {
+async function startDrill(min, max, handwriting) {
   const cards = currentCards().filter(c => c.stufe >= min && c.stufe <= max);
   if (cards.length === 0) {
-    alert("Keine Karten in diesem Stufenbereich.");
+    await dlgAlert("In diesem Stufenbereich gibt es keine Karten.", "Nichts zu üben");
     return;
   }
   startDrillWithCards(cards, min === max ? ("Stufe " + min) : ("Stufe " + min + "–" + max), handwriting);
 }
-function startDrillFromSet(setId, handwriting) {
+async function startDrillFromSet(setId, handwriting) {
   const set = findSet(setId);
   if (!set) return;
   const cards = setCards(set);
   if (cards.length === 0) {
-    alert('Die Speicherkarte „' + set.name + '" enthält keine Karten (mehr).');
+    await dlgAlert('Die Speicherkarte „' + set.name + '" enthält keine Karten (mehr).', "Nichts zu üben");
     return;
   }
   startDrillWithCards(cards, "Speicherkarte: " + set.name, handwriting);
@@ -1378,17 +1484,21 @@ function findeDuplikat(wort, exceptId, cards) {
   const key = vergleichsWort(wort);
   return (cards || currentCards()).find(c => c.id !== exceptId && vergleichsWort(c.wort) === key) || null;
 }
-function submitCardForm() {
+async function submitCardForm() {
   const wort = val("f-wort").trim();
   const ueb = val("f-ueb").trim();
   const extra = val("f-extra").trim();
   if (!wort || !ueb) {
-    alert("Bitte Wort und Übersetzung ausfüllen.");
+    await dlgAlert("Bitte Wort und Übersetzung ausfüllen.", "Noch unvollständig");
     return;
   }
+  /* D6: Der Entwurf haelt den getippten Text fest, waehrend der Dialog offen
+     ist - beim Abbrechen bleibt die Eingabe also stehen. */
   const dup = findeDuplikat(wort, ui.editId || null);
-  if (dup && !confirm('„' + wort + '" gibt es in diesem Bereich schon (Übersetzung: „' + dup.uebersetzung + '").\n\nTrotzdem speichern?')) {
-    return;
+  if (dup) {
+    const ok = await dlgConfirm('„' + wort + '" gibt es in diesem Bereich schon.\nÜbersetzung dort: „' +
+      dup.uebersetzung + '"', { title: "Wort gibt es schon", okLabel: "Trotzdem speichern" });
+    if (!ok) return;
   }
   if (ui.editId) {
     const card = findCard(ui.editId);
@@ -1444,10 +1554,12 @@ function editCard(id) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 function cancelEdit() { ui.editId = null; resetFormDraft(); render(); }
-function deleteCard(id) {
+async function deleteCard(id) {
   const card = findCard(id);
   if (!card) return;
-  if (!confirm('Karte "' + card.wort + '" wirklich löschen?')) return;
+  const ok = await dlgConfirm('Die Karte „' + card.wort + '" (' + card.uebersetzung + ') wird gelöscht.',
+    { title: "Karte löschen?", okLabel: "Löschen", danger: true });
+  if (!ok) return;
   const cards = currentCards();
   cards.splice(cards.findIndex(c => c.id === id), 1);
   purgeFromSets([id]);
@@ -1462,7 +1574,30 @@ function startSession() {
   ui.session = { queue: shuffled(due.map(c => c.id)), total: due.length, revealed: false, extraOpen: false, lastAction: null, isDrill: false, bereichId: currentBereich().id };
   render();
 }
-function revealAnswer() { ui.session.revealed = true; render(); }
+/* E5 (1.8.0): Beim Aufdecken das Vollbild verlassen.
+   Die Zeichenflaeche liegt im Vollbild als fixiertes Fenster (position:fixed,
+   z-index 50) UEBER der Seite. Die Loesung wurde also durchaus gerendert - sie
+   lag nur darunter und war unsichtbar. Man musste erst "Verkleinern" druecken.
+   Jetzt schliesst "Fertig" das Vollbild gleich mit. */
+function revealAnswer() {
+  ui.session.revealed = true;
+  hwFullscreen = false;
+  render();
+  scrollAnswerIntoView();
+}
+/* E5 (1.8.0): nur so weit scrollen, dass die Loesung ins Bild kommt - die
+   eigene Zeichnung darueber soll sichtbar bleiben, sonst muesste man zum
+   Vergleichen wieder hochscrollen. Deshalb block:"nearest" (bewegt das
+   Minimum) und nicht block:"center" (holt das Wort in die Mitte und schiebt
+   die Zeichnung oben aus dem Bild).
+   requestAnimationFrame: erst wenn der Browser das neue DOM gesetzt hat,
+   sonst gibt es das Element noch gar nicht. */
+function scrollAnswerIntoView() {
+  requestAnimationFrame(() => {
+    const el = document.querySelector(".study-answer");
+    if (el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  });
+}
 function toggleExtra() { ui.session.extraOpen = !ui.session.extraOpen; render(); }
 /* B2: drei Tasten statt zwei.
    „Nicht gewusst" warf bisher jede Karte auf Stufe 0 zurueck - auch eine, die
@@ -1718,7 +1853,10 @@ function renderMain() {
   const prevSelStart = prevActive && typeof prevActive.selectionStart === "number"
     ? prevActive.selectionStart : null;
 
+  html += renderDialog();          // D2 – liegt als Overlay ueber allem
   app.innerHTML = html;
+  /* E7: Faktor am Container, damit ihn jede .arabic-Stelle darunter erbt. */
+  app.style.setProperty("--arab-scale", String(arabFaktor()));
 
   if (prevActiveId) {
     const again = document.getElementById(prevActiveId);
@@ -1741,6 +1879,8 @@ function renderMain() {
   if (ui.tab === "lernen" && ui.session && ui.session.handwriting && ui.session.queue.length > 0) {
     setupHandwritingCanvas();
   }
+
+  if (ui.dialog) setupDialog();     // D2
 
   if (ui.tab === "verwalten") {
     ["f-wort", "f-ueb"].forEach(id => {
@@ -1813,6 +1953,20 @@ function renderLernen() {
   html += '<label for="f-neu-pro-tag" style="margin:0">Neue Karten pro Tag</label>';
   html += '<input type="number" id="f-neu-pro-tag" min="0" max="' + NEU_PRO_TAG_MAX + '" step="5" value="' + settings.neuProTag + '">';
   html += '<span class="hint" style="padding:0">heute ' + neueKartenHeute() + ' eingeführt (gilt für alle Bereiche zusammen)</span>';
+  html += '</div>';
+  /* E7: Bewusst drei feste Stufen statt eines Zahlenfeldes - es gibt nichts
+     einzustellen, nur auszuprobieren, was man lesen kann. */
+  html += '<div class="seg-row">';
+  html += '<span style="font-size:0.88rem; color:var(--ink-soft)">Arabische Schrift</span>';
+  html += '<span class="seg" role="group" aria-label="Schriftgröße für Arabisch">';
+  for (const st of ARAB_STUFEN) {
+    html += '<button class="' + (settings.arabGroesse === st.id ? "active" : "") +
+      '" data-action="set-arab-groesse" data-id="' + st.id + '"' +
+      (settings.arabGroesse === st.id ? ' aria-pressed="true"' : ' aria-pressed="false"') +
+      '>' + st.label + '</button>';
+  }
+  html += '</span>';
+  html += '<span class="arabic" lang="ar" dir="rtl" style="font-size:calc(1.2rem * var(--arab-scale,1))">بِسْمِ ٱللَّٰهِ</span>';
   html += '</div>';
   html += '</div>';
 
@@ -1891,12 +2045,12 @@ function renderFortschritt() {
     html += '<p class="stat-sub">ab ' + LEECH_SCHWELLE + ' Rückfällen – meist liegt es an der Karte, nicht am Gedächtnis</p>';
     leeches.slice(0, 8).forEach(x => {
       html += '<div class="leech-row">';
-      html += '<div class="words"><div class="wort arabic">' + esc(x.card.wort) + '</div>' +
+      html += '<div class="words"><div class="wort arabic" lang="ar" dir="rtl">' + esc(x.card.wort) + '</div>' +
         '<div class="uebersetzung">' + esc(x.card.uebersetzung) +
         (ui.statsScope === "alle" && bereiche.length > 1 ? ' · ' + esc(x.bereich.name) : '') + '</div></div>';
       html += '<span class="leech-badge">' + x.card.rueckfaelle + '×</span>';
-      html += '<button class="ghost" data-action="edit-leech" data-bid="' + esc(x.bereich.id) + '" data-id="' + esc(x.card.id) + '" title="Karte umformulieren oder aufteilen">✏️</button>';
-      html += '<button class="ghost" data-action="reset-leech" data-bid="' + esc(x.bereich.id) + '" data-id="' + esc(x.card.id) + '" title="Zähler auf 0 setzen – die Karte bleibt unverändert">↺</button>';
+      html += '<button class="ghost" data-action="edit-leech" data-bid="' + esc(x.bereich.id) + '" data-id="' + esc(x.card.id) + '" title="Karte umformulieren oder aufteilen" aria-label="Karte bearbeiten">✏️</button>';
+      html += '<button class="ghost" data-action="reset-leech" data-bid="' + esc(x.bereich.id) + '" data-id="' + esc(x.card.id) + '" title="Zähler auf 0 setzen – die Karte bleibt unverändert" aria-label="Rückfallzähler zurücksetzen">↺</button>';
       html += '</div>';
     });
     if (leeches.length > 8) {
@@ -1988,7 +2142,10 @@ function renderSession() {
       ' – dein Fortschritt wird hier nicht verändert</div>';
   }
   html += '<p class="progress-note">Noch ' + remaining + ' Karte' + (remaining === 1 ? "" : "n") + (s.isDrill ? " in dieser Runde" : " in dieser Session") + '</p>';
-  html += '<div class="study-word' + (promptArabic ? ' arabic' : '') + '">' + esc(promptText) + '</div>';
+  /* D4 (1.8.0): lang und dir sagen dem Browser, dass hier Arabisch steht.
+     Er waehlt danach Schrift und Leserichtung; ohne das rutschen Satzzeichen
+     in gemischtem Text auf die falsche Seite. */
+  html += '<div class="study-word' + (promptArabic ? ' arabic" lang="ar" dir="rtl' : '') + '">' + esc(promptText) + '</div>';
   if (!s.revealed) {
     if (s.handwriting) {
       html += renderHandwritingCanvas(false);
@@ -1999,7 +2156,7 @@ function renderSession() {
     if (s.handwriting) {
       html += renderHandwritingCanvas(true);
     }
-    html += '<div class="study-answer' + (answerArabic ? ' arabic' : '') + '">' + esc(answerText) + '</div>';
+    html += '<div class="study-answer' + (answerArabic ? ' arabic" lang="ar" dir="rtl' : '') + '">' + esc(answerText) + '</div>';
     /* E6: erst NACH dem Aufdecken. Vorher waere der Hinweis ein Tipp
        ("Achtung, die kannst du nicht") und wuerde die Bewertung verfaelschen.
        Im Uebungsmodus bleibt er weg, dort zaehlt nichts. */
@@ -2035,8 +2192,15 @@ function renderHandwritingCanvas(revealed) {
   let html = '<div class="hw-canvas-wrap' + (hwFullscreen ? ' fullscreen' : '') + '">';
   html += '<canvas id="hw-canvas" width="700" height="260"></canvas>';
   html += '<div class="hw-toolbar">';
-  html += '<button class="secondary" data-action="hw-clear">🗑️ Löschen</button>';
-  html += '<button class="secondary" data-action="hw-fullscreen">' + (hwFullscreen ? "↙ Verkleinern" : "⛶ Vollbild") + '</button>';
+  /* D9 (1.8.0): einzelnen Strich zuruecknehmen. Vorher gab es nur "alles
+     loeschen" - ein verrutschter letzter Zahn kostete das ganze Wort.
+     Nach dem Aufdecken ausgeblendet: dann wird nicht mehr geschrieben,
+     sondern verglichen. */
+  if (!revealed && hwStrokes.length) {
+    html += '<button class="secondary" data-action="hw-undo" aria-label="Letzten Strich zurücknehmen">↶ Strich zurück</button>';
+  }
+  html += '<button class="secondary" data-action="hw-clear" aria-label="Ganze Zeichnung löschen">🗑️ Löschen</button>';
+  html += '<button class="secondary" data-action="hw-fullscreen" aria-label="' + (hwFullscreen ? "Zeichenfläche verkleinern" : "Zeichenfläche als Vollbild") + '">' + (hwFullscreen ? "↙ Verkleinern" : "⛶ Vollbild") + '</button>';
   if (!revealed) html += '<button data-action="reveal">Fertig</button>';
   html += '</div></div>';
   return html;
@@ -2141,41 +2305,74 @@ function renderVerwalten() {
   html += renderSetsPanel();
 
   const q = ui.searchQuery.trim().toLowerCase();
-  const shownCards = q
-    ? cards.filter(c => c.wort.toLowerCase().includes(q) || c.uebersetzung.toLowerCase().includes(q) || c.extra.toLowerCase().includes(q))
-    : cards;
+  /* D7 (1.8.0): Suche wahlweise ueber alle Bereiche. Bewusst nur der
+     Umschalter und sonst nichts. Treffer aus einem FREMDEN Bereich bekommen
+     den Bereichsnamen als Plakette und nur den ✏️-Knopf: Loeschen und
+     Ankreuzen arbeiten auf currentCards() und wuerden bei einer fremden Karte
+     die falsche treffen. Der ✏️-Knopf wechselt vorher den Bereich. */
+  const treffer = c => c.wort.toLowerCase().includes(q) ||
+                       c.uebersetzung.toLowerCase().includes(q) ||
+                       c.extra.toLowerCase().includes(q);
+  const fremdeBereiche = new Map();   // Karten-ID → Bereich, nur bei Treffern von anderswo
+  let shownCards;
+  if (!q) {
+    shownCards = cards;
+  } else if (ui.searchAll) {
+    shownCards = [];
+    for (const b of bereiche) {
+      for (const c of b.karten) {
+        if (!treffer(c)) continue;
+        if (b.id !== currentBereich().id) fremdeBereiche.set(c.id, b);
+        shownCards.push(c);
+      }
+    }
+  } else {
+    shownCards = cards.filter(treffer);
+  }
 
-  if (cards.length === 0) {
+  if (cards.length === 0 && !ui.searchAll) {
     html += '<p class="hint">Noch keine Karten vorhanden.</p>';
   } else {
-    html += '<input type="text" id="f-search" placeholder="🔍 Suche nach Wort oder Übersetzung…" value="' + esc(ui.searchQuery) + '" style="margin-bottom:14px">';
+    html += '<input type="text" id="f-search" placeholder="🔍 Suche nach Wort oder Übersetzung…" value="' + esc(ui.searchQuery) + '" style="margin-bottom:10px">';
+    if (bereiche.length > 1) {
+      html += '<div class="seg-row" style="margin:0 0 14px">';
+      html += '<span class="seg" role="group" aria-label="Suchbereich">';
+      html += '<button class="' + (ui.searchAll ? "" : "active") + '" data-action="search-scope" data-scope="eins" aria-pressed="' + (ui.searchAll ? "false" : "true") + '">nur dieser Bereich</button>';
+      html += '<button class="' + (ui.searchAll ? "active" : "") + '" data-action="search-scope" data-scope="alle" aria-pressed="' + (ui.searchAll ? "true" : "false") + '">alle Bereiche</button>';
+      html += '</span></div>';
+    }
     if (shownCards.length === 0) {
-      html += '<p class="hint">Keine Treffer für „' + esc(ui.searchQuery) + '".</p>';
+      html += '<p class="hint">' + (q ? 'Keine Treffer für „' + esc(ui.searchQuery) + '".' : "Noch keine Karten vorhanden.") + '</p>';
     } else {
       const draggable = !q && !ui.selectMode;
       if (draggable) html += '<p class="hint" style="margin-bottom:10px">↕ Ziehe eine Karte am ⠿-Griff, um die Reihenfolge zu ändern.</p>';
       for (let i = 0; i < shownCards.length; i++) {
         const c = shownCards[i];
-        if (ui.selectMode) {
+        const fremd = fremdeBereiche.get(c.id) || null;
+        if (ui.selectMode && !fremd) {
           const checked = ui.selectedIds.has(c.id);
           html += '<div class="card-row" data-action="toggle-card-select" data-id="' + esc(c.id) + '" style="cursor:pointer">';
           html += '<input type="checkbox" style="pointer-events:none" ' + (checked ? "checked" : "") + '>';
         } else {
           html += '<div class="card-row"' + (draggable ? ' data-cardid="' + esc(c.id) + '"' : '') + '>';
-          if (draggable) html += '<span class="drag-handle" title="Ziehen zum Sortieren">⠿</span>';
+          if (draggable) html += '<span class="drag-handle" title="Ziehen zum Sortieren" aria-hidden="true">⠿</span>';
         }
         html += '<div class="words">';
-        html += '<div class="wort arabic">' + esc(c.wort) + '</div>';
+        html += '<div class="wort arabic" lang="ar" dir="rtl">' + esc(c.wort) + '</div>';
         html += '<div class="uebersetzung">' + esc(c.uebersetzung) + '</div>';
         if (c.extra) html += '<div class="extra-note">' + renderExtra(c.extra) + '</div>';
         html += '</div>';
+        if (fremd) html += '<span class="badge" title="Diese Karte liegt in einem anderen Bereich">' + esc(fremd.name) + '</span>';
         html += '<span class="badge">Stufe ' + c.stufe + '</span>';
         /* E6: In der Liste sichtbar machen, damit beim Durchsehen sofort
            auffaellt, welche Karte umformuliert gehoert. */
         if (istVerbrannt(c)) html += '<span class="leech-badge" title="' + c.rueckfaelle + '-mal wieder vergessen – umformulieren oder aufteilen">🔥 ' + c.rueckfaelle + '×</span>';
-        if (!ui.selectMode) {
-          html += '<button class="ghost" data-action="edit-card" data-id="' + esc(c.id) + '" title="Bearbeiten">✏️</button>';
-          html += '<button class="ghost" data-action="delete-card" data-id="' + esc(c.id) + '" title="Löschen">🗑️</button>';
+        if (fremd) {
+          html += '<button class="ghost" data-action="edit-card-in-bereich" data-bereich="' + esc(fremd.id) + '" data-id="' + esc(c.id) +
+            '" title="In „' + esc(fremd.name) + '" öffnen" aria-label="Karte im Bereich ' + esc(fremd.name) + ' bearbeiten">✏️</button>';
+        } else if (!ui.selectMode) {
+          html += '<button class="ghost" data-action="edit-card" data-id="' + esc(c.id) + '" title="Bearbeiten" aria-label="Karte bearbeiten">✏️</button>';
+          html += '<button class="ghost" data-action="delete-card" data-id="' + esc(c.id) + '" title="Löschen" aria-label="Karte löschen">🗑️</button>';
         }
         html += '</div>';
       }
@@ -2199,9 +2396,9 @@ function renderSetsPanel() {
     html += '<span class="set-name">' + esc(s.name) + '</span>';
     html += '<span class="badge">' + cards.length + ' Karte' + (cards.length === 1 ? "" : "n") + '</span>';
     html += '<button class="ghost" data-action="drill-set" data-id="' + esc(s.id) + '" title="Diese Auswahl üben">🔁 Üben</button>';
-    html += '<button class="ghost" data-action="toggle-set-open" data-id="' + esc(s.id) + '" title="Karten anzeigen">' + (open ? "▾" : "▸") + '</button>';
-    html += '<button class="ghost" data-action="rename-set" data-id="' + esc(s.id) + '" title="Umbenennen">✏️</button>';
-    html += '<button class="ghost" data-action="delete-set" data-id="' + esc(s.id) + '" title="Speicherkarte löschen (Vokabeln bleiben erhalten)">🗑️</button>';
+    html += '<button class="ghost" data-action="toggle-set-open" data-id="' + esc(s.id) + '" title="Karten anzeigen" aria-label="' + (open ? "Karten dieser Speicherkarte verbergen" : "Karten dieser Speicherkarte anzeigen") + '" aria-expanded="' + (open ? "true" : "false") + '">' + (open ? "▾" : "▸") + '</button>';
+    html += '<button class="ghost" data-action="rename-set" data-id="' + esc(s.id) + '" title="Umbenennen" aria-label="Speicherkarte umbenennen">✏️</button>';
+    html += '<button class="ghost" data-action="delete-set" data-id="' + esc(s.id) + '" title="Speicherkarte löschen (Vokabeln bleiben erhalten)" aria-label="Speicherkarte löschen">🗑️</button>';
     html += '</div>';
     if (open) {
       html += '<div class="set-cards">';
@@ -2210,10 +2407,10 @@ function renderSetsPanel() {
       } else {
         for (const c of cards) {
           html += '<div class="card-row">';
-          html += '<div class="words"><div class="wort arabic">' + esc(c.wort) + '</div>';
+          html += '<div class="words"><div class="wort arabic" lang="ar" dir="rtl">' + esc(c.wort) + '</div>';
           html += '<div class="uebersetzung">' + esc(c.uebersetzung) + '</div></div>';
           html += '<span class="badge">Stufe ' + c.stufe + '</span>';
-          html += '<button class="ghost" data-action="remove-from-set" data-set="' + esc(s.id) + '" data-id="' + esc(c.id) + '" title="Aus dieser Speicherkarte entfernen (Karte bleibt im Bereich)">✕</button>';
+          html += '<button class="ghost" data-action="remove-from-set" data-set="' + esc(s.id) + '" data-id="' + esc(c.id) + '" title="Aus dieser Speicherkarte entfernen (Karte bleibt im Bereich)" aria-label="Aus dieser Speicherkarte entfernen">✕</button>';
           html += '</div>';
         }
       }
@@ -2324,6 +2521,21 @@ function drawStrokes(ctx, canvas) {
   const w = rect.width || 1;
   const h = rect.height || 1;
   ctx.clearRect(0, 0, w, h);
+  /* E5 (1.8.0): Grundlinie wie im Schreibheft. Arabisch sitzt auf dieser
+     Linie, einzelne Buchstaben (ج ع ر) haengen darunter - deshalb liegt sie
+     nicht mittig, sondern bei knapp zwei Dritteln, damit unten Platz bleibt.
+     Sie wird VOR den Strichen gezeichnet und liegt so immer hinter der
+     eigenen Schrift. Das halbe Pixel (+0.5) macht die Linie scharf statt
+     grau verwaschen. */
+  ctx.save();
+  ctx.strokeStyle = "#ddd0ba";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  const baseline = Math.round(h * 0.66) + 0.5;
+  ctx.moveTo(10, baseline);
+  ctx.lineTo(Math.max(10, w - 10), baseline);
+  ctx.stroke();
+  ctx.restore();
   ctx.strokeStyle = "#2a2016";
   ctx.lineWidth = 4;
   ctx.lineCap = "round";
@@ -2384,6 +2596,91 @@ window.addEventListener("resize", () => {
   drawStrokes(ctx, canvas);
 });
 
+/* ---------- D2 (1.8.0): eigene Dialoge ----------
+   alert/confirm/prompt halten das ganze Programm an und liefern ihr Ergebnis
+   sofort zurueck. Eigene Dialoge koennen das nicht - sie muessen auf einen
+   Klick warten. Deshalb geben die drei Funktionen ein Promise zurueck, und
+   jede aufrufende Stelle wurde auf async/await umgestellt.
+   Der Zustand liegt in ui.dialog und nicht in einer eigenen Variablen: So
+   ueberlebt ein offener Dialog auch ein render(), das mitten hinein von
+   einem Cloud-Snapshot ausgeloest wird. */
+function openDialog(cfg) {
+  return new Promise(resolve => {
+    ui.dialog = Object.assign({ value: "", okLabel: "OK", danger: false, resolve: resolve }, cfg);
+    render();
+    requestAnimationFrame(() => {
+      const el = document.getElementById("dlg-input");
+      if (el) { el.focus(); el.select(); }
+    });
+  });
+}
+function closeDialog(result) {
+  const d = ui.dialog;
+  if (!d) return;
+  ui.dialog = null;
+  render();
+  d.resolve(result);
+}
+/* Ergebnis je nach Art: prompt liefert Text oder null, confirm true/false,
+   alert nichts. Damit verhalten sie sich wie ihre Vorbilder und die
+   aufrufenden Stellen mussten inhaltlich nicht umgebaut werden. */
+function dialogResult(d, ok) {
+  if (d.kind === "prompt") return ok ? d.value : null;
+  if (d.kind === "confirm") return !!ok;
+  return undefined;
+}
+function dlgAlert(text, title) {
+  return openDialog({ kind: "alert", title: title || "Hinweis", text: text });
+}
+function dlgConfirm(text, opts) {
+  const o = opts || {};
+  return openDialog({
+    kind: "confirm", title: o.title || "Bist du sicher?", text: text,
+    okLabel: o.okLabel || "Ja, weiter", danger: !!o.danger
+  });
+}
+function dlgPrompt(text, defaultValue, opts) {
+  const o = opts || {};
+  return openDialog({
+    kind: "prompt", title: o.title || "Eingabe", text: text,
+    value: defaultValue || "", okLabel: o.okLabel || "Übernehmen"
+  });
+}
+function renderDialog() {
+  const d = ui.dialog;
+  if (!d) return "";
+  /* Bewusst KEIN Schliessen durch Klick auf den Hintergrund: auf dem Handy
+     trifft man den beim Scrollen zu leicht, und dann waere die Eingabe weg. */
+  let h = '<div class="dlg-backdrop">';
+  h += '<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dlg-title">';
+  h += '<h3 id="dlg-title">' + esc(d.title) + '</h3>';
+  h += '<div class="dlg-text">' + esc(d.text) + '</div>';
+  if (d.kind === "prompt") {
+    h += '<input type="text" id="dlg-input" value="' + esc(d.value) + '">';
+  }
+  h += '<div class="dlg-actions">';
+  if (d.kind !== "alert") h += '<button class="secondary" data-action="dlg-cancel">Abbrechen</button>';
+  h += '<button' + (d.danger ? ' class="danger"' : '') + ' data-action="dlg-ok">' + esc(d.okLabel) + '</button>';
+  h += '</div></div></div>';
+  return h;
+}
+function setupDialog() {
+  const inp = document.getElementById("dlg-input");
+  if (!inp) return;
+  /* Wie beim Kartenformular: jeden Tastendruck sofort in den Zustand
+     spiegeln, sonst loescht ein render() dazwischen das Getippte. */
+  inp.addEventListener("input", e => { if (ui.dialog) ui.dialog.value = e.target.value; });
+  inp.addEventListener("keydown", e => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (ui.dialog) closeDialog(dialogResult(ui.dialog, true));
+    }
+  });
+}
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && ui.dialog) closeDialog(dialogResult(ui.dialog, false));
+});
+
 /* ---------- Event-Delegation ---------- */
 app.addEventListener("click", e => {
   const btn = e.target.closest("[data-action]");
@@ -2403,7 +2700,7 @@ app.addEventListener("click", e => {
     case "add-bereich": addBereich(); break;
     case "rename-bereich": renameBereich(); break;
     case "delete-bereich": deleteBereich(); break;
-    case "tab-lernen": ui.tab = "lernen"; ui.editId = null; resetFormDraft(); ui.searchQuery = ""; ui.selectMode = false; ui.selectedIds = new Set(); ui.drillOpen = false; render(); break;
+    case "tab-lernen": ui.tab = "lernen"; ui.editId = null; resetFormDraft(); ui.searchQuery = ""; ui.searchAll = false; ui.selectMode = false; ui.selectedIds = new Set(); ui.drillOpen = false; render(); break;
     case "tab-fortschritt": ui.tab = "fortschritt"; ui.session = null; ui.editId = null; resetFormDraft(); ui.drillOpen = false; render(); break;
     case "stats-scope": ui.statsScope = btn.dataset.scope === "bereich" ? "bereich" : "alle"; render(); break;
     case "edit-leech": editCardInBereich(btn.dataset.bid, btn.dataset.id); break;
@@ -2419,6 +2716,11 @@ app.addEventListener("click", e => {
     case "end-session": endSession(); break;
     case "submit-card": submitCardForm(); break;
     case "edit-card": editCard(btn.dataset.id); break;
+    /* D7: Sprung in den fremden Bereich. Nutzt dieselbe Funktion wie der
+       Fortschritts-Tab - dort wechselt sie schon seit 1.7.0 den Bereich,
+       oeffnet Verwalten und fuellt das Formular. */
+    case "edit-card-in-bereich": editCardInBereich(btn.dataset.bereich, btn.dataset.id); break;
+    case "search-scope": ui.searchAll = btn.dataset.scope === "alle"; ui.selectMode = false; ui.selectedIds = new Set(); render(); break;
     case "cancel-edit": cancelEdit(); break;
     case "delete-card": deleteCard(btn.dataset.id); break;
     case "reverse-order": reverseOrder(); break;
@@ -2458,6 +2760,10 @@ app.addEventListener("click", e => {
     case "rename-set": renameSet(btn.dataset.id); break;
     case "delete-set": deleteSet(btn.dataset.id); break;
     case "remove-from-set": removeCardFromSet(btn.dataset.set, btn.dataset.id); break;
+    case "dlg-ok": if (ui.dialog) closeDialog(dialogResult(ui.dialog, true)); break;
+    case "dlg-cancel": if (ui.dialog) closeDialog(dialogResult(ui.dialog, false)); break;
+    case "set-arab-groesse": setArabGroesse(btn.dataset.id); break;   // E7
+    case "hw-undo": hwStrokes.pop(); render(); break;   // D9
     case "hw-clear": hwStrokes = []; render(); break;
     case "hw-fullscreen": hwFullscreen = !hwFullscreen; render(); break;
     case "export-backup": exportBackup(false); break;
