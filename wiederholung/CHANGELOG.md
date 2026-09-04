@@ -2,6 +2,59 @@
 
 Neueste Version oben. Einträge werden **ergänzt**, nie ersetzt.
 
+## 1.8.0 – 4. September 2026
+
+### Schreiben (E5)
+
+- Das Zeichenfeld im Handschrift-Übungsmodus hat jetzt eine Grundlinie wie im
+  Schreibheft. Sie sitzt bei zwei Dritteln der Höhe, damit die Buchstaben, die
+  unter die Linie hängen, noch Platz haben.
+- „Fertig" schließt das Vollbild automatisch. Vorher lag die Zeichenfläche als
+  eigenes Fenster über der Lösung – man musste erst „Verkleinern" drücken, um
+  überhaupt zu sehen, was richtig gewesen wäre.
+- Nach dem Aufdecken rutscht die Seite nur so weit, dass die Lösung sichtbar
+  wird. Die eigene Zeichnung bleibt dabei im Bild.
+
+### Einzelnen Strich zurücknehmen (D9)
+
+- Neuer Knopf **↶ Strich zurück** neben „Löschen". Er erscheint ab dem ersten
+  Strich und verschwindet nach dem Aufdecken.
+
+### Schriftgröße für Arabisch (E7)
+
+- Auf dem Lernen-Tab drei Knöpfe: klein / normal / groß. Die Einstellung gilt
+  überall, wo Arabisch steht, und liegt in der Cloud – also auf jedem Gerät
+  gleich.
+
+### Suche über alle Bereiche (D7)
+
+- Im Verwalten-Tab schaltet ein Umschalter zwischen „nur dieser Bereich" und
+  „alle Bereiche". Treffer aus einem anderen Bereich tragen dessen Namen; der
+  ✏️-Knopf springt dorthin und öffnet die Karte.
+
+### Eigene Dialoge (D2)
+
+- Alle 22 System-Kästen (`alert`, `confirm`, `prompt`) sind durch eigene
+  Dialoge im Stil der App ersetzt. Sie zeigen einen echten Titel statt der
+  Seiten-Adresse, Löschen-Knöpfe sind rot, und Enter beziehungsweise Escape
+  funktionieren. `prompt()` wurde von manchen Browsern schlicht ignoriert –
+  dann passierte gar nichts und niemand wusste, warum.
+
+### Kleinigkeiten
+
+- Das Datum des letzten Backups liegt jetzt in der Cloud statt nur im Gerät
+  (D5). Auf einem neuen Handy hieß es vorher immer „noch nie gesichert".
+- Arabischer Text ist in Listen, Lernkarte und Fortschritts-Tab als Arabisch
+  ausgezeichnet (D4). Der Browser wählt danach Schrift und Leserichtung.
+- Die Emoji-Knöpfe haben Beschriftungen für Vorlesefunktionen bekommen (D3).
+
+### Nicht enthalten, bewusst
+
+Audio pro Karte · zweite Abfragerichtung · Vorlage zum Nachfahren ·
+Zeichnung speichern · Tippen statt Aufdecken · Filter „nur schwierige Karten" ·
+Hell/Dunkel · Tastatur-Kürzel anzeigen · Session-Länge wählbar ·
+Quran-Schrift ins Repo. Begründungen stehen in der Projektakte.
+
 ## 1.7.0 – 3. September 2026
 
 **Neue Funktionen**
