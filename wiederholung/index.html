@@ -2188,9 +2188,7 @@ function renderVerwalten() {
   html += '<label for="f-extra">Optional: Beispielsatz, Bild-Link oder Notiz</label>';
   html += '<textarea id="f-extra" rows="2">' + esc(formDraft.extra) + '</textarea>';
   if (editing) {
-    html += '<label for="f-stufe">Wiederholungsstufe (0 = sofort fällig, sonst ' +
-      [1, 2, 3, 4, 5, 6].map(s => s + " → " + intervalForStufe(s)).join(", ") +
-      ' Tage … höchstens ' + MAX_INTERVAL_DAYS + ')</label>';
+    html += '<label for="f-stufe">Wiederholungsstufe</label>';
     html += '<input type="number" id="f-stufe" min="0" max="' + MAX_STUFE + '" step="1" value="' + editing.stufe + '">';
   }
   html += '<div class="form-actions">';
@@ -2528,10 +2526,17 @@ function setupHandwritingCanvas() {
       y: (e.clientY - rect.top) / w
     };
   }
+  /* D9-Nachbesserung (1.8.2): "Strich zurück" tauchte bisher nur nach dem
+     Wechsel in den Vollbild-Modus auf, weil nur DIESE eine Aktion ein
+     render() ausloeste, das den Knopf neu ins HTML schreibt. Waehrend des
+     Zeichnens selbst wird nur roh aufs Canvas gemalt (drawStrokes) - der
+     Knopf blieb also unsichtbar, bis irgendetwas anderes render() antrieb. */
+  let ersterStrich = false;
   canvas.addEventListener("pointerdown", e => {
     e.preventDefault();
     drawing = true;
     canvas.setPointerCapture(e.pointerId);
+    ersterStrich = hwStrokes.length === 0;
     hwStrokes.push([posFromEvent(e)]);
     drawStrokes(ctx, canvas);
   });
@@ -2540,7 +2545,13 @@ function setupHandwritingCanvas() {
     hwStrokes[hwStrokes.length - 1].push(posFromEvent(e));
     drawStrokes(ctx, canvas);
   });
-  function endStroke() { drawing = false; }
+  function endStroke() {
+    drawing = false;
+    /* Erst HIER, nach pointerup, ist der Strich fertig. Ein render() waehrend
+       des Zeichnens wuerde das Canvas-Element ersetzen und damit die laufende
+       Pointer-Erfassung kappen - der Strich risse mitten drin ab. */
+    if (ersterStrich) { ersterStrich = false; render(); }
+  }
   canvas.addEventListener("pointerup", endStroke);
   canvas.addEventListener("pointercancel", endStroke);
 }
