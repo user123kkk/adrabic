@@ -684,6 +684,7 @@ function resetFormDraft() { formDraft = { wort: "", ueb: "", extra: "" }; }
    da render() das DOM inkl. Canvas bei jeder Aktion neu aufbaut) ---------- */
 let hwStrokes = [];
 let hwFullscreen = false;
+let hwDrawing = false;   // true waehrend eines Handschrift-Strichs; siehe Rand-Scrollen weiter unten
 
 /* ---------- Alte lokale Daten (Offline-Version) ---------- */
 const OLD_STORAGE_KEY = "lernkarten-app-v1";
@@ -2485,6 +2486,58 @@ function endDrag() {
 app.addEventListener("pointerup", endDrag);
 app.addEventListener("pointercancel", endDrag);
 
+/* ---------- Allgemeines Rand-Scrollen mit der Maus (PC) ---------- */
+/* Entscheidung des Betreibers, 4. September 2026: Die Seite soll auf dem PC
+   von selbst scrollen, sobald die Maus oben oder unten am Bildschirmrand
+   steht - ganz ohne Klick, wie man es von manchen Websites kennt. Das ist
+   etwas anderes als das Rand-Scrollen beim Kartenziehen weiter oben: DAS
+   reagiert nur waehrend eines aktiven Ziehvorgangs, DIESES staendig, allein
+   durch die Mausposition.
+
+   Nur fuer echte Maeuse (pointerType "mouse") - auf dem Handy bleibt es beim
+   gewohnten Wischen mit dem Finger, das soll unangetastet bleiben. */
+let edgeScrollMouseY = null;
+document.addEventListener("pointermove", e => {
+  if (e.pointerType !== "mouse") return;
+  edgeScrollMouseY = e.clientY;
+});
+/* Verlaesst die Maus das Fenster (Tab-Wechsel, zweiter Bildschirm), kommen
+   keine neuen pointermove-Ereignisse mehr - ohne dieses Zuruecksetzen wuerde
+   mit dem letzten bekannten Wert fuer immer weitergescrollt. */
+document.addEventListener("pointerleave", () => { edgeScrollMouseY = null; });
+
+function edgeScrollTick() {
+  const tag = document.activeElement && document.activeElement.tagName;
+  /* Vier Faelle, in denen Rand-Scrollen mehr schaden als nuetzen wuerde:
+     - dragState: das Kartenziehen hat sein eigenes Rand-Scrollen (siehe
+       autoScrollTick oben) - beide gleichzeitig wuerden sich addieren
+     - hwDrawing: sonst wuerde ein Strich beim Schreiben mitten im Zug
+       verrutschen, weil die Seite unter dem Stift wegscrollt
+     - hwFullscreen: hinter der Vollbild-Zeichenflaeche gibt es nichts zu
+       scrollen
+     - ui.dialog: waehrend ein eigener Dialog offen ist (D2), soll der
+       Hintergrund stillstehen wie bei jedem Dialog
+     - INPUT/TEXTAREA im Fokus: sonst rutscht ein Formularfeld beim
+       Ausfuellen unter der Maus weg */
+  const gesperrt = dragState || hwDrawing || hwFullscreen || ui.dialog ||
+    tag === "INPUT" || tag === "TEXTAREA";
+  if (!gesperrt && edgeScrollMouseY !== null) {
+    const margin = 70;   // dieselbe Randzone wie beim Kartenziehen
+    const maxSpeed = 16; // dieselbe Hoechstgeschwindigkeit - ein Gefuehl fuer beides
+    const y = edgeScrollMouseY;
+    const vh = window.innerHeight;
+    let dy = 0;
+    if (y < margin) {
+      dy = -maxSpeed * Math.min(1, Math.max(0, (margin - y) / margin));
+    } else if (y > vh - margin) {
+      dy = maxSpeed * Math.min(1, Math.max(0, (y - (vh - margin)) / margin));
+    }
+    if (dy !== 0) window.scrollBy(0, dy);
+  }
+  requestAnimationFrame(edgeScrollTick);
+}
+requestAnimationFrame(edgeScrollTick);
+
 /* ---------- Handschrift-Canvas: Zeichnen per Zeigegerät (Maus/Touch/Stylus) ---------- */
 /* Die Striche werden NICHT in Pixeln gespeichert, sondern als Anteil der
    Canvas-Breite (0 bis 1) - fuer x und y mit demselben Faktor. Dadurch bleibt
@@ -2546,7 +2599,6 @@ function setupHandwritingCanvas() {
   const ctx = canvas.getContext("2d");
   sizeCanvas(canvas, ctx);
   drawStrokes(ctx, canvas);
-  let drawing = false;
   function posFromEvent(e) {
     const rect = canvas.getBoundingClientRect();
     const w = rect.width || 1;
@@ -2563,19 +2615,19 @@ function setupHandwritingCanvas() {
   let ersterStrich = false;
   canvas.addEventListener("pointerdown", e => {
     e.preventDefault();
-    drawing = true;
+    hwDrawing = true;
     canvas.setPointerCapture(e.pointerId);
     ersterStrich = hwStrokes.length === 0;
     hwStrokes.push([posFromEvent(e)]);
     drawStrokes(ctx, canvas);
   });
   canvas.addEventListener("pointermove", e => {
-    if (!drawing) return;
+    if (!hwDrawing) return;
     hwStrokes[hwStrokes.length - 1].push(posFromEvent(e));
     drawStrokes(ctx, canvas);
   });
   function endStroke() {
-    drawing = false;
+    hwDrawing = false;
     /* Erst HIER, nach pointerup, ist der Strich fertig. Ein render() waehrend
        des Zeichnens wuerde das Canvas-Element ersetzen und damit die laufende
        Pointer-Erfassung kappen - der Strich risse mitten drin ab. */
