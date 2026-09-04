@@ -591,14 +591,6 @@ let syncError = null;
 let streak = normStreak(null); // { count, lastCompletedDate, lastEvaluatedDate } – nur echte Lernsessions zählen, Üben nicht
 let settings = normSettings(null); // { neuProTag }
 
-/* E2: oeffentliche, nur lesbare Sammlung fertiger Kartensaetze (eigene
-   Firestore-Collection "library", getrennt von "users/{uid}"). null = noch
-   nicht geladen - wird erst angefragt, wenn der Bibliothek-Tab tatsaechlich
-   geoeffnet wird, um unnoetige Firestore-Lesevorgaenge zu vermeiden (C4). */
-let library = null;
-let libraryLoading = false;
-let libraryError = null;
-
 let ui = {
   authMode: "login",         // "login" | "register" | "reset"
   authError: null,
@@ -777,80 +769,6 @@ function persistStreak() {
 function persistSettings() {
   if (!userDocRef) return;
   fb.updateDoc(userDocRef, { settings: settings }).catch(() => {});
-}
-
-/* ---------- E2: Bibliothek (öffentliche, nur lesbare Kartensätze) ----------
-   Eigene Collection "library/{setId}", komplett getrennt vom "users/{uid}"-
-   Dokument. Firestore-Regel dafür: allow read: if true; allow write: if false -
-   die Inhalte pflegt der Betreiber selbst über die Firebase-Konsole, die App
-   bietet dafür bewusst keine eigene Verwaltungsoberfläche (siehe Abschnitt 12
-   der Akte). */
-async function loadLibrary() {
-  if (!db || libraryLoading) return;
-  libraryLoading = true;
-  libraryError = null;
-  render();
-  try {
-    const snap = await fb.getDocs(fb.collection(db, "library"));
-    const list = [];
-    snap.forEach(docSnap => {
-      const data = docSnap.data() || {};
-      if (typeof data.name !== "string" || !data.name) return;
-      const kartenMap = data.karten && typeof data.karten === "object" ? data.karten : {};
-      const karten = Object.keys(kartenMap).map(cid => {
-        const c = kartenMap[cid] || {};
-        return {
-          wort: c.wort,
-          uebersetzung: c.uebersetzung,
-          extra: typeof c.extra === "string" ? c.extra : "",
-          order: Number.isFinite(c.order) ? c.order : 0
-        };
-      }).filter(c => c.wort != null && c.uebersetzung != null)
-        .sort((a, b) => a.order - b.order);
-      if (karten.length === 0) return; // ein Satz ohne lesbare Karten ist nicht anzeigbar
-      list.push({
-        id: docSnap.id,
-        name: String(data.name).slice(0, 60),
-        beschreibung: typeof data.beschreibung === "string" ? data.beschreibung.slice(0, 200) : "",
-        order: Number.isFinite(data.order) ? data.order : 0,
-        karten: karten
-      });
-    });
-    list.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
-    library = list;
-  } catch (e) {
-    libraryError = e && e.code === "permission-denied"
-      ? "Zugriff verweigert – die Sicherheitsregel für die Bibliothek fehlt oder ist falsch."
-      : "Bibliothek konnte nicht geladen werden – bitte Internetverbindung prüfen.";
-  }
-  libraryLoading = false;
-  render();
-}
-/* Kopiert einen Bibliothek-Satz als neuen, eigenen Bereich ins Konto. Jede
-   Karte startet frisch auf Stufe 0, ungelernt - "eigene Kopie mit eigenem
-   Fortschritt", wie in Abschnitt 10 (E2) gefordert. Der Bibliothek-Satz selbst
-   bleibt dabei unverändert, es wird nur kopiert, nichts verschoben.
-   Namenskollisionen werden wie beim Backup-Import über ein angehängtes „(2)"
-   gelöst statt etwas zu überschreiben. */
-function copyLibraryToAccount(id) {
-  const lib = (library || []).find(x => x.id === id);
-  if (!lib) return;
-  let name = lib.name.slice(0, 40);
-  if (bereiche.some(b => b.name === name)) {
-    let n = 2;
-    while (bereiche.some(b => b.name === name + " (" + n + ")")) n++;
-    name = name + " (" + n + ")";
-  }
-  const t = todayStr();
-  const karten = lib.karten.map(c => normCard({
-    wort: c.wort, uebersetzung: c.uebersetzung, extra: c.extra,
-    stufe: 0, nextReview: t, ersteBewertung: null, rueckfaelle: 0
-  }));
-  bereiche.push({ id: genId(), name: name, karten: karten, sets: [] });
-  ui.bereichIdx = bereiche.length - 1;
-  persist();
-  render();
-  alert('„' + name + '" mit ' + karten.length + ' Karte(n) in dein Konto kopiert – unter „Lernen" und „Verwalten" zu finden.');
 }
 
 /* ---------- Streak: zählt nur echte, vollständig erledigte Lerntage (kein Üben) ---------- */
@@ -1785,13 +1703,11 @@ function renderMain() {
   html += '<div class="tabs">';
   html += '<button class="tab' + (ui.tab === "lernen" ? " active" : "") + '" data-action="tab-lernen">Lernen</button>';
   html += '<button class="tab' + (ui.tab === "fortschritt" ? " active" : "") + '" data-action="tab-fortschritt">Fortschritt</button>';
-  html += '<button class="tab' + (ui.tab === "bibliothek" ? " active" : "") + '" data-action="tab-bibliothek">Bibliothek</button>';
   html += '<button class="tab' + (ui.tab === "verwalten" ? " active" : "") + '" data-action="tab-verwalten">Verwalten</button>';
   html += '</div>';
 
   html += ui.tab === "lernen" ? renderLernen()
         : ui.tab === "fortschritt" ? renderFortschritt()
-        : ui.tab === "bibliothek" ? renderBibliothek()
         : renderVerwalten();
   html += '<p style="text-align:center; font-size:0.72rem; color:var(--ink-soft); opacity:0.6; margin:18px 0 8px">Version ' + APP_VERSION + '</p>';
 
@@ -2136,38 +2052,6 @@ function renderExtra(extra) {
     return '<a href="' + esc(trimmed) + '" target="_blank" rel="noopener noreferrer">' + esc(trimmed) + '</a>';
   }
   return esc(extra);
-}
-
-/* E2: der Bibliothek-Tab. Zeigt die öffentliche, nur lesbare Sammlung
-   fertiger Kartensätze (Firestore-Collection "library") - unabhängig vom
-   eigenen Kontostand. Wird erst geladen, wenn der Tab tatsächlich geöffnet
-   wird (siehe loadLibrary und der "tab-bibliothek"-Fall im Dispatcher unten),
-   nicht schon beim Anmelden. */
-function renderBibliothek() {
-  let html = '<div class="panel">';
-  html += '<h2>📚 Bibliothek</h2>';
-  html += '<p class="hint" style="padding-top:0">Fertige Kartensätze zum Übernehmen. „In mein Konto kopieren" legt einen eigenen Bereich mit denselben Karten an – dein bestehender Fortschritt bleibt unberührt, jede kopierte Karte startet neu.</p>';
-  if (libraryLoading) {
-    html += '<p class="hint">Lädt…</p>';
-  } else if (libraryError) {
-    html += '<div class="error-box">' + esc(libraryError) + '</div>';
-    html += '<div class="form-actions"><button class="secondary" data-action="reload-library">Erneut versuchen</button></div>';
-  } else if (library === null) {
-    html += '<div class="form-actions"><button data-action="reload-library">Bibliothek laden</button></div>';
-  } else if (library.length === 0) {
-    html += '<p class="hint">Noch keine geteilten Kartensätze vorhanden.</p>';
-  } else {
-    for (const lib of library) {
-      html += '<div class="set-row">';
-      html += '<span class="set-name">' + esc(lib.name) + '</span>';
-      html += '<span class="badge">' + lib.karten.length + ' Karte' + (lib.karten.length === 1 ? "" : "n") + '</span>';
-      html += '<button class="ghost" data-action="copy-library" data-id="' + esc(lib.id) + '" title="Als eigenen Bereich übernehmen">+ In mein Konto kopieren</button>';
-      html += '</div>';
-      if (lib.beschreibung) html += '<p class="hint" style="padding:2px 0 8px">' + esc(lib.beschreibung) + '</p>';
-    }
-  }
-  html += '</div>';
-  return html;
 }
 
 function renderVerwalten() {
@@ -2524,13 +2408,6 @@ app.addEventListener("click", e => {
     case "stats-scope": ui.statsScope = btn.dataset.scope === "bereich" ? "bereich" : "alle"; render(); break;
     case "edit-leech": editCardInBereich(btn.dataset.bid, btn.dataset.id); break;
     case "reset-leech": resetRueckfaelle(btn.dataset.bid, btn.dataset.id); break;
-    case "tab-bibliothek": {
-      ui.tab = "bibliothek"; ui.session = null; ui.editId = null; resetFormDraft(); ui.drillOpen = false;
-      if (library === null && !libraryLoading) loadLibrary(); else render();
-      break;
-    }
-    case "reload-library": loadLibrary(); break;
-    case "copy-library": copyLibraryToAccount(btn.dataset.id); break;
     case "tab-verwalten": ui.tab = "verwalten"; ui.session = null; render(); break;
     case "start-session": startSession(); break;
     case "reveal": revealAnswer(); break;
