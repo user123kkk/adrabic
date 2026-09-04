@@ -13,11 +13,6 @@ Neueste Version oben. Einträge werden **ergänzt**, nie ersetzt.
   gekennzeichnet (🔥-Plakette) – Signal, dass die Karte umformuliert oder geteilt werden
   sollte statt einfach immer wieder versucht zu werden. Im Verwalten-Tab mit Badge.
   Übungsmodus zählt nicht, der Zähler wird nur beim echten Lernen hochgezählt.
-- **Bibliothek-Tab**: Öffentliche, nur lesbare Sammlung fertiger Kartensätze (Firestore
-  `library`). Jeder Satz kann mit „+ In mein Konto kopieren" als neuer Bereich übernommen
-  werden – mit eigenem Fortschritt, alle Karten starten auf Stufe 0. Der Betreiber pflegt
-  die Sätze über die Firebase-Konsole, die App bietet dafür keine Verwaltungsoberfläche.
-  Wird erst geladen, wenn der Tab tatsächlich geöffnet wird (Kostenersparnis).
 - **E-Mail-Bestätigung**: Nach der Registrierung wird eine Bestätigungs-E-Mail versendet.
   Die App sperrt sich selbst, bis der Nutzer den Link bestätigt hat. Verhindert
   Fake-Registrierungen mit erfundenen Adressen. Button „E-Mail erneut senden" auf der
@@ -31,7 +26,7 @@ Neueste Version oben. Einträge werden **ergänzt**, nie ersetzt.
 **Sonstiges**
 - Reste von E1 (Massen-Import) aufgeräumt – leere Zeilen und verwaiste Kommentare
   entfernt.
-  
+
 ## 1.6.0 – 3. September 2026
 
 **Lernlogik**
