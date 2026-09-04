@@ -1,7 +1,19 @@
-# Diesen Block OBEN in wiederholung/CHANGELOG.md einfügen
+# CHANGELOG.md – vollständig, Stand 4. September 2026
 
-Ergänzen, nicht ersetzen. Der Eintrag zu 1.8.0 bleibt darunter stehen.
-Danach diese Hilfsdatei wegwerfen – sie gehört nicht ins Repo.
+**Wichtiger Hinweis zur Herkunft, bevor du das einsetzt:**
+
+- **1.8.0 und 1.8.1** sind Wort für Wort das, was ich dir in diesem Chat schon
+  als Einfüge-Blöcke gegeben habe – exakt, nicht rekonstruiert.
+- **1.5.0 bis 1.7.0** habe ich aus den Kurzbeschreibungen in der Projektakte
+  zusammengesetzt. Ich habe keinen Zugriff auf deine tatsächliche
+  `wiederholung/CHANGELOG.md` auf GitHub und kenne den Wortlaut nicht, den du
+  damals wirklich eingetragen hast. Bitte gegenlesen, bevor du das komplett
+  ersetzt – im Zweifel dein bestehendes File behalten und nur das übernehmen,
+  was hier fehlt.
+- Die Akte erwähnt außerdem, dass der ursprüngliche 1.5.0-Eintrag einmal durch
+  ein Versehen überschrieben und über die GitHub-History zurückgeholt wurde.
+  Was hier bei 1.5.0 steht, ist meine Rekonstruktion aus der Akte, nicht diese
+  wiederhergestellte Originalfassung.
 
 ---
 
@@ -52,3 +64,157 @@ Danach diese Hilfsdatei wegwerfen – sie gehört nicht ins Repo.
   Sortieren der Karten per Ziehen. Reagiert nicht, während eine Karte gezogen
   wird, während im Übungsmodus geschrieben wird, bei offenem Dialog oder in
   einem Textfeld. Auf dem Handy unverändert: normales Wischen mit dem Finger.
+
+---
+
+## 1.8.0 – 4. September 2026
+
+### Schreiben (E5)
+
+- Das Zeichenfeld im Handschrift-Übungsmodus hat jetzt eine Grundlinie wie im
+  Schreibheft. Sie sitzt bei zwei Dritteln der Höhe, damit die Buchstaben, die
+  unter die Linie hängen, noch Platz haben.
+- „Fertig" schließt das Vollbild automatisch. Vorher lag die Zeichenfläche als
+  eigenes Fenster über der Lösung – man musste erst „Verkleinern" drücken, um
+  überhaupt zu sehen, was richtig gewesen wäre.
+- Nach dem Aufdecken rutscht die Seite nur so weit, dass die Lösung sichtbar
+  wird. Die eigene Zeichnung bleibt dabei im Bild.
+
+### Einzelnen Strich zurücknehmen (D9)
+
+- Neuer Knopf **↶ Strich zurück** neben „Löschen". Er erscheint ab dem ersten
+  Strich und verschwindet nach dem Aufdecken.
+
+### Schriftgröße für Arabisch (E7)
+
+- Auf dem Lernen-Tab drei Knöpfe: klein / normal / groß. Die Einstellung gilt
+  überall, wo Arabisch steht, und liegt in der Cloud – also auf jedem Gerät
+  gleich.
+
+### Suche über alle Bereiche (D7)
+
+- Im Verwalten-Tab schaltet ein Umschalter zwischen „nur dieser Bereich" und
+  „alle Bereiche". Treffer aus einem anderen Bereich tragen dessen Namen; der
+  ✏️-Knopf springt dorthin und öffnet die Karte.
+
+### Eigene Dialoge (D2)
+
+- Alle 22 System-Kästen (`alert`, `confirm`, `prompt`) sind durch eigene
+  Dialoge im Stil der App ersetzt. Sie zeigen einen echten Titel statt der
+  Seiten-Adresse, Löschen-Knöpfe sind rot, und Enter beziehungsweise Escape
+  funktionieren. `prompt()` wurde von manchen Browsern schlicht ignoriert –
+  dann passierte gar nichts und niemand wusste, warum.
+
+### Kleinigkeiten
+
+- Das Datum des letzten Backups liegt jetzt in der Cloud statt nur im Gerät
+  (D5). Auf einem neuen Handy hieß es vorher immer „noch nie gesichert".
+- Arabischer Text ist in Listen, Lernkarte und Fortschritts-Tab als Arabisch
+  ausgezeichnet (D4). Der Browser wählt danach Schrift und Leserichtung.
+- Die Emoji-Knöpfe haben Beschriftungen für Vorlesefunktionen bekommen (D3).
+
+### Nicht enthalten, bewusst
+
+Audio pro Karte · zweite Abfragerichtung · Vorlage zum Nachfahren ·
+Zeichnung speichern · Tippen statt Aufdecken · Filter „nur schwierige Karten" ·
+Hell/Dunkel · Tastatur-Kürzel anzeigen · Session-Länge wählbar ·
+Quran-Schrift ins Repo. Begründungen stehen in der Projektakte.
+
+---
+
+## 1.7.0 – 4. September 2026 — „Für die Brüder"
+
+*(rekonstruiert aus der Projektakte, Abschnitte 10 und 11 – nicht wortgleich mit dem Original)*
+
+### Neu
+
+- **Fortschritt sichtbar (E4/D10).** Ein neuer Tab zeigt Kennzahlen, wie fest
+  der Stoff sitzt (Verteilung über die Wiederholungsstufen), die nächsten
+  7 Tage an Wiederholungen und eine Liste der Karten, die immer wieder
+  entfallen.
+- **Verbrannte Karten (E6).** Karten, die wiederholt nicht klappen, bekommen
+  ab 5 Rückfällen eine 🔥-Markierung – ein Hinweis, sie umzuformulieren oder
+  in zwei Karten aufzuteilen, statt weiter Lernzeit zu kosten. Neues Feld
+  `karten.*.rueckfaelle`; alte Karten starten bei 0.
+- **E-Mail-Bestätigung (C4).** Nach der Registrierung muss die E-Mail-Adresse
+  bestätigt werden, bevor die App nutzbar ist – verhindert Registrierungen mit
+  erfundenen Adressen.
+
+### Aufgeräumt
+
+- Reste der in 1.6.0 kurzzeitig vorhandenen Funktion „Liste einfügen" (E1)
+  entfernt: verwaiste Kommentare, leere Zeilen im Aktions-Verteiler, eine
+  Lücke im CSS.
+
+### Kurzzeitig enthalten, wieder entfernt
+
+- Ein „Bibliothek"-Tab mit öffentlichen, kopierbaren Kartensätzen (E2) wurde
+  eingebaut und auf Wunsch des Betreibers vollständig wieder herausgenommen –
+  dauerhaft, nicht nur für diese Version.
+
+---
+
+## 1.6.0 – 3. September 2026 — „Lernlogik"
+
+*(rekonstruiert aus der Projektakte, Abschnitte 6, 7 und 9 – nicht wortgleich mit dem Original)*
+
+### Behoben
+
+- **Intervall ohne Deckel (B1).** Wiederholungsabstände verdoppelten sich ohne
+  Obergrenze und wurden nach einigen Monaten unrealistisch lang. Jetzt bei
+  180 Tagen gedeckelt.
+- **„Wusste ich nicht" warf zu hart zurück (B2).** Eine dritte Bewertungstaste
+  unterscheidet jetzt „nicht gewusst" von „fast gewusst" statt beides gleich
+  zu behandeln.
+- **Kein Tageslimit für neue Karten – Lawineneffekt (B3).** Neue Karten kamen
+  unbegrenzt dazu und rissen bestehende Wiederholungen mit sich. Jetzt ein
+  einstellbares Tageslimit (`settings.neuProTag`).
+- **Kein Jitter (B4).** Karten aus derselben Sitzung kamen exakt am selben
+  Tag wieder zurück und stauten sich. Ein kleiner Zufallswert verteilt sie
+  jetzt leicht.
+- **Der Tag begann um Mitternacht (B5).** Für jemanden, der nach Mitternacht
+  noch lernt, fühlte sich das falsch an; die Tagesgrenze liegt jetzt bei 4 Uhr.
+- **Streak riss bei mehreren Bereichen (A7).** Der Streak-Zähler prüfte nur
+  einen Bereich statt alle zusammen.
+- **Keine Duplikatprüfung (D6).** Dasselbe Wort ließ sich zweimal im selben
+  Bereich anlegen. Jetzt eine Warnung beim Speichern und beim Import, Vergleich
+  ohne Harakat und Tatweel.
+
+### Neu, später wieder entfernt
+
+- **Massen-Import („Liste einfügen", E1).** Mehrere Vokabeln auf einmal per
+  Textfeld einfügen. Auf Wunsch des Betreibers nach dieser Version wieder
+  vollständig entfernt – siehe Projektakte, Abschnitt 10.
+
+Neue Felder: `karten.*.ersteBewertung`, `settings.neuProTag`. Bestehende
+Fälligkeitsdaten blieben unangetastet.
+
+---
+
+## 1.5.0 – Datum nicht in der Akte vermerkt — „Reparieren und Grundlagen"
+
+*(rekonstruiert aus der Projektakte, Abschnitt 6 und 9 – nicht wortgleich mit dem Original; siehe Hinweis ganz oben zur verlorenen Originalfassung)*
+
+### Behoben
+
+- **Absturz beim Bewerten (A1).** Wurde eine Karte auf einem anderen Gerät
+  gelöscht, während die Session hier offen war, stürzte die Bewertung mit
+  einem TypeError ab.
+- **Handschrift wurde verzerrt gezeichnet (A2).** Die Zeichenfläche war intern
+  700×260 Pixel groß, wurde aber verzerrt angezeigt – auf dem Handy waagerecht
+  um fast das Doppelte gestaucht. Runde Bögen wurden zu Ellipsen.
+- **Wiederholungsstufe war nach oben offen (A5).**
+- **Getippter Text ging verloren (A6).** Kam während der Eingabe ein
+  Cloud-Snapshot herein oder wurde ein anderer Knopf gedrückt, war die halb
+  getippte Vokabel weg. Ein Zwischenspeicher (`formDraft`) hält den Entwurf
+  jetzt bei jedem Tastendruck fest.
+- **Veraltetes Meta-Tag (D8).** `apple-mobile-web-app-capable` durch das
+  aktuelle `mobile-web-app-capable` ergänzt.
+
+### Neu
+
+- Versionsnummer sichtbar in der App.
+- `sw.js` überarbeitet.
+- `CHANGELOG.md` angelegt.
+- Fokus bleibt nach „Karte hinzufügen" im Eingabefeld, statt bei jeder
+  weiteren Karte neu hineinklicken zu müssen (D1).
