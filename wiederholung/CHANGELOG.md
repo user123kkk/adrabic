@@ -1,3 +1,13 @@
+## 1.9.0 – 4. September 2026
+- A4: Änderungen werden gezielt gespeichert statt das ganze Dokument
+  zu überschreiben. Zwei Geräte können sich nicht mehr gegenseitig
+  Karten löschen.
+- A3: Der offene Bereich hängt an seiner ID statt an einer
+  Positionsnummer. Karten landen nicht mehr im falschen Bereich, wenn
+  auf einem anderen Gerät ein Bereich gelöscht oder umsortiert wurde.
+- firestore.rules liegt jetzt im Repo; die Regeln verlangen zusätzlich
+  eine bestätigte E-Mail-Adresse.
+
 ## 1.8.1 – 4. September 2026
 
 ### Entfernt
