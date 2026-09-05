@@ -10,10 +10,14 @@
     />
 
     <!-- Wird die Seite auf dem Startbildschirm abgelegt ("Zum Home-Bildschirm
-         hinzufügen"), sorgen diese Angaben für einen eigenen Namen, eine
-         dunkle Statusleiste und keine Browser-Adressleiste. Bewusst OHNE
-         manifest.json und Service Worker: das bräuchte Icon-Dateien und für
-         Vite ein zusätzliches Plugin. -->
+         hinzufügen"), sorgen diese Angaben für Symbol, eigenen Namen, dunkle
+         Statusleiste und keine Browser-Adressleiste. Die Dateien dazu liegen
+         in public/ und werden von Vite unverändert unter "/" ausgeliefert.
+         Bewusst OHNE Service Worker: der bräuchte für Vite ein zusätzliches
+         Plugin, weil die gebauten Dateinamen ein Zufallskürzel tragen. -->
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="icon" type="image/png" href="/icon-192.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="theme-color" content="#0a0a09" />
     <meta name="color-scheme" content="dark" />
     <meta name="mobile-web-app-capable" content="yes" />
