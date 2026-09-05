@@ -4462,6 +4462,7 @@ function PronunciationScreen({ C, fontStack, items, rule, packLabel, onExit }) {
   // Enter als Shortcut: erst auflösen, dann weiter (nützlich mit iPad-Tastatur).
   useEffect(() => {
     function onKey(e) {
+      if (isTypingTarget()) return;
       if (e.key !== "Enter" && e.key !== " ") return;
       e.preventDefault();
       if (!revealed) reveal();
@@ -4471,6 +4472,21 @@ function PronunciationScreen({ C, fontStack, items, rule, packLabel, onExit }) {
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [revealed, idx, isLast]);
+
+  // Wie im Lesebildschirm: nach dem Aufloesen zum Knopf scrollen, damit die
+  // Loesung und "Nächstes Wort" zusammen im Bild stehen.
+  const actionRef = useRef(null);
+  useEffect(() => {
+    if (!revealed || !actionRef.current) return;
+    const reduceMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    actionRef.current.scrollIntoView({
+      behavior: reduceMotion ? "auto" : "smooth",
+      block: "end",
+    });
+  }, [revealed]);
 
   const primaryBtn = {
     width: "100%",
@@ -4582,7 +4598,11 @@ function PronunciationScreen({ C, fontStack, items, rule, packLabel, onExit }) {
           Lösung zeigen
         </button>
       ) : (
-        <button onClick={next} style={primaryBtn}>
+        <button
+          ref={actionRef}
+          onClick={next}
+          style={{ ...primaryBtn, scrollMarginBottom: 78 }}
+        >
           {isLast ? "Fertig ✓" : "Nächstes Wort"}
         </button>
       )}
@@ -4680,6 +4700,61 @@ function GuideScreen({ C, fontStack, pack, onExit }) {
   const [qIdx, setQIdx] = useState(0);
   const [chosen, setChosen] = useState(null);
   const [correctCount, setCorrectCount] = useState(0);
+
+  // ---- Steuerung ----
+  // Liegt hier oben, weil die Bildschirme unten je nach Phase frueh
+  // zurueckkehren - ein Hook darf aber nicht hinter einem return stehen.
+  // Die Anzeige weiter unten benutzt genau diese Funktionen weiter.
+  const learnLast = learnIdx >= data.length - 1;
+  const quizAnswered = chosen !== null;
+  const quizLast = qIdx >= quiz.length - 1;
+
+  function quizChoose(i) {
+    if (quizAnswered) return;
+    setChosen(i);
+    if (quiz[qIdx].options[i].correct) setCorrectCount((n) => n + 1);
+  }
+  function quizNext() {
+    if (quizLast) {
+      setPhase("result");
+    } else {
+      setQIdx((i) => i + 1);
+      setChosen(null);
+    }
+  }
+
+  // Tastatur: beim Lernen blaettern die Pfeiltasten (Leertaste geht vorwaerts),
+  // im Quiz waehlen die Ziffern 1-4 und Leertaste/Enter schaltet weiter.
+  useEffect(() => {
+    function onKey(e) {
+      if (isTypingTarget()) return;
+      const weiter = e.key === " " || e.key === "Enter";
+      if (phase === "learn") {
+        if (e.key === "ArrowRight" || weiter) {
+          e.preventDefault();
+          if (learnLast) setPhase("quiz");
+          else setLearnIdx((i) => i + 1);
+        } else if (e.key === "ArrowLeft") {
+          e.preventDefault();
+          setLearnIdx((i) => Math.max(0, i - 1));
+        }
+        return;
+      }
+      if (phase !== "quiz") return;
+      if (!quizAnswered) {
+        const n = Number(e.key);
+        if (!Number.isInteger(n) || n < 1 || n > quiz[qIdx].options.length) return;
+        e.preventDefault();
+        quizChoose(n - 1);
+      } else if (weiter || e.key === "ArrowRight") {
+        e.preventDefault();
+        quizNext();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, learnIdx, learnLast, qIdx, chosen, quizAnswered, quizLast, quiz]);
 
   const primaryBtn = {
     flex: 1,
@@ -4945,19 +5020,10 @@ function GuideScreen({ C, fontStack, pack, onExit }) {
     const q = quiz[qIdx];
     const answered = chosen !== null;
     const last = qIdx >= quiz.length - 1;
-    function choose(i) {
-      if (answered) return;
-      setChosen(i);
-      if (q.options[i].correct) setCorrectCount((n) => n + 1);
-    }
-    function nextQ() {
-      if (last) {
-        setPhase("result");
-      } else {
-        setQIdx((i) => i + 1);
-        setChosen(null);
-      }
-    }
+    // Dieselben Funktionen wie oben - so koennen Maus und Tastatur nicht
+    // auseinanderlaufen.
+    const choose = quizChoose;
+    const nextQ = quizNext;
     return (
       <div>
         <div style={headBar}>
