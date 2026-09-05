@@ -1484,6 +1484,356 @@ class ErrorBoundary extends React.Component {
   }
 }
 
+// ============================================================
+//  Steuerung und Sicherheitsabfragen
+//  Uebernommen aus der Wiederholungs-App (adrabic/wiederholung) und auf
+//  React umgestellt: dort lag das in einer eigenen render()-Schleife,
+//  hier sind es Hooks und Komponenten.
+// ============================================================
+
+// Steht der Cursor gerade in einem Eingabefeld? Dann duerfen weder
+// Tastatur-Kuerzel noch das Rand-Scrollen dazwischenfunken.
+function isTypingTarget() {
+  const el = typeof document !== "undefined" ? document.activeElement : null;
+  if (!el) return false;
+  const tag = el.tagName;
+  return (
+    tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el.isContentEditable === true
+  );
+}
+
+// Rand-Scrollen mit der Maus (nur PC): steht der Zeiger OHNE Klick oben oder
+// unten am Bildschirmrand, scrollt die Seite von selbst - je naeher am Rand,
+// desto schneller. Nur fuer echte Maeuse (pointerType "mouse"), damit das
+// gewohnte Wischen auf dem Handy unangetastet bleibt.
+function useEdgeScroll(blocked) {
+  const mouseYRef = useRef(null);
+  const blockedRef = useRef(blocked);
+  useEffect(() => {
+    blockedRef.current = blocked;
+  }, [blocked]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    function onMove(e) {
+      if (e.pointerType !== "mouse") return;
+      mouseYRef.current = e.clientY;
+    }
+    // Verlaesst die Maus das Fenster (Tabwechsel, zweiter Bildschirm), kommen
+    // keine pointermove-Ereignisse mehr. Ohne dieses Zuruecksetzen wuerde mit
+    // dem letzten bekannten Wert endlos weitergescrollt.
+    function onLeave() {
+      mouseYRef.current = null;
+    }
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerleave", onLeave);
+
+    const MARGIN = 70; // Randzone in Pixeln, die das Scrollen ausloest
+    const MAX_SPEED = 16; // Pixel pro Bild, ganz am Rand
+    let raf = requestAnimationFrame(tick);
+
+    function tick() {
+      const y = mouseYRef.current;
+      if (y !== null && !blockedRef.current && !isTypingTarget()) {
+        const vh = window.innerHeight;
+        let dy = 0;
+        if (y < MARGIN) {
+          dy = -MAX_SPEED * Math.min(1, (MARGIN - y) / MARGIN);
+        } else if (y > vh - MARGIN) {
+          dy = MAX_SPEED * Math.min(1, (y - (vh - MARGIN)) / MARGIN);
+        }
+        if (dy !== 0) window.scrollBy(0, dy);
+      }
+      raf = requestAnimationFrame(tick);
+    }
+
+    return () => {
+      cancelAnimationFrame(raf);
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerleave", onLeave);
+    };
+  }, []);
+}
+
+// Rueckfrage statt window.confirm. Der Systemkasten zeigt auf dem Handy die
+// Seiten-Adresse statt eines Titels und laesst sich nicht gestalten.
+// ask() liefert ein Promise, das mit true/false endet, sobald geklickt wurde -
+// die aufrufende Stelle liest sich dadurch fast wie mit confirm().
+function useConfirmDialog() {
+  const [dialog, setDialog] = useState(null);
+  const resolveRef = useRef(null);
+
+  function ask(cfg) {
+    return new Promise((resolve) => {
+      resolveRef.current = resolve;
+      setDialog({
+        title: "Bist du sicher?",
+        text: "",
+        okLabel: "Ja, weiter",
+        cancelLabel: "Abbrechen",
+        danger: false,
+        ...cfg,
+      });
+    });
+  }
+
+  function close(result) {
+    setDialog(null);
+    const resolve = resolveRef.current;
+    resolveRef.current = null;
+    if (resolve) resolve(result);
+  }
+
+  return { dialog, ask, close };
+}
+
+function ConfirmDialog({ C, dialog, onClose }) {
+  const cancelRef = useRef(null);
+
+  // Escape bricht ab. Enter ist bewusst NICHT belegt: der Fokus liegt beim
+  // Oeffnen auf "Abbrechen", ein versehentliches Enter loescht also nichts.
+  useEffect(() => {
+    if (!dialog) return;
+    function onKey(e) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onClose(false);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [dialog, onClose]);
+
+  useEffect(() => {
+    if (dialog && cancelRef.current) cancelRef.current.focus();
+  }, [dialog]);
+
+  if (!dialog) return null;
+
+  const btn = {
+    padding: "10px 16px",
+    borderRadius: 12,
+    fontSize: 14.5,
+    fontWeight: 700,
+    cursor: "pointer",
+  };
+
+  return (
+    // Bewusst KEIN Schliessen per Klick auf den Hintergrund: auf dem Handy
+    // trifft man den beim Scrollen zu leicht.
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={dialog.title}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 100,
+        background: "rgba(0,0,0,.6)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 20,
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          maxWidth: 420,
+          background: C.panel,
+          border: `1px solid ${C.line}`,
+          borderRadius: 14,
+          boxShadow: "0 4px 18px rgba(0,0,0,.45)",
+          padding: "20px 20px 16px",
+          textAlign: "left",
+        }}
+      >
+        <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 8 }}>{dialog.title}</div>
+        {dialog.text ? (
+          <div style={{ fontSize: 14, lineHeight: 1.55, color: C.sub, whiteSpace: "pre-wrap" }}>
+            {dialog.text}
+          </div>
+        ) : null}
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            justifyContent: "flex-end",
+            marginTop: 18,
+            flexWrap: "wrap",
+          }}
+        >
+          <button
+            ref={cancelRef}
+            onClick={() => onClose(false)}
+            style={{
+              ...btn,
+              background: "transparent",
+              border: `1px solid ${C.line}`,
+              color: C.ink,
+            }}
+          >
+            {dialog.cancelLabel}
+          </button>
+          <button
+            onClick={() => onClose(true)}
+            style={{
+              ...btn,
+              border: "none",
+              background: dialog.danger
+                ? C.red
+                : `linear-gradient(180deg, ${C.accent}, ${C.accentDark})`,
+              color: dialog.danger ? "#fff" : C.accentInk,
+            }}
+          >
+            {dialog.okLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+//  Sicherung: Statistik + Checkliste als Datei
+//  Beides liegt nur im Speicher DIESES Browsers. Einmal Browserdaten
+//  geloescht (oder ein neues Handy) und der Fortschritt ist weg. Export und
+//  Import als schlichte JSON-Datei brauchen weder Server noch Konto.
+//  Der Vers-Zwischenspeicher kommt bewusst NICHT mit: er laedt sich von
+//  selbst wieder nach und wuerde die Datei nur aufblaehen.
+// ============================================================
+const BACKUP_LS_KEY = "arabtrainer:lastbackup:v1";
+
+function BackupSection({ C, statsMap, checklistDone, onRestore, ask }) {
+  const fileRef = useRef(null);
+  const [lastBackup, setLastBackup] = useState(() => {
+    try {
+      return window.localStorage.getItem(BACKUP_LS_KEY);
+    } catch {
+      return null;
+    }
+  });
+  const [note, setNote] = useState(null); // { ok: boolean, text: string }
+
+  function exportBackup() {
+    const heute = new Date().toISOString().slice(0, 10);
+    const data = {
+      app: "adrabic-trainer",
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      stats: statsMap,
+      checklist: checklistDone,
+    };
+    try {
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `adrabic-trainer-sicherung-${heute}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      setNote({ ok: false, text: "Die Datei liess sich nicht erzeugen." });
+      return;
+    }
+    try {
+      window.localStorage.setItem(BACKUP_LS_KEY, heute);
+    } catch {
+      // Speicher blockiert (privater Modus) -> nur das Datum fehlt spaeter
+    }
+    setLastBackup(heute);
+    setNote({ ok: true, text: "Datei wurde erstellt." });
+  }
+
+  async function handleFile(file) {
+    if (!file) return;
+    let data;
+    try {
+      data = JSON.parse(await file.text());
+    } catch {
+      setNote({ ok: false, text: "Die Datei liess sich nicht lesen." });
+      return;
+    }
+    if (!data || data.app !== "adrabic-trainer" || (!data.stats && !data.checklist)) {
+      setNote({ ok: false, text: "Das sieht nicht nach einer Sicherung des Trainers aus." });
+      return;
+    }
+    const ok = await ask({
+      title: "Sicherung einspielen?",
+      text:
+        "Statistik und Checkliste auf diesem Gerät werden durch den Stand aus der Datei ersetzt.",
+      okLabel: "Ja, einspielen",
+      danger: true,
+    });
+    if (!ok) return;
+    onRestore({ stats: data.stats || {}, checklist: data.checklist || {} });
+    setNote({ ok: true, text: "Sicherung eingespielt." });
+  }
+
+  const btn = {
+    flex: 1,
+    minWidth: 130,
+    padding: "10px 14px",
+    borderRadius: 10,
+    border: `1px solid ${C.line}`,
+    background: C.panel2,
+    color: C.ink,
+    fontSize: 13.5,
+    fontWeight: 600,
+    cursor: "pointer",
+  };
+
+  return (
+    <div
+      style={{
+        background: C.panel,
+        border: `1px solid ${C.line}`,
+        borderRadius: 12,
+        padding: "14px 16px",
+        marginTop: 14,
+      }}
+    >
+      <div style={{ fontSize: 13, color: C.sub, fontWeight: 600, marginBottom: 4 }}>
+        SICHERUNG
+      </div>
+      <div style={{ fontSize: 12.5, color: C.sub, lineHeight: 1.5, marginBottom: 10 }}>
+        Statistik und Checkliste liegen nur in diesem Browser. Als Datei speichern, dann
+        gehen sie beim Löschen der Browserdaten oder auf einem neuen Gerät nicht verloren.
+      </div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <button onClick={exportBackup} style={btn}>
+          Als Datei speichern
+        </button>
+        <button onClick={() => fileRef.current && fileRef.current.click()} style={btn}>
+          Datei einspielen
+        </button>
+      </div>
+      <input
+        ref={fileRef}
+        type="file"
+        accept="application/json,.json"
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const f = e.target.files && e.target.files[0];
+          // Wert leeren, sonst loest dieselbe Datei beim zweiten Mal nichts aus.
+          e.target.value = "";
+          handleFile(f);
+        }}
+      />
+      <div style={{ fontSize: 11.5, color: note && !note.ok ? C.red : C.sub, marginTop: 9 }}>
+        {note
+          ? note.text
+          : lastBackup
+          ? `Zuletzt gesichert: ${lastBackup}`
+          : "Noch nie gesichert."}
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   return (
     <ErrorBoundary>
@@ -1495,6 +1845,11 @@ export default function App() {
 
 function ArabTrainerApp() {
   const [screen, setScreen] = useState("start"); // start | play | result
+
+  // Rueckfrage-Dialog (ersetzt window.confirm) und Rand-Scrollen mit der Maus.
+  // Solange ein Dialog offen ist, steht der Hintergrund still.
+  const confirmDlg = useConfirmDialog();
+  useEdgeScroll(!!confirmDlg.dialog);
 
   // Modul-/Modus-Auswahl
   const [moduleId, setModuleId] = useState("letters");
@@ -1583,11 +1938,28 @@ function ArabTrainerApp() {
       return next;
     });
   }
-  function resetChecklist() {
+  async function resetChecklist() {
+    const ok = await confirmDlg.ask({
+      title: "Checkliste zurücksetzen?",
+      text: "Alle gesetzten Haken werden entfernt. Das lässt sich nicht rückgängig machen.",
+      okLabel: "Ja, zurücksetzen",
+      danger: true,
+    });
+    if (!ok) return;
     setChecklistDone(() => {
       saveChecklist({});
       return {};
     });
+  }
+
+  // Spielt eine Sicherungsdatei ein (siehe BackupSection weiter unten).
+  // Beides wird ersetzt, nicht zusammengefuehrt: eine halb gemischte
+  // Statistik waere schwerer zu verstehen als ein klarer Stand.
+  function restoreBackup({ stats, checklist }) {
+    saveAllStats(stats);
+    setStatsMap(stats);
+    saveChecklist(checklist);
+    setChecklistDone(checklist);
   }
 
   // ---- Stimmen (Text-to-Speech, nur noch fuer Buchstaben/Harakat/Woerter) ----
@@ -2111,7 +2483,16 @@ function ArabTrainerApp() {
   }
 
   // Loescht die gespeicherte Statistik des aktuell gewaehlten Modus/Pakets.
-  function resetCurrentStats() {
+  // Erst nach Rueckfrage: der Knopf sitzt direkt neben den Zahlen und hat
+  // vorher beim ersten Antippen sofort geloescht.
+  async function resetCurrentStats() {
+    const ok = await confirmDlg.ask({
+      title: "Statistik zurücksetzen?",
+      text: `Für „${statLabel}“ werden Durchgänge, Trefferquote und beste Serie gelöscht. Das lässt sich nicht rückgängig machen.`,
+      okLabel: "Ja, zurücksetzen",
+      danger: true,
+    });
+    if (!ok) return;
     setStatsMap((prev) => {
       const merged = { ...prev };
       delete merged[statKey];
@@ -2395,6 +2776,16 @@ function ArabTrainerApp() {
         )}
 
         {screen === "start" && (
+          <BackupSection
+            C={C}
+            statsMap={statsMap}
+            checklistDone={checklistDone}
+            onRestore={restoreBackup}
+            ask={confirmDlg.ask}
+          />
+        )}
+
+        {screen === "start" && (
           <div
             style={{
               background: C.panel,
@@ -2426,6 +2817,9 @@ function ArabTrainerApp() {
       {/* Fast unsichtbarer Deko-Schrift-Zugang unten rechts. Bewusst KEIN
           Lernmodul — nur eine Spielerei zum Angucken (Hinweis steht im Panel). */}
       <CalligraphyPeek C={C} fontStack={fontStack} />
+
+      {/* Liegt ganz aussen, damit der Dialog ueber allem anderen liegt. */}
+      <ConfirmDialog C={C} dialog={confirmDlg.dialog} onClose={confirmDlg.close} />
     </div>
   );
 }
@@ -3358,6 +3752,22 @@ function PlayScreen({
   correct, wrong, streak,
   autoMode, autoRevealSec, setAutoRevealSec,
 }) {
+  // ---- Tastatur ----
+  // Die Ziffern 1 bis 4 waehlen die Antwort in der angezeigten Reihenfolge.
+  // Nach dem Antippen ist gesperrt (locked), dann tut die Taste nichts mehr -
+  // genau wie ein zweiter Klick.
+  useEffect(() => {
+    function onKey(e) {
+      if (locked || isTypingTarget()) return;
+      const n = Number(e.key);
+      if (!Number.isInteger(n) || n < 1 || n > q.options.length) return;
+      e.preventDefault();
+      onChoose(q.options[n - 1], n - 1);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [locked, q, onChoose]);
+
   const stat = (label, val, color) => (
     <div style={{ textAlign: "center" }}>
       <div style={{ fontSize: 11, color: C.sub, letterSpacing: 0.5 }}>{label}</div>
@@ -3627,6 +4037,49 @@ function ReadingScreen({
   // auf 34px (oder umgekehrt) springen, falls beide Texte unterschiedlich
   // knapp an der 14-Zeichen-Grenze liegen — bei stabiler Basis passiert das nie.
   const long = item.ar.length > 14;
+
+  // ---- Tastatur (PC/Tablet mit Tastatur) ----
+  // Leertaste oder Enter deckt auf; danach waehlen 1 / Pfeil links "Nochmal"
+  // und 2 / Pfeil rechts "Konnte ich". Waehrend der Leseverfolgung sind die
+  // Tasten aus - dort steuert der Pause-Knopf. Die Kuerzel stehen bewusst
+  // nirgends auf dem Bildschirm; wer sie braucht, findet sie.
+  useEffect(() => {
+    function onKey(e) {
+      if (follow || awaitingStart || isTypingTarget()) return;
+      if (!revealed) {
+        if (e.key === " " || e.key === "Enter") {
+          e.preventDefault();
+          onReveal();
+        }
+        return;
+      }
+      if (e.key === "1" || e.key === "ArrowLeft") {
+        e.preventDefault();
+        onRate(false);
+      } else if (e.key === "2" || e.key === "ArrowRight") {
+        e.preventDefault();
+        onRate(true);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [revealed, follow, awaitingStart, onReveal, onRate]);
+
+  // ---- Nach dem Aufloesen zu den Bewertungsknoepfen scrollen ----
+  // Bei langen Versen stand die Loesung zwar da, die Knoepfe aber unter dem
+  // Bildschirmrand - man musste erst von Hand weiterscrollen, um ueberhaupt
+  // bewerten zu koennen. scrollMarginBottom laesst "Fertig" darunter sichtbar.
+  const actionsRef = useRef(null);
+  useEffect(() => {
+    if (!revealed || follow) return;
+    const el = actionsRef.current;
+    if (!el) return;
+    const reduceMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    el.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "end" });
+  }, [revealed, follow]);
 
   return (
     <div>
@@ -3921,7 +4374,10 @@ function ReadingScreen({
           Auflösen
         </button>
       ) : (
-        <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
+        <div
+          ref={actionsRef}
+          style={{ display: "flex", gap: 10, marginBottom: 12, scrollMarginBottom: 78 }}
+        >
           <button
             onClick={() => onRate(false)}
             style={{
