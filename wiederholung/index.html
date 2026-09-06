@@ -1254,10 +1254,36 @@ function checkStreakOnSessionComplete() {
 }
 /* Alle Bereiche, in denen heute noch etwas zu tun ist – Grundlage für die
    Streak-Prüfung UND für die Anzeige „Noch offen: …" auf dem Lernen-Tab. */
+/* 2.1.0: Die Bereiche teilen sich das Tageslimit fuer neue Karten - vorher
+   fragte diese Funktion jeden Bereich einzeln, und jeder rechnete mit dem
+   VOLLEN Restbudget, weil keiner von den anderen weiss. Bei Limit 10 und drei
+   Bereichen voller neuer Karten stand in der Zeile "noch offen" 30, obwohl
+   heute 10 eingefuehrt werden. Kaputt ging dadurch nichts (nach 10 gelernten
+   Karten sprang die Anzeige von selbst auf 0), die Zahl versprach nur zu viel.
+
+   Jetzt wird das Budget der Reihe nach verteilt. Der offene Bereich kommt
+   zuerst dran, denn er ist der, in dem als naechstes gelernt wird - sonst
+   koennte die Zeile ihm 0 neue zuweisen, waehrend der Knopf "Session starten"
+   daneben noch welche anbietet. */
 function bereicheMitOffenem() {
   if (bereiche === null) return [];
+  const t = todayStr();
+  let budget = freieNeuPlaetze();
+  const offenerId = currentBereich().id;
+  const reihenfolge = bereiche.slice().sort((a, b) =>
+    (a.id === offenerId ? 0 : 1) - (b.id === offenerId ? 0 : 1));
+  const ergebnis = new Map();
+  for (const b of reihenfolge) {
+    const wiederholungen = b.karten.filter(c => !istNeueKarte(c) && c.nextReview <= t).length;
+    const neue = b.karten.filter(c => istNeueKarte(c) && c.nextReview <= t).length;
+    const nimm = Math.min(neue, budget);
+    budget -= nimm;
+    ergebnis.set(b.id, wiederholungen + nimm);
+  }
+  /* In der Reihenfolge der Bereiche ausgeben, nicht in der Verteilreihenfolge -
+     die Zeile soll aussehen wie die Bereichsleiste oben. */
   return bereiche
-    .map(b => ({ bereich: b, offen: dueCardsFor(b).length }))
+    .map(b => ({ bereich: b, offen: ergebnis.get(b.id) || 0 }))
     .filter(x => x.offen > 0);
 }
 
