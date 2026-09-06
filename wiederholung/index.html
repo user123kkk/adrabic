@@ -498,7 +498,7 @@ const firebaseConfig = {
 
 /* Versionsnummer: bei jeder Veroeffentlichung hochzaehlen und denselben Wert
    als CACHE_NAME in sw.js eintragen, damit alte Dateien verworfen werden. */
-const APP_VERSION = "2.4.0";
+const APP_VERSION = "2.5.0";
 
 const CONFIGURED = firebaseConfig.apiKey !== "HIER_EINFUEGEN";
 const app = document.getElementById("app");
@@ -525,7 +525,7 @@ const app = document.getElementById("app");
    Stelle - und daran kann keine Seite etwas aendern, die im Browser des
    Lesers laeuft. Ihr Zweck ist, dass niemand VERSEHENTLICH etwas in Umlauf
    bringt, nicht dass etwas geheim bleibt. */
-const AUTOR_UID = "pitcQCAowlSOMjCvJ4xKSnuGVXi1";
+const AUTOR_UID = "";
 function istAutor() {
   if (!AUTOR_UID) return true;              // noch nicht eingerichtet
   return !!(currentUser && currentUser.uid === AUTOR_UID);
@@ -675,6 +675,9 @@ function istGefuehrt(b) { return !!(b && b.gefuehrt); }
    spart bei 500 Karten das Aufbauen einer Menge, die ohnehin jeden Test
    bestehen wuerde; jede Abfrage lautet deshalb (frei === null || frei.has(id)). */
 function freieIdsFor(b) {
+  /* Kein gefuehrter Satz -> kein Schloss -> die Frage stellt sich nicht.
+     Ein "gesperrt" an einer Speicherkarte im eigenen Bereich bleibt damit
+     folgenlos, auch wenn es aus einer aelteren Fassung noch dranhaengt. */
   if (!istGefuehrt(b)) return null;
   const frei = new Set();
   for (const s of (b.sets || [])) {
@@ -688,6 +691,37 @@ function karteFrei(c, bereich) {
   return frei === null || frei.has(c.id);
 }
 function lektionenVon(b) { return (b.sets || []).filter(s => s.art === "lektion"); }
+/* ---------- Wer bekommt das Lektions-System überhaupt zu sehen? ----------
+   Schloss, Gruppen und der Modus „Lernen" gehoeren zu einem WEITERGEGEBENEN
+   Kartensatz. In einem eigenen Bereich haben sie nichts verloren: Dort gibt es
+   niemanden, der etwas freischalten muesste, und ein Schloss haette dort nicht
+   einmal eine Wirkung - freieIdsFor() gibt fuer einen eigenen Bereich null
+   zurueck, es waere also ein Knopf, der luegt.
+
+   Deshalb gilt ab 2.5.0:
+     - gefuehrter Bereich  -> alles: Gruppen, Schloss, ▶ Lernen
+     - eigener Bereich     -> die schlichte Liste wie vor 2.3.0
+     - eigener Bereich, aber Autorenmodus -> zusaetzlich die Art-Auswahl, denn
+       die Lektionen fuer die Weitergabe muessen ja irgendwo entstehen. Und
+       gruppiert wird erst, wenn wirklich eine Art vergeben wurde - vorher
+       sieht das Feld genauso aus wie immer. */
+function zeigtSchloss(b) { return istGefuehrt(b || currentBereich()); }
+function zeigtArtWahl(b) {
+  b = b || currentBereich();
+  /* Auch beim Autor nicht dauerhaft: Ein Auswahlfeld in jeder Zeile macht das
+     Feld unruhig, und vergeben wird die Art einmal pro Speicherkarte und dann
+     nie wieder. Deshalb ein Schalter darueber, der im Normalfall aus ist. */
+  return istAutor() && !istGefuehrt(b) && ui.setsArtWahl;
+}
+function zeigtGruppen(b) {
+  b = b || currentBereich();
+  if (istGefuehrt(b)) return true;
+  /* Absichtlich NICHT am Schalter haengend: Wer erst 20 Lektionen angelegt
+     und den Schalter dann wieder ausgemacht hat, saehe sonst wieder eine
+     flache Liste aus 26 Zeilen. Gruppiert wird, sobald es etwas zu gruppieren
+     gibt - und vorher sieht das Feld aus wie immer. */
+  return istAutor() && (b.sets || []).some(s => (s.art || "eigen") !== "eigen");
+}
 /* Darf in diesem Bereich an den Karten selbst etwas geaendert werden? */
 function kartenBearbeitbar(b) { return !istGefuehrt(b || currentBereich()); }
 /* Darf diese Speicherkarte umbenannt, geloescht oder umsortiert werden?
@@ -939,6 +973,7 @@ let ui = {
      Suchfeld und Kartenliste aus dem Bild. Bewusst NICHT gespeichert: nach
      jedem Start ist es wieder zu, das ist der Normalfall. */
   setsOffen: false,
+  setsArtWahl: false,        // 2.5.0: Arten vergeben (nur Autor, eigener Bereich)
 };
 
 /* ---------- Formular-Entwurf ----------
@@ -1872,6 +1907,146 @@ async function exportWeitergabe() {
   render();
 }
 
+/* ---------- 2.5.0: Nachschub für einen vorhandenen Kartensatz ----------
+
+   Bis 2.4.0 legte jeder Import einen NEUEN Bereich an. Fuer ein normales
+   Backup ist das richtig - es schuetzt davor, dass eine alte Datei einen
+   neueren Stand ueberbuegelt. Fuer die zweite Ausgabe eines weitergegebenen
+   Kartensatzes ist es fatal: Wer Lektion 6-10 nachbekommt, haette danach
+   zweimal "Medina 1", die ersten 125 Karten doppelt, und seinen Lernstand
+   von vier Wochen im falschen der beiden Bereiche.
+
+   Deshalb erkennt der Import jetzt wieder, was er schon kennt. Zwei Angaben
+   machen das moeglich, beide seit 2.3.0 in jeder Weitergabe-Datei:
+     - die Kennung des Satzes am Bereich (satzId)
+     - eine Herkunfts-Nummer an jeder Karte und jeder Speicherkarte (quelleId)
+   Die Nummern der Karten aendern sich beim Import (seit 2.2.0, sonst
+   ueberschreibt ein Import vorhandene Karten). Die Herkunfts-Nummer bleibt -
+   sie ist das einzige, was ueber zwei Veroeffentlichungen hinweg haelt.
+
+   Was beim Zusammenfuehren gilt:
+     - Der Autor bestimmt den INHALT: Text, Notiz, Reihenfolge, welche Karten
+       es gibt, welche Lektionen es gibt.
+     - Der Lernende behaelt seinen FORTSCHRITT: Stufe, Faelligkeit,
+       Rueckfaelle - und welche Lektionen er freigeschaltet hat. Eine Lektion,
+       die er offen hat, wird nicht wieder zugesperrt, nur weil sie in der
+       Datei gesperrt steht.
+     - Eigene Speicherkarten des Lernenden bleiben unangetastet.
+
+   Und eine Sicherung: Zusammengefuehrt wird nur in einen GEFUEHRTEN Bereich.
+   Der eigene Bereich, aus dem der Satz stammt, traegt dieselbe Kennung -
+   ohne diese Bedingung wuerde ein Testimport der eigenen Datei den eigenen
+   Meisterbereich umbauen. So entsteht stattdessen eine gefuehrte Kopie zum
+   Ausprobieren, genau wie bei einem Bruder. */
+function satzUnterschied(ziel, datei) {
+  const zielNachQuelle = new Map();
+  for (const c of ziel.karten) if (c.quelleId) zielNachQuelle.set(c.quelleId, c);
+  const gesehen = new Set();
+  const neu = [], aktualisiert = [];
+  for (const c of datei.karten) {
+    const q = c.quelleId || c.id;
+    const vorhanden = zielNachQuelle.get(q);
+    if (!vorhanden) { neu.push(c); continue; }
+    gesehen.add(q);
+    if (vorhanden.wort !== c.wort || vorhanden.uebersetzung !== c.uebersetzung || vorhanden.extra !== c.extra) {
+      aktualisiert.push(c);
+    }
+  }
+  const entfernt = ziel.karten.filter(c => !c.quelleId || !gesehen.has(c.quelleId));
+  /* Speicherkarten ohne Herkunfts-Nummer hat sich der Lernende selbst
+     angelegt - die gehoeren ihm und bleiben, egal was in der Datei steht. */
+  const dateiSetQuellen = new Set(datei.sets.map(s => s.quelleId || s.id));
+  const neueSets = datei.sets.filter(s => !ziel.sets.some(z => z.quelleId === (s.quelleId || s.id)));
+  const entfernteSets = ziel.sets.filter(s => s.quelleId && !dateiSetQuellen.has(s.quelleId));
+  return { neu, aktualisiert, entfernt, neueSets, entfernteSets };
+}
+
+async function satzZusammenfuehren(ziel, datei) {
+  const d = satzUnterschied(ziel, datei);
+  const neueLektionen = d.neueSets.filter(s => s.art === "lektion").length;
+  let text = "Ausgabe Nr. " + (datei.satzVersion || 1) + " von „" + datei.name + "\".\n\n";
+  const zeilen = [];
+  if (d.neu.length) zeilen.push("• " + d.neu.length + " Karte(n) kommen dazu" + (neueLektionen ? " (" + neueLektionen + " neue Lektion(en), gesperrt)" : ""));
+  if (d.aktualisiert.length) zeilen.push("• " + d.aktualisiert.length + " Karte(n) werden im Text berichtigt");
+  if (d.entfernt.length) zeilen.push("• " + d.entfernt.length + " Karte(n) fallen weg");
+  if (d.entfernteSets.length) zeilen.push("• " + d.entfernteSets.length + " Speicherkarte(n) fallen weg");
+  if (zeilen.length === 0) zeilen.push("• Am Inhalt ändert sich nichts.");
+  text += zeilen.join("\n");
+  text += "\n\nDein Lernstand und die von dir freigeschalteten Lektionen bleiben.";
+  if ((datei.satzVersion || 1) <= (ziel.satzVersion || 0)) {
+    text = "Diese Ausgabe hast du schon (Nr. " + (ziel.satzVersion || 0) + ").\n\n" + text;
+  }
+  const ok = await dlgConfirm(text, { title: "Kartensatz aktualisieren?", okLabel: "Übernehmen" });
+  if (!ok) return null;
+
+  /* 1. Karten: vorhandene behalten (mit Fortschritt), fehlende anlegen,
+        weggefallene loeschen. Die Reihenfolge kommt aus der Datei. */
+  const nachQuelle = new Map();
+  for (const c of ziel.karten) if (c.quelleId) nachQuelle.set(c.quelleId, c);
+  const vergeben = new Set(ziel.karten.map(c => c.id));
+  const frisch = () => { let x = genId(); while (vergeben.has(x)) x = genId(); vergeben.add(x); return x; };
+  const dateiZuLokal = new Map();   // Karten-Nummer in der Datei -> Karte im Konto
+  const neueListe = [];
+  for (const c of datei.karten) {
+    const q = c.quelleId || c.id;
+    let lokal = nachQuelle.get(q);
+    if (lokal) {
+      lokal.wort = c.wort;
+      lokal.uebersetzung = c.uebersetzung;
+      lokal.extra = c.extra;
+      /* stufe, nextReview, ersteBewertung, rueckfaelle bleiben, wie sie sind */
+    } else {
+      lokal = normCard({ id: frisch(), wort: c.wort, uebersetzung: c.uebersetzung, extra: c.extra, stufe: 0, quelleId: q });
+      lokal.nextReview = todayStr();
+    }
+    dateiZuLokal.set(c.id, lokal);
+    neueListe.push(lokal);
+  }
+  const behalten = new Set(neueListe.map(c => c.id));
+  const geloeschteIds = ziel.karten.filter(c => !behalten.has(c.id)).map(c => c.id);
+  ziel.karten = neueListe;
+
+  /* 2. Speicherkarten: Inhalt und Name aus der Datei, Schloss vom Lernenden.
+        Eigene (ohne Herkunfts-Nummer) bleiben stehen und verlieren nur
+        Verweise auf Karten, die es nicht mehr gibt. */
+  const uebersetzeIds = ids => ids.map(fid => dateiZuLokal.get(fid)).filter(Boolean).map(c => c.id);
+  const zielNachSetQuelle = new Map();
+  for (const s of ziel.sets) if (s.quelleId) zielNachSetQuelle.set(s.quelleId, s);
+  const dateiSetQuellen = new Set(datei.sets.map(s => s.quelleId || s.id));
+  const eigene = ziel.sets.filter(s => !s.quelleId);
+  const ausDatei = datei.sets.map(s => {
+    const q = s.quelleId || s.id;
+    const vorhanden = zielNachSetQuelle.get(q);
+    if (vorhanden) {
+      vorhanden.name = s.name;
+      vorhanden.art = s.art;
+      vorhanden.cardIds = uebersetzeIds(s.cardIds);
+      /* vorhanden.gesperrt bleibt: was der Lernende geöffnet hat, bleibt offen */
+      return vorhanden;
+    }
+    return normSet({ id: frisch(), quelleId: q, name: s.name, art: s.art, gesperrt: s.gesperrt, cardIds: uebersetzeIds(s.cardIds) });
+  });
+  const behalteneCardIds = new Set(neueListe.map(c => c.id));
+  eigene.forEach(s => { s.cardIds = s.cardIds.filter(id => behalteneCardIds.has(id)); });
+  const geloeschteSetIds = ziel.sets
+    .filter(s => s.quelleId && !dateiSetQuellen.has(s.quelleId))
+    .map(s => s.id);
+  ziel.sets = ausDatei.concat(eigene);
+
+  ziel.name = datei.name;
+  ziel.satzVersion = datei.satzVersion || 1;
+
+  /* 3. Schreiben. Der ganze Bereich wird neu geschrieben (Name, Kennung,
+        Speicherkarten, alle Karten) - dazu die ausdruecklichen Loeschungen,
+        denn ein Vollschreiben entfernt nichts, was nicht mehr vorkommt. */
+  const idx = bereiche.findIndex(x => x.id === ziel.id);
+  const patch = { [pfadBereich(ziel.id)]: bereichFelder(ziel, idx < 0 ? 0 : idx) };
+  for (const cid of geloeschteIds) patch[pfadKarte(ziel.id, cid)] = LOESCHEN;
+  for (const sid of geloeschteSetIds) patch[pfadSet(ziel.id, sid)] = LOESCHEN;
+  patchDoc(patch);
+  return d;
+}
+
 function importBackupFile(file) {
   if (!file) return;
   const reader = new FileReader();
@@ -1888,6 +2063,30 @@ function importBackupFile(file) {
       return;
     }
     const imported = normBereiche(data.bereiche);
+
+    /* 2.5.0: Erst pruefen, was davon Nachschub für einen schon vorhandenen
+       Satz ist. Nur der Rest wird als neuer Bereich angelegt. */
+    const anzulegen = [];
+    const berichte = [];
+    for (const b of imported) {
+      const ziel = b.satzId ? bereiche.find(x => x.satzId === b.satzId && istGefuehrt(x)) : null;
+      if (!ziel) { anzulegen.push(b); continue; }
+      const bericht = await satzZusammenfuehren(ziel, b);
+      if (bericht) berichte.push({ name: ziel.name, bericht: bericht });
+    }
+    if (anzulegen.length === 0) {
+      render();
+      if (berichte.length > 0) {
+        const r = berichte[0].bericht;
+        await dlgAlert('„' + berichte[0].name + '" ist aktualisiert: ' +
+          r.neu.length + ' Karte(n) dazu, ' + r.aktualisiert.length + ' berichtigt, ' + r.entfernt.length + ' weggefallen. ' +
+          'Dein Lernstand ist unverändert.', "Kartensatz aktualisiert");
+      }
+      return;
+    }
+    imported.length = 0;
+    for (const b of anzulegen) imported.push(b);
+
     /* A4: Die eingespielten Bereiche kommen als eigene Feldpfade dazu.
        Vorhandene Bereiche werden dabei nicht angefasst - frueher wurde das
        ganze Dokument neu geschrieben, ein Import konnte also Karten
@@ -2197,7 +2396,7 @@ function setArtAendern(id, art) {
    der Vergangenheit liegt. */
 async function toggleSetLock(id) {
   const set = findSet(id);
-  if (!set || set.art !== "lektion") return;
+  if (!set || set.art !== "lektion" || !istGefuehrt(currentBereich())) return;
   if (set.gesperrt) {
     const anzahl = setCards(set).length;
     const ok = await dlgConfirm('„' + set.name + '" wird freigeschaltet. ' + anzahl +
@@ -2254,7 +2453,7 @@ function removeCardFromSet(setId, cardId) {
 }
 function toggleSetOpen(id) {
   const set = findSet(id);
-  if (set && set.gesperrt) return;   // zu ist zu: auch kein Reinschauen
+  if (set && set.gesperrt && istGefuehrt(currentBereich())) return;   // zu ist zu: auch kein Reinschauen
   ui.openSetId = ui.openSetId === id ? null : id;
   render();
 }
@@ -2288,7 +2487,7 @@ async function startDrill(min, max, handwriting) {
 async function startDrillFromSet(setId, handwriting) {
   const set = findSet(setId);
   if (!set) return;
-  if (set.gesperrt) {
+  if (istGefuehrt(currentBereich()) && set.gesperrt) {
     await dlgAlert('„' + set.name + '" ist noch gesperrt. Schalte sie erst frei – dann kannst du sie auch üben.', "Noch gesperrt");
     return;
   }
@@ -2351,7 +2550,7 @@ function lernKarten(set) {
 }
 async function startLernen(setId) {
   const set = findSet(setId);
-  if (!set) return;
+  if (!set || !istGefuehrt(currentBereich())) return;
   /* Der natuerliche Weg, eine Lektion aufzuschliessen: draufdruecken. Ein
      eigenes Freischalt-Ritual muesste man erst finden. */
   if (set.gesperrt) {
@@ -3709,7 +3908,7 @@ function renderVerwaltenListe(cards, gefuehrt) {
 
   if (ui.drillOpen) {
     const stufen = availableStufen();
-    const sets = currentSets().filter(s => !s.gesperrt);
+    const sets = currentSets().filter(s => !(istGefuehrt(currentBereich()) && s.gesperrt));
     const srcSet = ui.drillSource === "stufen" ? null : findSet(ui.drillSource);
     html += '<div class="drill-picker">';
     html += '<p class="hint" style="padding-top:0">Was üben? (Fortschritt bleibt dabei unverändert)</p>';
@@ -3944,7 +4143,8 @@ function renderSetsPanel() {
   if (sets.length === 0) return "";
   const frei = freieIdsFor(b);
   const gefuehrt = istGefuehrt(b);
-  const zuAnzahl = sets.filter(s => s.gesperrt).length;
+  const gruppen = zeigtGruppen(b);
+  const zuAnzahl = gefuehrt ? sets.filter(s => s.gesperrt).length : 0;
   let html = '<div class="drill-picker" style="margin-bottom:14px">';
   /* 2.2.0: Kopfzeile zum Auf- und Zuklappen. Zu ist der Normalzustand. */
   html += '<button class="sets-kopf" data-action="toggle-sets" aria-expanded="' + (ui.setsOffen ? "true" : "false") + '">';
@@ -3953,6 +4153,19 @@ function renderSetsPanel() {
   if (zuAnzahl > 0) html += '<span class="badge" title="' + zuAnzahl + ' Lektion(en) noch gesperrt">🔒 ' + zuAnzahl + '</span>';
   html += '</button>';
   if (!ui.setsOffen) { html += '</div>'; return html; }
+  if (istAutor() && !gefuehrt) {
+    html += '<button class="tiny-link" data-action="toggle-set-art" style="padding:6px 0">' +
+      (ui.setsArtWahl ? "✕ Arten fertig" : "🛠 Arten vergeben") + '</button>';
+  }
+
+  if (!gruppen) {
+    /* Der Normalfall: eine schlichte Liste, wie vor 2.3.0. */
+    html += '<p class="hint" style="padding:6px 0">Feste Auswahl an Vokabeln, jederzeit beliebig oft übbar. Reihenfolge per ⠿-Griff ändern.</p>';
+    html += '<div class="set-liste" data-gruppe="alle">';
+    for (const s of sets) html += setBlock(s, b, frei, gefuehrt);
+    html += '</div></div>';
+    return html;
+  }
   for (const art of SET_ARTEN) {
     const gruppe = sets.filter(s => (s.art || "eigen") === art);
     if (gruppe.length === 0) continue;
@@ -3970,21 +4183,26 @@ function renderSetsPanel() {
 
 /* Eine einzelne Speicherkarte samt (optional) aufgeklappter Kartenliste. */
 function setBlock(s, b, frei, gefuehrt) {
-  const zu = !!s.gesperrt;
+  /* Ein Schloss wirkt nur in einem gefuehrten Satz. In einem eigenen Bereich
+     wird es deshalb weder gezeigt noch beachtet. */
+  const zu = gefuehrt && !!s.gesperrt;
   const cards = setCards(s);
   const open = ui.openSetId === s.id && !zu;
   const eigenerBesitz = setBearbeitbar(s, b);
   let html = '<div class="set-block' + (zu ? " set-locked" : "") + '" data-setid="' + esc(s.id) + '">';
   html += '<div class="set-row">';
   if (eigenerBesitz) html += '<span class="drag-handle" title="Ziehen zum Sortieren" aria-hidden="true">⠿</span>';
-  if (s.art === "lektion") {
+  if (gefuehrt && s.art === "lektion") {
     html += '<button class="ghost lock-btn" data-action="toggle-set-lock" data-id="' + esc(s.id) + '" title="' +
       (zu ? 'Freischalten – die Karten kommen ins Lernen' : 'Wieder sperren – die Karten kommen nicht mehr dran') +
       '" aria-label="' + (zu ? "Lektion freischalten" : "Lektion sperren") + '">' + (zu ? "🔒" : "🔓") + '</button>';
   }
   html += '<span class="set-name">' + esc(s.name) + '</span>';
   html += '<span class="badge">' + cards.length + ' Karte' + (cards.length === 1 ? "" : "n") + '</span>';
-  if (cards.length > 0) {
+  /* ▶ Lernen ist der Weg durch einen weitergegebenen Satz. In einem eigenen
+     Bereich legt man die Karten ja selbst an - da gibt es nichts durchzugehen,
+     was man nicht gerade selbst getippt haette. */
+  if (gefuehrt && cards.length > 0) {
     /* Auch bei einer gesperrten Lektion: Der Knopf fragt dann, ob
        freigeschaltet werden soll. Das ist der natuerliche Weg weiter - ein
        eigenes Freischalt-Ritual muesste man erst finden. */
@@ -3998,7 +4216,7 @@ function setBlock(s, b, frei, gefuehrt) {
     if (cards.length > 0) html += '<button class="ghost" data-action="drill-set" data-id="' + esc(s.id) + '" title="Diese Auswahl üben">🔁 Üben</button>';
     html += '<button class="ghost" data-action="toggle-set-open" data-id="' + esc(s.id) + '" title="Karten anzeigen" aria-label="' + (open ? "Karten dieser Speicherkarte verbergen" : "Karten dieser Speicherkarte anzeigen") + '" aria-expanded="' + (open ? "true" : "false") + '">' + (open ? "▾" : "▸") + '</button>';
   }
-  if (!gefuehrt) {
+  if (zeigtArtWahl(b)) {
     html += '<select class="set-art-wahl" data-action="set-art" data-id="' + esc(s.id) + '" title="Art dieser Speicherkarte" aria-label="Art dieser Speicherkarte">';
     for (const a of SET_ARTEN) {
       html += '<option value="' + a + '"' + ((s.art || "eigen") === a ? " selected" : "") + '>' + SET_ART_ZEICHEN[a] + ' ' + SET_ART_TITEL[a] + '</option>';
@@ -4453,6 +4671,7 @@ app.addEventListener("click", e => {
     case "search-scope": ui.searchAll = btn.dataset.scope === "alle"; ui.kartenSeite = 0; ui.selectMode = false; ui.selectedIds = new Set(); render(); break;
     case "search-clear": ui.searchQuery = ""; ui.kartenSeite = 0; render(); break;
     case "toggle-sets": ui.setsOffen = !ui.setsOffen; render(); break;
+    case "toggle-set-art": ui.setsArtWahl = !ui.setsArtWahl; render(); break;
     case "cancel-edit": cancelEdit(); break;
     case "delete-card": deleteCard(btn.dataset.id); break;
     case "reverse-order": reverseOrder(); break;
