@@ -1,3 +1,70 @@
+## 2.1.0 – 6. September 2026 — „Suchen und Finden"
+
+### Behoben
+
+- **Tippen im Suchfeld auf dem Handy.** Wer „sonne" eintippte, sah plötzlich
+  „snn" im Feld stehen.
+
+  Grund: Jedes Zeichen löste 150 ms später einen kompletten Neuaufbau der
+  Seite aus – einschließlich des Suchfelds, in dem gerade getippt wurde. Die
+  Handy-Tastatur hängt aber mit ihrem halbfertigen Wort (Autokorrektur,
+  Wortvorschlag, Wischen) an genau diesem Feld. War es weg, schob sie beim
+  nächsten Zeichen ihre Reste verdreht in das neue Feld hinein. Am PC fiel
+  das nicht auf, weil es dort kein „Wort in Arbeit" gibt.
+
+  Jetzt steckt die Kartenliste in einem eigenen Kasten und wird beim Tippen
+  allein neu gezeichnet; das Suchfeld wird dabei nie angefasst. Zusätzlich
+  wartet die App, solange die Tastatur an einem Wort baut, und Autokorrektur
+  sowie Rechtschreibprüfung sind für das Suchfeld abgeschaltet.
+
+### Die Suche findet, was gemeint ist
+
+Bisher verglich die Suche rohen Text mit rohem Text. Gefunden wurde nur, was
+Zeichen für Zeichen gleich geschrieben war. Jetzt läuft jeder Vergleich über
+eine Vergleichsform – gespeichert und angezeigt wird selbstverständlich
+weiterhin der Originaltext.
+
+- **Ohne Harakat suchen.** Harakat, Sukun, Dagger-Alif und Tatweel fallen beim
+  Vergleich weg, أ إ آ ٱ gelten als ا, ى als ي und ة als ه. „شمس" findet
+  „الشَّمْس". Dieselbe Regel benutzt die Duplikatprüfung seit 1.6.0.
+- **Deutsch und Umschrift.** ä/ö/ü/ß und Umschrift-Striche (ā ī ū š ṣ ḥ ṭ)
+  zählen wie ihre Grundbuchstaben: „grosses" findet „großes", „kitab" findet
+  „kitāb", „schlussel" findet „Schlüssel".
+- **Artikel egal.** „alshams", „al-shams" und „shams" finden dasselbe, ebenso
+  „الشمس" und „شمس". Der Artikel wird nur am **Wortanfang** abgeschnitten und
+  nur, wenn danach noch mindestens drei Zeichen stehen – sonst würde „alle" zu
+  „le" und fände jedes zweite Wort.
+- **Mehrere Wörter gelten UND.** „sonne licht" findet die Karte, auf der beides
+  steht – in beliebiger Reihenfolge und in beliebigen Feldern.
+- **Reihenfolge der Treffer.** Wortanfänge stehen oben, „irgendwo drin" darunter.
+  Vorher stand der beste Treffer gelegentlich auf Platz 40.
+- **Ähnliche Treffer als Notfall.** Erst wenn es gar nichts Genaues gibt, wird
+  ein Buchstabe Abweichung erlaubt – auch das Vertauschen zweier Zeichen, der
+  häufigste Vertipper. „sonen" findet dann „Sonne", mit dem Hinweis, dass es
+  kein genauer Treffer ist. Immer an hieße: drei getippte Zeichen passen auf
+  fast alles, und man sucht in den Suchergebnissen weiter.
+- **Fundstellen sind markiert.** Der Teil, der gepasst hat, ist in der Zeile
+  hervorgehoben – beantwortet die Frage „warum ist das hier drin?" von allein.
+- **Trefferzahl** über der Liste und ein **✕** im Suchfeld zum Leeren.
+- Gesucht wird weiterhin in Wort, Übersetzung **und** Notiz. Der Platzhalter
+  sagt das jetzt auch.
+
+### Kartenliste lesbarer
+
+- Übersetzung und Notiz hatten dieselbe Farbe und keinen Abstand – die drei
+  Zeilen lasen sich als ein Block. Die Übersetzung steht jetzt in voller
+  Textfarbe, die Notiz bleibt gedämpft und bekommt einen Strich am Rand wie
+  ein Zitat.
+
+### Nicht enthalten, bewusst
+
+- **Latein zu Arabisch** („shams" findet شمس, ohne dass „shams" irgendwo auf der
+  Karte steht). Das bräuchte eine Umschrifttabelle, und Arabisch lässt sich auf
+  zehn Arten umschreiben – das rät mehr als es findet. Steht die Umschrift in
+  der Notiz, wird sie ohnehin gefunden.
+
+---
+
 ## 2.0.0 – 5. September 2026 — „Umbau"
 
 ### Karten als eigene Datensätze (C1)
