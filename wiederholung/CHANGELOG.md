@@ -1,3 +1,99 @@
+## 2.3.0 – 6. September 2026 — „Gruppen und Schlösser"
+
+### Neu
+
+- **Speicherkarten haben jetzt eine Art.** Im Verwalten-Tab stehen sie in drei
+  Abschnitten untereinander, jeder mit einer Zeile, die erklärt, was er tut:
+
+  - **📚 Kategorien** – die großen Sammelmappen quer durch den Stoff (Nomen,
+    Verben, Grammatik …). Immer offen, nie sperrbar.
+  - **📖 Lektionen** – eine Einheit des Buchs bzw. ein Video. Nur Lektionen
+    lassen sich sperren, und nur sie geben Karten frei.
+  - **⭐ Eigene** – selbst zusammengestellt, zum gezielten Üben. Genau dafür
+    waren die Speicherkarten ursprünglich gedacht.
+
+  Umgestellt wird die Art über das kleine Auswahlfeld rechts in der Zeile.
+  Alle vorhandenen Speicherkarten gelten zunächst als „Eigene" und verhalten
+  sich damit exakt wie bisher.
+
+- **Das Schloss an den Lektionen.** Ein Tipp auf das 🔓 in der Zeile schaltet
+  eine Lektion frei, ein Tipp auf das 🔒 sperrt sie wieder. Gesperrt heißt
+  wirklich zu: die Karten sind nicht fällig, lassen sich nicht üben, nicht
+  aufklappen, nicht auswählen und zählen nicht im Fortschritt.
+
+  Die Regel dahinter in einem Satz: **Eine Karte ist frei, wenn sie in
+  mindestens einer nicht gesperrten Lektion liegt.** Kategorien und eigene
+  Speicherkarten geben nie frei – sie zeigen nur an. Deshalb darf dieselbe
+  Karte in beliebig vielen Kategorien liegen, ohne dass es die Freigabe stört.
+
+- **Geführte Kartensätze.** Ein Bereich, der aus einem weitergegebenen Satz
+  entstanden ist, ist schreibgeschützt: keine neuen Karten, kein Bearbeiten,
+  kein Löschen, kein Umsortieren. Nur so steht der Stoff bei allen in
+  derselben Reihenfolge – und nur so kann eine spätere Ausgabe des Satzes
+  sauber nachziehen, ohne etwas durcheinanderzubringen. Eigene Speicherkarten
+  darf sich trotzdem jede:r anlegen; aufnehmen lassen sich darin allerdings
+  nur freigeschaltete Karten.
+
+  Im eigenen Bereich ändert sich davon nichts. Dort ist weiterhin alles frei
+  und alles bearbeitbar.
+
+- **In den Kategorien ist zu sehen, was schon dran ist.** Freigeschaltete
+  Karten sind hervorgehoben – dieselbe Farbe wie bei den Suchtreffern –,
+  gesperrte stehen ausgegraut mit 🔒 daneben. Wer „Nomen" mit seinen 96 Karten
+  öffnet, sieht auf einen Blick, welche davon er anfassen darf.
+
+- **Ein dritter Backup-Knopf: „zum Weitergeben".** Er erzeugt aus dem offenen
+  Bereich eine Datei für andere: alle Karten auf Stufe 0 ohne Lernverlauf,
+  alle Lektionen gesperrt bis auf die erste, Schreibschutz gesetzt.
+
+  Der Unterschied fällt damit beim **Erzeugen** der Datei, nicht beim
+  Einspielen. Das ist Absicht: So gibt es keinen Import-Knopf, mit dem sich
+  aus Versehen der eigene Lernstand auf Null setzen ließe. Der Import liest
+  schlicht, was in der Datei steht, und bleibt ein einziger Knopf.
+
+  Die Datei trägt außerdem eine Kennung des Satzes, eine laufende Nummer und
+  eine Herkunfts-Nummer an jeder Karte. Das tut heute noch nichts – es muss
+  aber schon in der allerersten Datei stehen, weil sich Dateien, die einmal
+  draußen sind, nicht nachrüsten lassen. Ohne diese Angaben könnte eine
+  spätere Ausgabe den vorhandenen Satz nicht wiedererkennen und würde einen
+  zweiten Bereich mit allem doppelt anlegen.
+
+### Geändert
+
+- **Das Tageslimit für neue Karten ist entfallen.** Es war die Notbremse gegen
+  500 fällige Karten am ersten Tag. Diese Aufgabe übernimmt jetzt das Schloss,
+  und zwar besser: Es bremst am Stoff statt an einer Zahl, die niemand
+  einstellen will – und man sieht, *warum* heute nicht mehr kommt, statt nur,
+  dass etwas fehlt.
+
+  In einem eigenen Bereich ohne Lektionen gibt es damit keine Bremse mehr.
+  Wer dort auf einmal viele Karten anlegt, hat sie auch alle am selben Tag
+  fällig.
+
+- **Für die Streak zählen nur noch Wiederholungen.** Neuer Stoff ist
+  freiwillig, Wiederholungen sind die Pflicht.
+
+  Ohne diese Trennung könnte das Freischalten einer Lektion die Flamme kosten:
+  Wer abends Lektion 3 aufschließt und sie nicht mehr durcharbeitet, hätte
+  plötzlich 25 offene Karten, obwohl er alles Fällige erledigt hatte. Vorher
+  hielt das Tageslimit neue Karten zurück und das Problem fiel nicht auf; ohne
+  Limit fällt es sofort auf.
+
+- **Die vier Knöpfe oben rechts heißen nach dem, was sie tun.** „Backup" und
+  „exportieren" bezeichneten vorher dasselbe und sahen nach zwei verschiedenen
+  Funktionen aus. Jetzt: 💾 Backup · alles, 💾 Backup · nur „X",
+  💾 Backup · zum Weitergeben, 📥 Import.
+
+- **Der Fortschritts-Tab lässt gesperrte Karten weg.** Sonst stünden bei einem
+  frisch eingespielten Satz 500 Karten in der Gruppe „neu" und der Fortschritt
+  sähe aus, als wäre nichts geschafft – obwohl die erste Lektion sitzt.
+
+- **Speicherkarten werden innerhalb ihrer Gruppe sortiert.** Der ⠿-Griff zieht
+  weiterhin, aber nur zwischen Speicherkarten derselben Art. Die Art wechselt
+  man über das Auswahlfeld, nicht durchs Ziehen.
+
+---
+
 ## 2.2.0 – 6. September 2026 — „Speicherkarten"
 
 ### Neu
