@@ -175,8 +175,30 @@
   .drag-handle:active { cursor: grabbing; }
   .card-row .words { flex: 1; min-width: 0; }
   .card-row .wort { font-weight: 600; word-break: break-word; }
-  .card-row .uebersetzung { color: var(--ink-soft); font-size: 0.92rem; word-break: break-word; }
-  .card-row .extra-note { color: var(--ink-soft); font-size: 0.82rem; font-style: italic; word-break: break-word; white-space: pre-wrap; }
+  /* 2.1.0: Uebersetzung und Notiz hatten dieselbe Farbe und keinen Abstand -
+     die drei Zeilen lasen sich als ein Block. Jetzt traegt das Wort, dann die
+     Uebersetzung in voller Textfarbe, dann die Notiz gedaempft mit Strich am
+     Rand wie ein Zitat. */
+  .card-row .uebersetzung { color: var(--ink); font-size: 0.92rem; word-break: break-word; margin-top: 3px; }
+  .card-row .extra-note {
+    color: var(--ink-soft); font-size: 0.82rem; font-style: italic;
+    word-break: break-word; white-space: pre-wrap;
+    margin-top: 6px; padding-left: 9px; border-left: 2px solid var(--border);
+  }
+
+  /* 2.1.0: Fundstellen der Suche. Kein Standard-Gelb des Browsers - das ist
+     auf dunklem Grund grell und macht den Text unlesbar. */
+  mark { background: rgba(227, 200, 138, 0.26); color: var(--ink); border-radius: 3px; padding: 0 1px; }
+
+  /* 2.1.0: Suchfeld mit Knopf zum Leeren */
+  .search-wrap { position: relative; margin-bottom: 10px; }
+  .search-wrap input { padding-right: 46px; }
+  .search-clear {
+    position: absolute; top: 50%; right: 6px; transform: translateY(-50%);
+    background: transparent; color: var(--ink-soft);
+    padding: 7px 11px; font-size: 0.95rem; line-height: 1; border-radius: 10px;
+  }
+  .search-clear:hover { background: var(--accent-soft); color: var(--ink); }
   .badge {
     background: var(--accent-soft);
     color: var(--accent-dark);
@@ -421,7 +443,7 @@ const firebaseConfig = {
 
 /* Versionsnummer: bei jeder Veroeffentlichung hochzaehlen und denselben Wert
    als CACHE_NAME in sw.js eintragen, damit alte Dateien verworfen werden. */
-const APP_VERSION = "2.0.0";
+const APP_VERSION = "2.1.0";
 
 const CONFIGURED = firebaseConfig.apiKey !== "HIER_EINFUEGEN";
 const app = document.getElementById("app");
@@ -666,6 +688,9 @@ const SEITEN_SCHWELLE = 150;   // ab so vielen Karten ueberhaupt Seiten
 const SEITE_GROESSE = 100;     // Karten pro Seite
 const SUCH_VERZOEGERUNG = 150; // Millisekunden Ruhe, bevor die Suche neu zeichnet
 let sucheTimer = null;
+/* 2.1.0: true, solange die Handy-Tastatur an einem Wort baut. In dieser Zeit
+   darf die Liste nicht neu gezeichnet werden. */
+let tastaturBautWort = false;
 /* Welcher Ausschnitt der Gesamtliste gerade zu sehen ist. endDrag() braucht
    das, um eine umsortierte Seite an der richtigen Stelle zurueckzuschreiben
    statt die Karten der anderen Seiten zu verlieren. */
@@ -2451,16 +2476,33 @@ function renderMain() {
     }
     const searchEl = document.getElementById("f-search");
     if (searchEl) {
-      searchEl.addEventListener("input", e => {
+      const clearEl = document.getElementById("f-search-clear");
+      const uebernehmen = wert => {
         /* Der Suchtext wird sofort uebernommen - im Feld steht er ohnehin
            schon, und ein render() aus anderer Richtung darf ihn nicht
            verlieren. Nur das Neuzeichnen der Liste wartet, bis der Finger
            kurz still steht. Ohne das rechnet jeder Tastendruck die Treffer
            aus und baut alle Zeilen neu. */
-        ui.searchQuery = e.target.value;
+        ui.searchQuery = wert;
         ui.kartenSeite = 0;
+        if (clearEl) clearEl.hidden = !wert;
         if (sucheTimer) clearTimeout(sucheTimer);
-        sucheTimer = setTimeout(() => { sucheTimer = null; render(); }, SUCH_VERZOEGERUNG);
+        /* 2.1.0: zeichneKartenListe() statt render() - nur die Liste, nicht
+           das Suchfeld, in dem gerade getippt wird. */
+        sucheTimer = setTimeout(() => { sucheTimer = null; zeichneKartenListe(); }, SUCH_VERZOEGERUNG);
+      };
+      searchEl.addEventListener("input", e => {
+        /* 2.1.0: Solange die Handy-Tastatur an einem Wort baut (Autokorrektur,
+           Wortvorschlag, Wischen), wird der Text nur mitgeschrieben und nichts
+           neu gezeichnet. Jede Aenderung am DOM waehrend dieser Phase bringt
+           die Tastatur durcheinander. */
+        if (tastaturBautWort) { ui.searchQuery = e.target.value; return; }
+        uebernehmen(e.target.value);
+      });
+      searchEl.addEventListener("compositionstart", () => { tastaturBautWort = true; });
+      searchEl.addEventListener("compositionend", e => {
+        tastaturBautWort = false;
+        uebernehmen(e.target.value);
       });
     }
   }
@@ -2751,7 +2793,7 @@ function renderHandwritingCanvas(revealed) {
 }
 
 /* Extra-Feld: Bild-Links als Bild, http(s)-Links klickbar, Rest als Text */
-function renderExtra(extra) {
+function renderExtra(extra, tokens) {
   const trimmed = extra.trim();
   if (/^https?:\/\/\S+\.(png|jpe?g|gif|webp|svg)(\?\S*)?$/i.test(trimmed)) {
     return '<img src="' + esc(trimmed) + '" alt="Bild" style="max-width:100%;border-radius:8px">';
@@ -2759,7 +2801,227 @@ function renderExtra(extra) {
   if (/^https?:\/\/\S+$/i.test(trimmed)) {
     return '<a href="' + esc(trimmed) + '" target="_blank" rel="noopener noreferrer">' + esc(trimmed) + '</a>';
   }
-  return esc(extra);
+  /* Nur reiner Text wird markiert - in ein Bild oder einen Link duerfen
+     keine Markierungen hineingeschrieben werden. */
+  return markiere(extra, tokens || []);
+}
+
+
+/* ============================================================
+   SUCHE (2.1.0)
+
+   Die Suche verglich bisher rohen Text mit rohem Text (`includes`). Damit
+   fand sie nur, was Zeichen fuer Zeichen gleich geschrieben war: mit
+   Harakat getippt fand die Karte ohne Harakat nicht, "alshams" fand
+   "shams" nicht, ein Buchstabe daneben fand gar nichts.
+
+   Jetzt laeuft jeder Vergleich ueber eine Vergleichsform: Harakat und
+   Tatweel raus, Alif-Varianten vereinheitlicht, deutsche Umlaute und
+   Umschrift-Striche auf Grundbuchstaben. Gespeichert und angezeigt wird
+   selbstverstaendlich weiterhin der Originaltext - die Vergleichsform
+   existiert nur fuer die Dauer der Suche.
+
+   Bewusst NICHT enthalten: Latein zu Arabisch ("shams" findet شمس, ohne
+   dass "shams" auf der Karte steht). Das braeuchte eine Umschrifttabelle,
+   und Arabisch laesst sich auf zehn Arten umschreiben - das raet mehr als
+   es findet.
+   ============================================================ */
+
+/* Zeichen, die beim Vergleichen ersatzlos verschwinden: Harakat, Sukun,
+   Dagger-Alif, Tatweel, Quran-Zeichen, freistehende Hamza-Striche und
+   unsichtbare Steuerzeichen. */
+const SUCH_WEG = /[\u064B-\u0652\u0653\u0654\u0655\u0670\u0640\u06D6-\u06ED\u200B-\u200F\u2018\u2019\u02BE\u02BF\u02BC'`\u00B4]/;
+
+/* Zeichen, die auf eine gemeinsame Form gebracht werden. */
+const SUCH_ERSATZ = {
+  "\u0623": "\u0627", "\u0625": "\u0627", "\u0622": "\u0627", "\u0671": "\u0627",  // أ إ آ ٱ → ا
+  "\u0624": "\u0648",                                                       // ؤ → و
+  "\u0626": "\u064A", "\u0649": "\u064A",                                  // ئ ى → ي
+  "\u0629": "\u0647",                                                       // ة → ه
+  "\u0621": "",                                                             // ء
+  "\u00DF": "ss",
+  "\u00E4": "a", "\u00F6": "o", "\u00FC": "u",
+  "-": " ", "\u2013": " ", "_": " "
+};
+
+/* Ein Zeichen in seine Vergleichsform. Rueckgabe kann leer sein (faellt weg)
+   oder mehrere Zeichen lang (ß → ss) - deshalb fuehrt suchNorm() Buch
+   darueber, welches Zeichen der Vergleichsform aus welcher Stelle des
+   Originals stammt. Ohne dieses Verzeichnis liesse sich eine Fundstelle
+   spaeter nicht mehr im Originaltext markieren. */
+function normZeichen(ch) {
+  const c = ch.toLowerCase();
+  if (Object.prototype.hasOwnProperty.call(SUCH_ERSATZ, c)) return SUCH_ERSATZ[c];
+  if (SUCH_WEG.test(c)) return "";
+  /* NFD zerlegt zum Beispiel ā in a + Strich; der Strich faellt dann weg.
+     Deckt alle Umschrift-Zeichen auf einmal ab (ā ī ū š ṣ ḥ ṭ ẓ ḍ). */
+  return c.normalize("NFD").replace(/[\u0300-\u036F]/g, "");
+}
+
+function suchNorm(text) {
+  const s = String(text);
+  let out = "";
+  const map = [];                 // Stelle in der Vergleichsform → Stelle im Original
+  for (let i = 0; i < s.length; i++) {
+    const r = normZeichen(s[i]);
+    for (let k = 0; k < r.length; k++) map.push(i);
+    out += r;
+  }
+  return { text: out, map: map };
+}
+
+/* Vergleichsform eines Kartenfeldes, dazu seine einzelnen Woerter.
+   Gepuffert, weil dasselbe Feld beim Tippen sehr oft gefragt wird. */
+const suchPuffer = new Map();
+function suchFeld(text) {
+  const roh = String(text == null ? "" : text);
+  let f = suchPuffer.get(roh);
+  if (!f) {
+    const t = suchNorm(roh).text;
+    f = { text: t, woerter: t.split(/[^\p{L}\p{N}]+/u).filter(Boolean) };
+    if (suchPuffer.size > 4000) suchPuffer.clear();
+    suchPuffer.set(roh, f);
+  }
+  return f;
+}
+
+/* Der Suchtext, zerlegt in einzelne Woerter. Mehrere Woerter gelten UND:
+   "sonne licht" findet die Karte, auf der beides steht - in beliebiger
+   Reihenfolge und in beliebigen Feldern. */
+function suchTokens(q) {
+  const roh = suchNorm(q).text.split(/\s+/).filter(Boolean);
+  /* Ein alleinstehender Artikel ist kein Suchwort: Wer "al-shams" tippt,
+     meint shams. Nur wenn sonst nichts dasteht, bleibt er stehen - dann
+     sucht jemand wirklich nach diesen zwei Buchstaben. */
+  const ohne = roh.filter(t => t !== "al" && t !== "\u0627\u0644");
+  return ohne.length > 0 ? ohne : roh;
+}
+
+/* Arabischer Artikel ال und seine Umschrift "al". Nur abschneiden, wenn
+   danach noch mindestens drei Zeichen stehen - sonst wuerde "alle" zu "le"
+   und faende jedes zweite Wort. */
+function ohneArtikel(w) {
+  if (w.length > 4 && (w.startsWith("\u0627\u0644") || w.startsWith("al"))) return w.slice(2);
+  return w;
+}
+
+/* Wie gut passt ein Suchwort auf ein Feld? 3 = Feld faengt damit an,
+   2 = ein Wort im Feld faengt damit an, 1 = steht irgendwo drin, 0 = gar
+   nicht. Daraus entsteht die Reihenfolge der Treffer: Wortanfaenge zuerst. */
+function tokenPunkte(t, f, ungefaehr) {
+  if (!f.text || !t) return 0;
+  if (f.text.startsWith(t)) return 3;
+  if (f.woerter.some(w => w.startsWith(t))) return 2;
+  if (f.text.includes(t)) return 1;
+  /* Artikel-Toleranz, absichtlich nur am Wortanfang: "alshams" findet
+     "shams" und umgekehrt, ohne dass mitten in fremden Woertern getroffen
+     wird. */
+  const stamm = ohneArtikel(t);
+  if (stamm !== t && f.woerter.some(w => w.startsWith(stamm) || ohneArtikel(w).startsWith(stamm))) return 2;
+  if (t.length >= 3 && f.woerter.some(w => ohneArtikel(w).startsWith(t))) return 2;
+  if (!ungefaehr) return 0;
+  const erlaubt = t.length <= 3 ? 0 : (t.length <= 6 ? 1 : 2);
+  if (erlaubt === 0) return 0;
+  return f.woerter.some(w => abstand(t, w, erlaubt) <= erlaubt) ? 1 : 0;
+}
+
+/* Abstand zweier Woerter: wie viele Aenderungen trennen sie? Gezaehlt werden
+   Einfuegen, Loeschen, Ersetzen und - wichtig - das Vertauschen zweier
+   benachbarter Zeichen. Reines Levenshtein wertet "sonen" statt "sonne" als
+   zwei Fehler; das Vertauschen ist aber der haeufigste Vertipper ueberhaupt
+   und soll als einer zaehlen.
+
+   Abbruch, sobald feststeht, dass mehr als `max` Aenderungen noetig sind. */
+function abstand(a, b, max) {
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  let vorvorher = null;
+  let vorher = new Array(b.length + 1);
+  for (let j = 0; j <= b.length; j++) vorher[j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    const jetzt = new Array(b.length + 1);
+    jetzt[0] = i;
+    let bestes = i;
+    for (let j = 1; j <= b.length; j++) {
+      const kosten = a[i - 1] === b[j - 1] ? 0 : 1;
+      let w = Math.min(jetzt[j - 1] + 1, vorher[j] + 1, vorher[j - 1] + kosten);
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+        w = Math.min(w, vorvorher[j - 2] + 1);
+      }
+      jetzt[j] = w;
+      if (w < bestes) bestes = w;
+    }
+    if (bestes > max) return max + 1;
+    vorvorher = vorher;
+    vorher = jetzt;
+  }
+  return vorher[b.length];
+}
+
+/* Punktzahl einer ganzen Karte. Fehlt auch nur eines der Suchwoerter in
+   allen drei Feldern, ist die Karte kein Treffer. */
+function kartenPunkte(c, tokens, ungefaehr) {
+  const felder = [suchFeld(c.wort), suchFeld(c.uebersetzung), suchFeld(c.extra)];
+  let summe = 0;
+  for (const t of tokens) {
+    let beste = 0;
+    for (const f of felder) {
+      const p = tokenPunkte(t, f, ungefaehr);
+      if (p > beste) beste = p;
+    }
+    if (beste === 0) return null;
+    summe += beste;
+  }
+  return summe;
+}
+
+function suchLauf(quelle, tokens, ungefaehr) {
+  const treffer = [];
+  for (const eintrag of quelle) {
+    const punkte = kartenPunkte(eintrag.card, tokens, ungefaehr);
+    if (punkte === null) continue;
+    treffer.push({ card: eintrag.card, bereich: eintrag.bereich, punkte: punkte });
+  }
+  /* sort() ist in JavaScript stabil: bei gleicher Punktzahl bleibt die
+     eigene Kartenreihenfolge erhalten. */
+  treffer.sort((a, b) => b.punkte - a.punkte);
+  return treffer;
+}
+
+/* Fundstellen im Originaltext hervorheben. Gesucht wird in der
+   Vergleichsform, markiert wird im Original - dafuer dient das Verzeichnis
+   aus suchNorm(). Gibt fertiges, abgesichertes HTML zurueck. */
+function markiere(text, tokens) {
+  const roh = String(text == null ? "" : text);
+  if (!tokens || tokens.length === 0) return esc(roh);
+  const n = suchNorm(roh);
+  const stellen = [];
+  for (const t of tokens) {
+    const varianten = [t];
+    const stamm = ohneArtikel(t);
+    if (stamm !== t) varianten.push(stamm);
+    for (const v of varianten) {
+      if (!v) continue;
+      let von = n.text.indexOf(v);
+      while (von !== -1) {
+        stellen.push([n.map[von], n.map[von + v.length - 1] + 1]);
+        von = n.text.indexOf(v, von + 1);
+      }
+    }
+  }
+  if (stellen.length === 0) return esc(roh);
+  stellen.sort((a, b) => a[0] - b[0]);
+  const zusammen = [];
+  for (const st of stellen) {
+    const letzte = zusammen[zusammen.length - 1];
+    if (letzte && st[0] <= letzte[1]) letzte[1] = Math.max(letzte[1], st[1]);
+    else zusammen.push([st[0], st[1]]);
+  }
+  let out = "", pos = 0;
+  for (const [a, b] of zusammen) {
+    out += esc(roh.slice(pos, a)) + "<mark>" + esc(roh.slice(a, b)) + "</mark>";
+    pos = b;
+  }
+  return out + esc(roh.slice(pos));
 }
 
 function renderVerwalten() {
@@ -2846,36 +3108,21 @@ function renderVerwalten() {
 
   html += renderSetsPanel();
 
-  const q = ui.searchQuery.trim().toLowerCase();
-  /* D7 (1.8.0): Suche wahlweise ueber alle Bereiche. Bewusst nur der
-     Umschalter und sonst nichts. Treffer aus einem FREMDEN Bereich bekommen
-     den Bereichsnamen als Plakette und nur den ✏️-Knopf: Loeschen und
-     Ankreuzen arbeiten auf currentCards() und wuerden bei einer fremden Karte
-     die falsche treffen. Der ✏️-Knopf wechselt vorher den Bereich. */
-  const treffer = c => c.wort.toLowerCase().includes(q) ||
-                       c.uebersetzung.toLowerCase().includes(q) ||
-                       c.extra.toLowerCase().includes(q);
-  const fremdeBereiche = new Map();   // Karten-ID → Bereich, nur bei Treffern von anderswo
-  let shownCards;
-  if (!q) {
-    shownCards = cards;
-  } else if (ui.searchAll) {
-    shownCards = [];
-    for (const b of bereiche) {
-      for (const c of b.karten) {
-        if (!treffer(c)) continue;
-        if (b.id !== currentBereich().id) fremdeBereiche.set(c.id, b);
-        shownCards.push(c);
-      }
-    }
-  } else {
-    shownCards = cards.filter(treffer);
-  }
-
+  /* 2.1.0: Die Kartenliste steckt in einem eigenen Kasten und wird beim
+     Tippen allein neu gezeichnet - das Suchfeld selbst wird dabei nie
+     angefasst. Vorher baute jeder Tastendruck die ganze Seite neu, samt
+     Suchfeld: Die Handy-Tastatur haengt dann mit ihrem halbfertigen Wort an
+     einem Feld, das es nicht mehr gibt, und schiebt beim naechsten Zeichen
+     ihre Reste verdreht ins neue hinein - aus "sonne" wurde "snn". */
   if (cards.length === 0 && !ui.searchAll) {
     html += '<p class="hint">Noch keine Karten vorhanden.</p>';
   } else {
-    html += '<input type="text" id="f-search" placeholder="🔍 Suche nach Wort oder Übersetzung…" value="' + esc(ui.searchQuery) + '" style="margin-bottom:10px">';
+    html += '<div class="search-wrap">';
+    html += '<input type="text" id="f-search" placeholder="🔍 Wort, Übersetzung oder Notiz…" value="' + esc(ui.searchQuery) + '"' +
+      ' autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false">';
+    html += '<button class="search-clear" id="f-search-clear" data-action="search-clear" aria-label="Suche leeren"' +
+      (ui.searchQuery ? '' : ' hidden') + '>✕</button>';
+    html += '</div>';
     if (bereiche.length > 1) {
       html += '<div class="seg-row" style="margin:0 0 14px">';
       html += '<span class="seg" role="group" aria-label="Suchbereich">';
@@ -2883,62 +3130,120 @@ function renderVerwalten() {
       html += '<button class="' + (ui.searchAll ? "active" : "") + '" data-action="search-scope" data-scope="alle" aria-pressed="' + (ui.searchAll ? "true" : "false") + '">alle Bereiche</button>';
       html += '</span></div>';
     }
-    if (shownCards.length === 0) {
-      html += '<p class="hint">' + (q ? 'Keine Treffer für „' + esc(ui.searchQuery) + '".' : "Noch keine Karten vorhanden.") + '</p>';
-    } else {
-      const draggable = !q && !ui.selectMode;
-      /* C2: Seiten erst ab SEITEN_SCHWELLE. Darunter ist shownCards die ganze
-         Liste und es erscheint keine Seitenleiste. */
-      const seiten = shownCards.length > SEITEN_SCHWELLE ? Math.ceil(shownCards.length / SEITE_GROESSE) : 1;
-      if (ui.kartenSeite > seiten - 1) ui.kartenSeite = seiten - 1;
-      if (ui.kartenSeite < 0) ui.kartenSeite = 0;
-      const start = seiten > 1 ? ui.kartenSeite * SEITE_GROESSE : 0;
-      const seitenKarten = seiten > 1 ? shownCards.slice(start, start + SEITE_GROESSE) : shownCards;
-      /* Beim Ziehen wird nur die sichtbare Seite umsortiert. endDrag() muss
-         wissen, an welcher Stelle der Gesamtliste dieser Ausschnitt sitzt -
-         sonst wuerde es die Reihenfolge der uebrigen Seiten ueberschreiben.
-         Ziehen ist ohnehin nur ohne Suche moeglich, deshalb entspricht der
-         Ausschnitt dann genau currentCards().slice(start, ...). */
-      listenFenster = { start: start, anzahl: seitenKarten.length };
-      if (draggable) html += '<p class="hint" style="margin-bottom:10px">↕ Ziehe eine Karte am ⠿-Griff, um die Reihenfolge zu ändern.' +
-        (seiten > 1 ? ' Verschieben über die Seitengrenze hinaus geht nicht – dafür „↪ Verschieben" im Auswahlmodus.' : '') + '</p>';
-      if (seiten > 1) html += seitenLeiste(ui.kartenSeite, seiten, shownCards.length);
-      for (let i = 0; i < seitenKarten.length; i++) {
-        const c = seitenKarten[i];
-        const fremd = fremdeBereiche.get(c.id) || null;
-        if (ui.selectMode && !fremd) {
-          const checked = ui.selectedIds.has(c.id);
-          html += '<div class="card-row" data-action="toggle-card-select" data-id="' + esc(c.id) + '" style="cursor:pointer">';
-          html += '<input type="checkbox" style="pointer-events:none" ' + (checked ? "checked" : "") + '>';
-        } else {
-          html += '<div class="card-row"' + (draggable ? ' data-cardid="' + esc(c.id) + '"' : '') + '>';
-          if (draggable) html += '<span class="drag-handle" title="Ziehen zum Sortieren" aria-hidden="true">⠿</span>';
-        }
-        html += '<div class="words">';
-        html += '<div class="wort arabic" lang="ar" dir="rtl">' + esc(c.wort) + '</div>';
-        html += '<div class="uebersetzung">' + esc(c.uebersetzung) + '</div>';
-        if (c.extra) html += '<div class="extra-note">' + renderExtra(c.extra) + '</div>';
-        html += '</div>';
-        if (fremd) html += '<span class="badge" title="Diese Karte liegt in einem anderen Bereich">' + esc(fremd.name) + '</span>';
-        html += '<span class="badge">Stufe ' + c.stufe + '</span>';
-        /* E6: In der Liste sichtbar machen, damit beim Durchsehen sofort
-           auffaellt, welche Karte umformuliert gehoert. */
-        if (istVerbrannt(c)) html += '<span class="leech-badge" title="' + c.rueckfaelle + '-mal wieder vergessen – umformulieren oder aufteilen">🔥 ' + c.rueckfaelle + '×</span>';
-        if (fremd) {
-          html += '<button class="ghost" data-action="edit-card-in-bereich" data-bereich="' + esc(fremd.id) + '" data-id="' + esc(c.id) +
-            '" title="In „' + esc(fremd.name) + '" öffnen" aria-label="Karte im Bereich ' + esc(fremd.name) + ' bearbeiten">✏️</button>';
-        } else if (!ui.selectMode) {
-          html += '<button class="ghost" data-action="edit-card" data-id="' + esc(c.id) + '" title="Bearbeiten" aria-label="Karte bearbeiten">✏️</button>';
-          html += '<button class="ghost" data-action="delete-card" data-id="' + esc(c.id) + '" title="Löschen" aria-label="Karte löschen">🗑️</button>';
-        }
-        html += '</div>';
-      }
-      /* Zweite Leiste unten: nach 100 Zeilen ist die obere aus dem Bild. */
-      if (seiten > 1) html += seitenLeiste(ui.kartenSeite, seiten, shownCards.length);
-    }
+    html += '<div id="karten-liste">' + kartenListeInhalt() + '</div>';
   }
   html += '</div>';
   return html;
+}
+
+/* Inhalt des Kastens #karten-liste: filtern, sortieren, blaettern, Zeilen
+   bauen. Steht bewusst fuer sich, damit ein Tastendruck in der Suche genau
+   diesen Teil erneuern kann und sonst nichts. */
+function kartenListeInhalt() {
+  const cards = currentCards();
+  const tokens = suchTokens(ui.searchQuery);
+  const eigenerId = currentBereich().id;
+  /* D7 (1.8.0): Suche wahlweise ueber alle Bereiche. Treffer aus einem
+     FREMDEN Bereich bekommen den Bereichsnamen als Plakette und nur den
+     ✏️-Knopf: Loeschen und Ankreuzen arbeiten auf currentCards() und wuerden
+     bei einer fremden Karte die falsche treffen. Der ✏️-Knopf wechselt
+     vorher den Bereich. */
+  const fremdeBereiche = new Map();   // Karten-ID → Bereich, nur bei Treffern von anderswo
+  let html = "";
+  let shownCards;
+  let ungefaehr = false;
+
+  if (tokens.length === 0) {
+    shownCards = cards;
+  } else {
+    const quelle = [];
+    if (ui.searchAll) {
+      for (const b of bereiche) for (const c of b.karten) quelle.push({ card: c, bereich: b });
+    } else {
+      for (const c of cards) quelle.push({ card: c, bereich: null });
+    }
+    let treffer = suchLauf(quelle, tokens, false);
+    /* Erst wenn es gar nichts Genaues gibt, wird ein Buchstabe Abweichung
+       erlaubt. Immer an hiesse: drei getippte Zeichen passen auf fast alles,
+       und man sucht in den Suchergebnissen weiter. */
+    if (treffer.length === 0) {
+      treffer = suchLauf(quelle, tokens, true);
+      ungefaehr = treffer.length > 0;
+    }
+    shownCards = treffer.map(t => t.card);
+    for (const t of treffer) {
+      if (t.bereich && t.bereich.id !== eigenerId) fremdeBereiche.set(t.card.id, t.bereich);
+    }
+  }
+
+  if (shownCards.length === 0) {
+    html += '<p class="hint">' + (tokens.length ? 'Keine Treffer für „' + esc(ui.searchQuery) + '".' : "Noch keine Karten vorhanden.") + '</p>';
+    return html;
+  }
+
+  if (tokens.length) {
+    html += '<p class="hint" style="margin-bottom:10px">' +
+      (ungefaehr ? 'Keine genauen Treffer – ähnlich geschrieben: ' : '') +
+      shownCards.length + (shownCards.length === 1 ? ' Karte' : ' Karten') + '</p>';
+  }
+
+  const draggable = tokens.length === 0 && !ui.selectMode;
+  /* C2: Seiten erst ab SEITEN_SCHWELLE. Darunter ist shownCards die ganze
+     Liste und es erscheint keine Seitenleiste. */
+  const seiten = shownCards.length > SEITEN_SCHWELLE ? Math.ceil(shownCards.length / SEITE_GROESSE) : 1;
+  if (ui.kartenSeite > seiten - 1) ui.kartenSeite = seiten - 1;
+  if (ui.kartenSeite < 0) ui.kartenSeite = 0;
+  const start = seiten > 1 ? ui.kartenSeite * SEITE_GROESSE : 0;
+  const seitenKarten = seiten > 1 ? shownCards.slice(start, start + SEITE_GROESSE) : shownCards;
+  /* Beim Ziehen wird nur die sichtbare Seite umsortiert. endDrag() muss
+     wissen, an welcher Stelle der Gesamtliste dieser Ausschnitt sitzt -
+     sonst wuerde es die Reihenfolge der uebrigen Seiten ueberschreiben.
+     Ziehen ist ohnehin nur ohne Suche moeglich, deshalb entspricht der
+     Ausschnitt dann genau currentCards().slice(start, ...). */
+  listenFenster = { start: start, anzahl: seitenKarten.length };
+  if (draggable) html += '<p class="hint" style="margin-bottom:10px">↕ Ziehe eine Karte am ⠿-Griff, um die Reihenfolge zu ändern.' +
+    (seiten > 1 ? ' Verschieben über die Seitengrenze hinaus geht nicht – dafür „↪ Verschieben" im Auswahlmodus.' : '') + '</p>';
+  if (seiten > 1) html += seitenLeiste(ui.kartenSeite, seiten, shownCards.length);
+  for (let i = 0; i < seitenKarten.length; i++) {
+    const c = seitenKarten[i];
+    const fremd = fremdeBereiche.get(c.id) || null;
+    if (ui.selectMode && !fremd) {
+      const checked = ui.selectedIds.has(c.id);
+      html += '<div class="card-row" data-action="toggle-card-select" data-id="' + esc(c.id) + '" style="cursor:pointer">';
+      html += '<input type="checkbox" style="pointer-events:none" ' + (checked ? "checked" : "") + '>';
+    } else {
+      html += '<div class="card-row"' + (draggable ? ' data-cardid="' + esc(c.id) + '"' : '') + '>';
+      if (draggable) html += '<span class="drag-handle" title="Ziehen zum Sortieren" aria-hidden="true">⠿</span>';
+    }
+    html += '<div class="words">';
+    html += '<div class="wort arabic" lang="ar" dir="rtl">' + markiere(c.wort, tokens) + '</div>';
+    html += '<div class="uebersetzung">' + markiere(c.uebersetzung, tokens) + '</div>';
+    if (c.extra) html += '<div class="extra-note">' + renderExtra(c.extra, tokens) + '</div>';
+    html += '</div>';
+    if (fremd) html += '<span class="badge" title="Diese Karte liegt in einem anderen Bereich">' + esc(fremd.name) + '</span>';
+    html += '<span class="badge">Stufe ' + c.stufe + '</span>';
+    /* E6: In der Liste sichtbar machen, damit beim Durchsehen sofort
+       auffaellt, welche Karte umformuliert gehoert. */
+    if (istVerbrannt(c)) html += '<span class="leech-badge" title="' + c.rueckfaelle + '-mal wieder vergessen – umformulieren oder aufteilen">🔥 ' + c.rueckfaelle + '×</span>';
+    if (fremd) {
+      html += '<button class="ghost" data-action="edit-card-in-bereich" data-bereich="' + esc(fremd.id) + '" data-id="' + esc(c.id) +
+        '" title="In „' + esc(fremd.name) + '" öffnen" aria-label="Karte im Bereich ' + esc(fremd.name) + ' bearbeiten">✏️</button>';
+    } else if (!ui.selectMode) {
+      html += '<button class="ghost" data-action="edit-card" data-id="' + esc(c.id) + '" title="Bearbeiten" aria-label="Karte bearbeiten">✏️</button>';
+      html += '<button class="ghost" data-action="delete-card" data-id="' + esc(c.id) + '" title="Löschen" aria-label="Karte löschen">🗑️</button>';
+    }
+    html += '</div>';
+  }
+  /* Zweite Leiste unten: nach 100 Zeilen ist die obere aus dem Bild. */
+  if (seiten > 1) html += seitenLeiste(ui.kartenSeite, seiten, shownCards.length);
+  return html;
+}
+
+/* Nur die Liste erneuern, ohne das Suchfeld anzufassen. */
+function zeichneKartenListe() {
+  const kasten = document.getElementById("karten-liste");
+  if (!kasten) { render(); return; }
+  kasten.innerHTML = kartenListeInhalt();
 }
 
 /* C2: Blaettern zwischen den Seiten der Kartenliste. */
@@ -3359,6 +3664,7 @@ app.addEventListener("click", e => {
        oeffnet Verwalten und fuellt das Formular. */
     case "edit-card-in-bereich": editCardInBereich(btn.dataset.bereich, btn.dataset.id); break;
     case "search-scope": ui.searchAll = btn.dataset.scope === "alle"; ui.kartenSeite = 0; ui.selectMode = false; ui.selectedIds = new Set(); render(); break;
+    case "search-clear": ui.searchQuery = ""; ui.kartenSeite = 0; render(); break;
     case "cancel-edit": cancelEdit(); break;
     case "delete-card": deleteCard(btn.dataset.id); break;
     case "reverse-order": reverseOrder(); break;
