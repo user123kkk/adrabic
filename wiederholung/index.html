@@ -273,6 +273,12 @@
   .select-actionbar select { padding: 7px 10px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--card); color: var(--ink); font: inherit; }
   .drill-picker select option, .select-actionbar select option { background: var(--card); color: var(--ink); }
   .card-row input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--accent); flex-shrink: 0; }
+  /* 2.2.0: Jede Speicherkarte samt ihrer aufgeklappten Kartenliste steckt in
+     einem Block. Gezogen wird der ganze Block - sonst bliebe die Kartenliste
+     beim Sortieren an ihrer alten Stelle liegen. */
+  .set-block.dragging { opacity: 0.6; }
+  .sets-kopf { display: flex; align-items: center; gap: 8px; width: 100%; padding: 4px 0; background: transparent; color: var(--ink); font-weight: 600; text-align: left; }
+  .sets-kopf:hover { background: transparent; color: var(--accent); }
   .set-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 0; border-bottom: 1px solid var(--border); }
   .set-row:last-child { border-bottom: none; }
   .set-row .set-name { flex: 1; min-width: 0; font-weight: 600; word-break: break-word; }
@@ -448,7 +454,7 @@ const firebaseConfig = {
 
 /* Versionsnummer: bei jeder Veroeffentlichung hochzaehlen und denselben Wert
    als CACHE_NAME in sw.js eintragen, damit alte Dateien verworfen werden. */
-const APP_VERSION = "2.1.0";
+const APP_VERSION = "2.2.0";
 
 const CONFIGURED = firebaseConfig.apiKey !== "HIER_EINFUEGEN";
 const app = document.getElementById("app");
@@ -734,6 +740,11 @@ let ui = {
   drillOpen: false,           // Auswahl für Übungsmodus sichtbar?
   drillSource: "stufen",      // "stufen" oder die ID einer Speicherkarte
   openSetId: null,            // Speicherkarte, deren Kartenliste aufgeklappt ist
+  /* 2.2.0: Das Feld mit den Speicherkarten ist beim Start zugeklappt. Es
+     wuchs sonst mit jeder neuen Speicherkarte weiter nach unten und schob
+     Suchfeld und Kartenliste aus dem Bild. Bewusst NICHT gespeichert: nach
+     jedem Start ist es wieder zu, das ist der Normalfall. */
+  setsOffen: false,
 };
 
 /* ---------- Formular-Entwurf ----------
@@ -1620,6 +1631,22 @@ function importBackupFile(file) {
         while (bereiche.some(x => x.name === name + " (" + n + ")")) n++;
         name = name + " (" + n + ")";
       }
+      /* 2.2.0: Jede importierte Karte bekommt eine NEUE Nummer.
+         Seit dem Umbau in 2.0.0 liegt jede Karte als eigener Datensatz unter
+         ihrer Nummer. Behielt der Import die Nummern aus der Datei bei und
+         gab es diese Karten im Konto noch, ueberschrieb der Import sie und zog
+         sie in den neuen Bereich hinueber - der alte Bereich blieb leer
+         zurueck. Genau das passierte beim zweiten Import derselben Datei.
+         Mit neuen Nummern kann das nicht mehr vorkommen. Die Verweise in den
+         Speicherkarten werden mit umgeschrieben, sonst zeigten sie ins Leere. */
+      const vergeben = new Set();
+      const frisch = () => { let x = genId(); while (vergeben.has(x)) x = genId(); vergeben.add(x); return x; };
+      const nummernTausch = new Map();
+      b.karten.forEach(c => { const altId = c.id; c.id = frisch(); nummernTausch.set(altId, c.id); });
+      (b.sets || []).forEach(st => {
+        st.id = frisch();
+        st.cardIds = st.cardIds.map(x => nummernTausch.get(x)).filter(Boolean);
+      });
       const neu = { id: genId(), name: name, karten: b.karten, sets: b.sets || [] };
       bereiche.push(neu);
       patch[pfadBereich(neu.id)] = bereichFelder(neu, bereiche.length - 1);
@@ -3305,11 +3332,18 @@ function renderSetsPanel() {
   const sets = currentSets();
   if (sets.length === 0) return "";
   let html = '<div class="drill-picker" style="margin-bottom:14px">';
-  html += '<p class="hint" style="padding:0 0 6px">⭐ Speicherkarten – feste Auswahl an Vokabeln, jederzeit beliebig oft übbar</p>';
+  /* 2.2.0: Kopfzeile zum Auf- und Zuklappen. Zu ist der Normalzustand. */
+  html += '<button class="sets-kopf" data-action="toggle-sets" aria-expanded="' + (ui.setsOffen ? "true" : "false") + '">';
+  html += '<span>' + (ui.setsOffen ? "▾" : "▸") + '</span><span>⭐ Speicherkarten</span>';
+  html += '<span class="badge">' + sets.length + '</span></button>';
+  if (!ui.setsOffen) { html += '</div>'; return html; }
+  html += '<p class="hint" style="padding:6px 0">Feste Auswahl an Vokabeln, jederzeit beliebig oft übbar. Reihenfolge per ⠿-Griff ändern.</p>';
   for (const s of sets) {
     const cards = setCards(s);
     const open = ui.openSetId === s.id;
+    html += '<div class="set-block" data-setid="' + esc(s.id) + '">';
     html += '<div class="set-row">';
+    html += '<span class="drag-handle" title="Ziehen zum Sortieren" aria-hidden="true">⠿</span>';
     html += '<span class="set-name">' + esc(s.name) + '</span>';
     html += '<span class="badge">' + cards.length + ' Karte' + (cards.length === 1 ? "" : "n") + '</span>';
     html += '<button class="ghost" data-action="drill-set" data-id="' + esc(s.id) + '" title="Diese Auswahl üben">🔁 Üben</button>';
@@ -3333,6 +3367,7 @@ function renderSetsPanel() {
       }
       html += '</div>';
     }
+    html += '</div>';
   }
   html += '</div>';
   return html;
@@ -3347,7 +3382,7 @@ function updateDragPosition(y) {
   const row = dragState.row;
   const parent = row.parentNode;
   if (!parent) return;
-  const siblings = [...parent.querySelectorAll(".card-row")].filter(r => r !== row);
+  const siblings = [...parent.querySelectorAll(dragState.selektor)].filter(r => r !== row);
   let target = null;
   for (const sib of siblings) {
     const rect = sib.getBoundingClientRect();
@@ -3379,10 +3414,16 @@ function autoScrollTick() {
 app.addEventListener("pointerdown", e => {
   const handle = e.target.closest(".drag-handle");
   if (!handle) return;
-  const row = handle.closest(".card-row");
+  /* 2.2.0: Derselbe Griff zieht jetzt zweierlei - eine Karte in der Liste
+     oder eine Speicherkarte im Feld darueber. Welches von beidem, entscheidet
+     sich hier einmal und steht danach in dragState.art. */
+  const row = handle.closest(".card-row, .set-block");
   if (!row) return;
+  const art = row.classList.contains("set-block") ? "set" : "karte";
   e.preventDefault();
-  dragState = { pointerId: e.pointerId, row: row, cardid: row.dataset.cardid, clientY: e.clientY };
+  dragState = { pointerId: e.pointerId, row: row, art: art,
+                selektor: art === "set" ? ".set-block" : ".card-row",
+                cardid: row.dataset.cardid, clientY: e.clientY };
   handle.setPointerCapture(e.pointerId);
   row.classList.add("dragging");
   if (!autoScrollRAF) autoScrollRAF = requestAnimationFrame(autoScrollTick);
@@ -3400,6 +3441,24 @@ function endDrag() {
   const row = dragState.row;
   const parent = row.parentNode;
   row.classList.remove("dragging");
+  if (parent && dragState.art === "set") {
+    /* 2.2.0: Neue Reihenfolge der Speicherkarten. Sie steckt nur in der
+       Ordnungszahl jedes Sets, die Karten selbst werden nicht angefasst. */
+    const ids = [...parent.querySelectorAll(".set-block")].map(r => r.dataset.setid);
+    const sets = currentSets();
+    const byId = new Map(sets.map(x => [x.id, x]));
+    const neu = ids.map(id => byId.get(id)).filter(Boolean);
+    if (neu.length === sets.length) {
+      sets.splice(0, sets.length, ...neu);
+      const b = currentBereich();
+      const patch = {};
+      sets.forEach((x, i) => { patch[pfadSet(b.id, x.id) + ".order"] = i; });
+      patchDoc(patch);
+    }
+    dragState = null;
+    render();
+    return;
+  }
   if (parent) {
     const newOrderIds = [...parent.querySelectorAll(".card-row")].map(r => r.dataset.cardid);
     const cards = currentCards();
@@ -3708,6 +3767,7 @@ app.addEventListener("click", e => {
     case "edit-card-in-bereich": editCardInBereich(btn.dataset.bereich, btn.dataset.id); break;
     case "search-scope": ui.searchAll = btn.dataset.scope === "alle"; ui.kartenSeite = 0; ui.selectMode = false; ui.selectedIds = new Set(); render(); break;
     case "search-clear": ui.searchQuery = ""; ui.kartenSeite = 0; render(); break;
+    case "toggle-sets": ui.setsOffen = !ui.setsOffen; render(); break;
     case "cancel-edit": cancelEdit(); break;
     case "delete-card": deleteCard(btn.dataset.id); break;
     case "reverse-order": reverseOrder(); break;
