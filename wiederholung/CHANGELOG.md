@@ -17,6 +17,23 @@
   wartet die App, solange die Tastatur an einem Wort baut, und Autokorrektur
   sowie Rechtschreibprüfung sind für das Suchfeld abgeschaltet.
 
+- **Schriftgröße wirkte im Fortschritts-Tab nicht.** Die Einstellung
+  klein / normal / groß gilt laut 1.8.0 überall, wo Arabisch steht. Die Zeilen
+  unter „🔥 Karten, die nicht klappen" waren davon ausgenommen – sie heißen im
+  Aufbau anders als die Zeilen der Kartenliste und wurden von der Regel nicht
+  erfasst. Dort blieb das arabische Wort auf Normalgröße.
+
+- **Duplikatprüfung war schwächer als die Suche.** Sie entfernte nur Harakat
+  und Tatweel. „أحمد" und „احمد" galten damit als zwei verschiedene Wörter und
+  liessen sich doppelt anlegen – beim Abtippen ohne Hamza der häufigste Fall
+  überhaupt. Sie benutzt jetzt dieselbe Vergleichsform wie die Suche.
+
+  Mit **einer** Ausnahme: ى und ي bleiben in der Duplikatprüfung getrennt.
+  على (auf) und علي (Ali) stehen beide in fast jedem Anfänger-Wortschatz. Die
+  Suche darf sie zusammenwerfen – ein Treffer zu viel kostet nichts. Eine
+  Warnung zu viel kostet dagegen Vertrauen, und eine Warnung, die man
+  gewohnheitsmäßig wegklickt, warnt nicht mehr.
+
 ### Die Suche findet, was gemeint ist
 
 Bisher verglich die Suche rohen Text mit rohem Text. Gefunden wurde nur, was
@@ -26,7 +43,7 @@ weiterhin der Originaltext.
 
 - **Ohne Harakat suchen.** Harakat, Sukun, Dagger-Alif und Tatweel fallen beim
   Vergleich weg, أ إ آ ٱ gelten als ا, ى als ي und ة als ه. „شمس" findet
-  „الشَّمْس". Dieselbe Regel benutzt die Duplikatprüfung seit 1.6.0.
+  „الشَّمْس".
 - **Deutsch und Umschrift.** ä/ö/ü/ß und Umschrift-Striche (ā ī ū š ṣ ḥ ṭ)
   zählen wie ihre Grundbuchstaben: „grosses" findet „großes", „kitab" findet
   „kitāb", „schlussel" findet „Schlüssel".
@@ -49,12 +66,14 @@ weiterhin der Originaltext.
 - Gesucht wird weiterhin in Wort, Übersetzung **und** Notiz. Der Platzhalter
   sagt das jetzt auch.
 
-### Kartenliste lesbarer
+### Listen lesbarer
 
 - Übersetzung und Notiz hatten dieselbe Farbe und keinen Abstand – die drei
   Zeilen lasen sich als ein Block. Die Übersetzung steht jetzt in voller
   Textfarbe, die Notiz bleibt gedämpft und bekommt einen Strich am Rand wie
   ein Zitat.
+- Dieselbe Verbesserung gilt jetzt auch für die Zeilen im Fortschritts-Tab.
+  Dort standen Wort und Übersetzung in gleicher Größe direkt übereinander.
 
 ### Nicht enthalten, bewusst
 
