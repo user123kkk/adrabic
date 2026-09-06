@@ -174,12 +174,17 @@
   .drag-handle { cursor: grab; color: var(--ink-soft); font-size: 1.2rem; padding: 4px; touch-action: none; user-select: none; }
   .drag-handle:active { cursor: grabbing; }
   .card-row .words { flex: 1; min-width: 0; }
-  .card-row .wort { font-weight: 600; word-break: break-word; }
+  /* Die Zeilen im Fortschritt-Tab (.leech-row) sind genauso aufgebaut wie die
+     in der Kartenliste und sollen auch genauso aussehen. Standen sie nicht
+     mit in diesen Regeln, blieb dort das arabische Wort auf Normalgroesse
+     (die Einstellung klein/normal/gross wirkte nicht) und Wort und
+     Uebersetzung klebten aneinander. */
+  .card-row .wort, .leech-row .wort { font-weight: 600; word-break: break-word; }
   /* 2.1.0: Uebersetzung und Notiz hatten dieselbe Farbe und keinen Abstand -
      die drei Zeilen lasen sich als ein Block. Jetzt traegt das Wort, dann die
      Uebersetzung in voller Textfarbe, dann die Notiz gedaempft mit Strich am
      Rand wie ein Zitat. */
-  .card-row .uebersetzung { color: var(--ink); font-size: 0.92rem; word-break: break-word; margin-top: 3px; }
+  .card-row .uebersetzung, .leech-row .uebersetzung { color: var(--ink); font-size: 0.92rem; word-break: break-word; margin-top: 3px; }
   .card-row .extra-note {
     color: var(--ink-soft); font-size: 0.82rem; font-style: italic;
     word-break: break-word; white-space: pre-wrap;
@@ -373,7 +378,7 @@
      beziehen und die 1,7 rem der Lernkarte verschlucken. */
   .study-word.arabic { font-size: calc(1.7rem * var(--arab-scale, 1)); }
   .study-answer.arabic { font-size: calc(1.3rem * var(--arab-scale, 1)); }
-  .card-row .wort.arabic { font-size: calc(1rem * var(--arab-scale, 1)); }
+  .card-row .wort.arabic, .leech-row .wort.arabic { font-size: calc(1rem * var(--arab-scale, 1)); }
   input.arabic { font-size: calc(1rem * var(--arab-scale, 1)); }
 
   /* Dreiteiliger Umschalter, benutzt von E7 (Schriftgroesse) und D7 (Suche) */
@@ -1907,11 +1912,20 @@ function startDrillWithCards(cards, label, handwriting) {
 /* D6: Vergleichsform fuer die Duplikatpruefung. Vokalzeichen und Tatweel werden
    entfernt, weil كِتَاب und كتاب dasselbe Wort sind - ohne das findet die Pruefung
    genau die Duplikate nicht, die man sich beim Abtippen einhandelt.
-   Nur zum Vergleichen; gespeichert wird selbstverstaendlich der Originaltext. */
+   Nur zum Vergleichen; gespeichert wird selbstverstaendlich der Originaltext.
+
+   2.1.0: benutzt jetzt dieselbe Vergleichsform wie die Suche (suchNorm), also
+   zusaetzlich أ إ آ ٱ als ا und ة als ه. Ohne das galten أحمد und احمد als zwei
+   verschiedene Woerter und liessen sich doppelt anlegen - beim Abtippen ohne
+   Hamza der haeufigste Fall ueberhaupt.
+
+   Eine Ausnahme: ى und ي bleiben hier getrennt (Parameter `streng`). Die Suche
+   darf sie zusammenwerfen, ein Treffer zu viel kostet nichts. Eine Warnung zu
+   viel kostet dagegen Vertrauen: على (auf) und علي (Ali) stehen beide in fast
+   jedem Anfaenger-Wortschatz, und eine Warnung, die man gewohnheitsmaessig
+   wegklickt, warnt nicht mehr. */
 function vergleichsWort(w) {
-  return String(w).trim().toLowerCase()
-    .replace(/[\u064B-\u0652\u0670\u0640]/g, "")
-    .replace(/\s+/g, " ");
+  return suchNorm(String(w).trim(), true).text.replace(/\s+/g, " ").trim();
 }
 function findeDuplikat(wort, exceptId, cards) {
   const key = vergleichsWort(wort);
@@ -2849,8 +2863,11 @@ const SUCH_ERSATZ = {
    darueber, welches Zeichen der Vergleichsform aus welcher Stelle des
    Originals stammt. Ohne dieses Verzeichnis liesse sich eine Fundstelle
    spaeter nicht mehr im Originaltext markieren. */
-function normZeichen(ch) {
+function normZeichen(ch, streng) {
   const c = ch.toLowerCase();
+  /* `streng` kommt von der Duplikatpruefung: dort bleibt ى ein ى, siehe
+     vergleichsWort(). Ueberall sonst gilt es als ي. */
+  if (streng && c === "\u0649") return c;
   if (Object.prototype.hasOwnProperty.call(SUCH_ERSATZ, c)) return SUCH_ERSATZ[c];
   if (SUCH_WEG.test(c)) return "";
   /* NFD zerlegt zum Beispiel ā in a + Strich; der Strich faellt dann weg.
@@ -2858,12 +2875,12 @@ function normZeichen(ch) {
   return c.normalize("NFD").replace(/[\u0300-\u036F]/g, "");
 }
 
-function suchNorm(text) {
+function suchNorm(text, streng) {
   const s = String(text);
   let out = "";
   const map = [];                 // Stelle in der Vergleichsform → Stelle im Original
   for (let i = 0; i < s.length; i++) {
-    const r = normZeichen(s[i]);
+    const r = normZeichen(s[i], streng);
     for (let k = 0; k < r.length; k++) map.push(i);
     out += r;
   }
