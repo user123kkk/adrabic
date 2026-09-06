@@ -23,6 +23,15 @@
   Aufbau anders als die Zeilen der Kartenliste und wurden von der Regel nicht
   erfasst. Dort blieb das arabische Wort auf Normalgröße.
 
+- **„Noch offen für die Streak" versprach zu viel.** Das Tageslimit für neue
+  Karten gilt über alle Bereiche zusammen. Die Zeile fragte aber jeden Bereich
+  einzeln, und jeder rechnete mit dem vollen Restbudget – bei Limit 10 und drei
+  Bereichen voller neuer Karten stand dort 30, obwohl heute 10 eingeführt
+  werden. Der Streak-Zähler selbst war davon nicht betroffen, und nach zehn
+  gelernten Karten sprang die Anzeige von selbst auf 0. Jetzt wird das Budget
+  der Reihe nach verteilt; der geöffnete Bereich kommt zuerst dran, weil dort
+  als Nächstes gelernt wird.
+
 - **Duplikatprüfung war schwächer als die Suche.** Sie entfernte nur Harakat
   und Tatweel. „أحمد" und „احمد" galten damit als zwei verschiedene Wörter und
   liessen sich doppelt anlegen – beim Abtippen ohne Hamza der häufigste Fall
