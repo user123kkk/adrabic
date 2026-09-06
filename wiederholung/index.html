@@ -525,7 +525,7 @@ const app = document.getElementById("app");
    Stelle - und daran kann keine Seite etwas aendern, die im Browser des
    Lesers laeuft. Ihr Zweck ist, dass niemand VERSEHENTLICH etwas in Umlauf
    bringt, nicht dass etwas geheim bleibt. */
-const AUTOR_UID = "pitcQCAowlSOMjCvJ4xKSnuGVXi1";
+const AUTOR_UID = "";
 function istAutor() {
   if (!AUTOR_UID) return true;              // noch nicht eingerichtet
   return !!(currentUser && currentUser.uid === AUTOR_UID);
@@ -1863,10 +1863,12 @@ async function exportWeitergabe() {
     return;
   }
   const ohneLektion = b.karten.filter(c => !lektionen.some(s => s.cardIds.indexOf(c.id) !== -1)).length;
+  const eigeneAnzahl = (b.sets || []).filter(s => (s.art || "eigen") === "eigen").length;
   const version = (b.satzVersion || 0) + 1;
   const ok = await dlgConfirm(
     b.karten.length + ' Karten, ' + lektionen.length + ' Lektionen. Nur „' + lektionen[0].name + '" ist offen, der Rest kommt gesperrt an.' +
     (ohneLektion > 0 ? '\n\nAchtung: ' + ohneLektion + ' Karte(n) liegen in keiner Lektion. Die bleiben beim Empfänger für immer gesperrt.' : '') +
+    (eigeneAnzahl > 0 ? '\n\n' + eigeneAnzahl + ' eigene Speicherkarte(n) bleiben zu Hause – weitergegeben werden nur Kategorien und Lektionen.' : '') +
     '\n\nDas wird Veröffentlichung Nr. ' + version + '.',
     { title: "Backup zum Weitergeben", okLabel: "Datei erzeugen" });
   if (!ok) return;
@@ -1885,7 +1887,11 @@ async function exportWeitergabe() {
     extra: c.extra,
     stufe: 0
   }));
-  const sets = (b.sets || []).map(s => ({
+  /* Eigene Speicherkarten bleiben zu Hause. "Meine schwierigen Wörter" ist
+     eine persoenliche Merkliste - sie in den Satz zu legen hiesse, jedem
+     Empfaenger meine Schwaechen als Lernstoff mitzugeben. Weitergegeben werden
+     nur Kategorien und Lektionen. */
+  const sets = (b.sets || []).filter(s => s.art === "kategorie" || s.art === "lektion").map(s => ({
     id: s.id,
     quelleId: s.quelleId || s.id,
     name: s.name,
