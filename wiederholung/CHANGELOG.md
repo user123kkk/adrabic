@@ -1,3 +1,35 @@
+## 2.2.0 – 6. September 2026 — „Speicherkarten"
+
+### Neu
+
+- **Speicherkarten sind zugeklappt, bis man sie braucht.** Über der Kartenliste
+  steht jetzt nur noch eine Zeile: „▸ ⭐ Speicherkarten (6)". Ein Tipp darauf
+  klappt sie auf. Beim nächsten Start ist sie wieder zu.
+
+  Grund: Das Feld wuchs mit jeder neuen Speicherkarte weiter nach unten und
+  schob Suchfeld und Kartenliste aus dem Bild. Wer Speicherkarten pro Lektion
+  anlegt, hätte nach einem halben Buch ein Dutzend Zeilen vor sich, bevor die
+  erste Vokabel kommt.
+
+- **Speicherkarten lassen sich sortieren.** Derselbe ⠰-Griff wie bei den
+  Karten, gezogen wird der ganze Block samt aufgeklappter Kartenliste. Damit
+  ordnest du selbst, was oben steht – zum Beispiel die festen Gruppen oben und
+  die Lektionen darunter. Eine eigene Gruppierungsfunktion braucht es dafür
+  nicht: Die Reihenfolge ist die Gruppierung.
+
+### Behoben
+
+- **Import konnte bestehende Karten überschreiben.** Er behielt die
+  Karten-Nummern aus der Datei bei. Seit dem Umbau in 2.0.0 liegt jede Karte
+  als eigener Datensatz unter ihrer Nummer – gab es diese Karten im Konto
+  noch, zog der Import sie in den neuen Bereich hinüber und ließ den alten
+  leer zurück. Betroffen war vor allem der zweite Import derselben Datei.
+
+  Jede importierte Karte bekommt jetzt eine neue Nummer; die Verweise in den
+  Speicherkarten werden mit umgeschrieben.
+
+---
+
 ## 2.1.0 – 6. September 2026 — „Suchen und Finden"
 
 ### Behoben
