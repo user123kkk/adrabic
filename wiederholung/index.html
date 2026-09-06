@@ -498,7 +498,7 @@ const firebaseConfig = {
 
 /* Versionsnummer: bei jeder Veroeffentlichung hochzaehlen und denselben Wert
    als CACHE_NAME in sw.js eintragen, damit alte Dateien verworfen werden. */
-const APP_VERSION = "2.5.0";
+const APP_VERSION = "2.6.0";
 
 const CONFIGURED = firebaseConfig.apiKey !== "HIER_EINFUEGEN";
 const app = document.getElementById("app");
@@ -525,7 +525,7 @@ const app = document.getElementById("app");
    Stelle - und daran kann keine Seite etwas aendern, die im Browser des
    Lesers laeuft. Ihr Zweck ist, dass niemand VERSEHENTLICH etwas in Umlauf
    bringt, nicht dass etwas geheim bleibt. */
-const AUTOR_UID = "pitcQCAowlSOMjCvJ4xKSnuGVXi1";
+const AUTOR_UID = "";
 function istAutor() {
   if (!AUTOR_UID) return true;              // noch nicht eingerichtet
   return !!(currentUser && currentUser.uid === AUTOR_UID);
@@ -1620,9 +1620,21 @@ function currentSets() {
 }
 function findSet(id) { return currentSets().find(s => s.id === id); }
 /* Karten einer Speicherkarte in Bereichsreihenfolge, gelöschte IDs fallen weg. */
+/* 2.6.0: Die Karten stehen in der Reihenfolge, in der sie in DIESER
+   Speicherkarte liegen - also so, wie sie beim Auswaehlen angehakt oder
+   danach am Griff zurechtgeschoben wurden.
+
+   Bis 2.5.0 wurde stattdessen nach der Reihenfolge des Bereichs sortiert.
+   Das war eine gerechnete Reihenfolge, keine gewaehlte: Die Karten einer
+   Lektion liessen sich nicht in die Abfolge des Videos bringen, ohne den
+   ganzen Bereich umzusortieren. Jetzt gehoert jeder Speicherkarte ihre
+   eigene Ordnung.
+
+   Karten, die es nicht mehr gibt, fallen still heraus - cardIds kann auf
+   geloeschte Karten zeigen. */
 function setCards(set) {
-  const ids = new Set(set.cardIds);
-  return currentCards().filter(c => ids.has(c.id));
+  const byId = new Map(currentCards().map(c => [c.id, c]));
+  return set.cardIds.map(id => byId.get(id)).filter(Boolean);
 }
 /* ---------- Was ist heute fällig? ----------
    Wer 500 Vokabeln auf einmal bekommt, hat ohne Bremse am ersten Tag 500
@@ -4239,13 +4251,18 @@ function setBlock(s, b, frei, gefuehrt) {
     if (cards.length === 0) {
       html += '<p class="hint">Keine Karten mehr in dieser Speicherkarte.</p>';
     } else {
+      if (eigenerBesitz && cards.length > 1) html += '<p class="hint" style="padding:6px 0">↕ Ziehe am ⠿-Griff, um die Reihenfolge in dieser Speicherkarte zu ändern. Die Reihenfolge im Bereich bleibt unberührt.</p>';
       for (const c of cards) {
         /* In einer Lektion sind ohnehin alle Karten gleich dran - dort waere
            eine Hervorhebung nur Unruhe. In den Kategorien steht dagegen alles
            gemischt, und genau dort ist die Frage "was darf ich schon?" echt. */
         const kartenZu = frei !== null && !frei.has(c.id);
         const hervor = frei !== null && !kartenZu && s.art !== "lektion";
-        html += '<div class="card-row' + (kartenZu ? " card-locked" : "") + (hervor ? " card-frei" : "") + '">';
+        html += '<div class="card-row' + (kartenZu ? " card-locked" : "") + (hervor ? " card-frei" : "") + '"' +
+          (eigenerBesitz ? ' data-cardid="' + esc(c.id) + '"' : '') + '>';
+        /* 2.6.0: Griff zum Sortieren INNERHALB dieser Speicherkarte. Er
+           veraendert nur cardIds, nie die Reihenfolge des Bereichs. */
+        if (eigenerBesitz) html += '<span class="drag-handle" title="Ziehen zum Sortieren" aria-hidden="true">⠿</span>';
         html += '<div class="words"><div class="wort arabic" lang="ar" dir="rtl">' + esc(c.wort) + '</div>';
         html += '<div class="uebersetzung">' + esc(c.uebersetzung) + '</div></div>';
         if (kartenZu) html += '<span class="badge" title="Noch in keiner freigeschalteten Lektion">🔒</span>';
@@ -4313,12 +4330,20 @@ app.addEventListener("pointerdown", e => {
   /* 2.2.0: Derselbe Griff zieht jetzt zweierlei - eine Karte in der Liste
      oder eine Speicherkarte im Feld darueber. Welches von beidem, entscheidet
      sich hier einmal und steht danach in dragState.art. */
-  const row = handle.closest(".card-row, .set-block");
+  /* 2.6.0: Erst .card-row pruefen, dann .set-block - und nicht umgekehrt.
+     Eine Kartenzeile in einer aufgeklappten Speicherkarte liegt INNERHALB
+     eines .set-block; wer zuerst nach .set-block sucht, findet den Kasten
+     drumherum und zieht die ganze Speicherkarte statt der Karte. */
+  const row = handle.closest(".card-row") || handle.closest(".set-block");
   if (!row) return;
-  const art = row.classList.contains("set-block") ? "set" : "karte";
+  const art = row.classList.contains("card-row") ? "karte" : "set";
+  /* Liegt die Kartenzeile in einer Speicherkarte, wird deren eigene
+     Reihenfolge geaendert, nicht die des Bereichs. */
+  const inSet = art === "karte" ? row.closest(".set-cards") : null;
   e.preventDefault();
   dragState = { pointerId: e.pointerId, row: row, art: art,
                 selektor: art === "set" ? ".set-block" : ".card-row",
+                setid: inSet && inSet.closest(".set-block") ? inSet.closest(".set-block").dataset.setid : null,
                 cardid: row.dataset.cardid, clientY: e.clientY };
   handle.setPointerCapture(e.pointerId);
   row.classList.add("dragging");
@@ -4358,6 +4383,20 @@ function endDrag() {
       const patch = {};
       sets.forEach((x, i) => { patch[pfadSet(b.id, x.id) + ".order"] = i; });
       patchDoc(patch);
+    }
+    dragState = null;
+    render();
+    return;
+  }
+  if (parent && dragState.setid) {
+    /* 2.6.0: Sortieren innerhalb einer Speicherkarte. Beruehrt nur deren
+       cardIds - die Reihenfolge des Bereichs und damit die Nummern der
+       Karten bleiben, wie sie sind. */
+    const set = findSet(dragState.setid);
+    const neu = [...parent.querySelectorAll(".card-row")].map(r => r.dataset.cardid).filter(Boolean);
+    if (set && neu.length === set.cardIds.length) {
+      set.cardIds = neu;
+      patchDoc({ [pfadSet(currentBereich().id, set.id) + ".cardIds"]: neu });
     }
     dragState = null;
     render();
