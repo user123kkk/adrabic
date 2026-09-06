@@ -249,10 +249,6 @@
   .btn-unknown:hover { background: #b8483d; }
 
   /* Tageslimit für neue Karten (B3) */
-  .limit-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
-  .limit-row input[type="number"] { width: 84px; }
-  .limit-row select { padding: 8px 10px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--card); color: var(--ink); font: inherit; }
-  .limit-row select option { background: var(--card); color: var(--ink); }
 
   .progress-note { font-size: 0.85rem; color: var(--ink-soft); margin-bottom: 10px; }
 
@@ -284,6 +280,28 @@
   .set-row .set-name { flex: 1; min-width: 0; font-weight: 600; word-break: break-word; }
   .set-cards { background: var(--bg); border-radius: var(--radius); padding: 4px 12px; margin: 0 0 10px; }
   .set-cards .card-row { padding: 8px 0; }
+  /* 2.3.0: Die drei Arten von Speicherkarten stehen als eigene Abschnitte
+     untereinander. Der Abschnittskopf ist bewusst leise - er ordnet nur, er
+     ist kein Knopf. */
+  .set-gruppe { margin-top: 14px; }
+  .set-gruppe:first-of-type { margin-top: 6px; }
+  .set-gruppe-kopf { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; font-weight: 600; color: var(--ink-soft); padding-top: 8px; border-top: 1px solid var(--border); }
+  .set-gruppe:first-of-type .set-gruppe-kopf { border-top: none; padding-top: 0; }
+  .set-art-wahl { padding: 4px 6px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--card); color: var(--ink-soft); font: inherit; font-size: 0.78rem; }
+  .set-art-wahl option { background: var(--card); color: var(--ink); }
+  /* Gesperrt heisst tot: ausgegraut, kein Ueben, kein Aufklappen. Nur das
+     Schloss selbst bleibt anfassbar. */
+  .set-block.set-locked .set-name { color: var(--ink-soft); text-decoration: line-through; text-decoration-color: var(--border); }
+  .set-block.set-locked .badge { opacity: 0.5; }
+  .card-row.card-locked .words { opacity: 0.42; }
+  .card-row.card-locked .badge { opacity: 0.5; }
+  /* Umgekehrt: in einem gefuehrten Satz wird hervorgehoben, was freigeschaltet
+     ist - dieselbe Farbe wie bei den Suchtreffern, damit "das darfst du
+     anfassen" ohne Erklaerung lesbar ist. */
+  .card-row.card-frei { background: rgba(227, 200, 138, 0.10); border-radius: var(--radius); padding-left: 8px; padding-right: 8px; }
+  .lock-btn { font-size: 1rem; padding: 4px 7px; }
+  .satz-banner { background: var(--accent-soft); color: var(--ink); border-radius: var(--radius); padding: 10px 14px; font-size: 0.86rem; margin-bottom: 14px; }
+  .satz-banner strong { color: var(--accent-dark); }
   /* E4/D10: Fortschritt sichtbar. Balken und Saeulen bestehen bewusst aus
      einfachen div-Elementen statt aus einer Diagramm-Bibliothek - die App soll
      eine einzige Datei ohne Build-Schritt bleiben. Alles hier ist reine
@@ -454,7 +472,7 @@ const firebaseConfig = {
 
 /* Versionsnummer: bei jeder Veroeffentlichung hochzaehlen und denselben Wert
    als CACHE_NAME in sw.js eintragen, damit alte Dateien verworfen werden. */
-const APP_VERSION = "2.2.0";
+const APP_VERSION = "2.3.0";
 
 const CONFIGURED = firebaseConfig.apiKey !== "HIER_EINFUEGEN";
 const app = document.getElementById("app");
@@ -562,20 +580,106 @@ function normCard(c) {
     /* E6: Karten von vor 1.7.0 haben das Feld nicht - sie starten bei 0.
        Rueckwirkend laesst es sich nicht rekonstruieren, die Zaehlung beginnt
        also mit dem Einbau. */
-    rueckfaelle: Number.isInteger(c.rueckfaelle) && c.rueckfaelle >= 0 ? c.rueckfaelle : 0
+    rueckfaelle: Number.isInteger(c.rueckfaelle) && c.rueckfaelle >= 0 ? c.rueckfaelle : 0,
+    /* 2.3.0: Herkunfts-Nummer. Bei einem weitergegebenen Kartensatz bleibt sie
+       ueber alle Veroeffentlichungen hinweg dieselbe. Beim Import bekommt jede
+       Karte eine neue id (sonst ueberschreibt sie vorhandene Karten, siehe
+       2.2.0) - an der quelleId erkennt ein spaeteres Update trotzdem wieder,
+       welche Karte im Konto schon da ist. Eigene Karten haben keine. */
+    quelleId: typeof c.quelleId === "string" && c.quelleId ? c.quelleId : null
   };
 }
 function istNeueKarte(c) { return !c.ersteBewertung; }
 function istVerbrannt(c) { return (c.rueckfaelle || 0) >= LEECH_SCHWELLE; }
+
+/* ---------- 2.3.0: gefuehrte Kartensaetze und das Schloss ----------
+   Ein "gefuehrter Bereich" ist ein Kartensatz, den jemand anders
+   zusammengestellt und weitergegeben hat. Zwei Dinge gelten dort:
+
+     1. Die Karten sind schreibgeschuetzt - nichts hinzufuegen, aendern,
+        loeschen oder umsortieren. Nur so steht der Stoff bei allen in
+        derselben Reihenfolge, und nur so kann ein spaeteres Update sauber
+        nachziehen, ohne etwas durcheinanderzubringen.
+     2. Gelernt wird nur, was freigeschaltet ist.
+
+   Die Freigabe-Regel lautet:
+     Eine Karte ist frei, wenn sie in mindestens einer NICHT gesperrten
+     Lektion liegt.
+
+   Kategorien und eigene Speicherkarten geben nie frei, sie zeigen nur an -
+   sonst waere ueber "Nomen" mit seinen 96 Karten sofort fast alles offen.
+   Weil die Regel so herum steht, darf eine Karte in beliebig vielen
+   Kategorien liegen, ohne dass es die Freigabe stoert; und laege sie in zwei
+   Lektionen, waere sie frei, sobald die fruehere davon offen ist.
+
+   In einem eigenen Bereich gibt es nichts davon: dort ist alles frei und
+   alles bearbeitbar, genau wie vor 2.3.0. */
+function istGefuehrt(b) { return !!(b && b.gefuehrt); }
+/* Die Menge der freigeschalteten Karten-Nummern - oder null, wenn der Bereich
+   gar nicht gefuehrt ist und die Frage sich nicht stellt. null statt "alle"
+   spart bei 500 Karten das Aufbauen einer Menge, die ohnehin jeden Test
+   bestehen wuerde; jede Abfrage lautet deshalb (frei === null || frei.has(id)). */
+function freieIdsFor(b) {
+  if (!istGefuehrt(b)) return null;
+  const frei = new Set();
+  for (const s of (b.sets || [])) {
+    if (s.art !== "lektion" || s.gesperrt) continue;
+    for (const id of s.cardIds) frei.add(id);
+  }
+  return frei;
+}
+function karteFrei(c, bereich) {
+  const frei = freieIdsFor(bereich || currentBereich());
+  return frei === null || frei.has(c.id);
+}
+function lektionenVon(b) { return (b.sets || []).filter(s => s.art === "lektion"); }
+/* Darf in diesem Bereich an den Karten selbst etwas geaendert werden? */
+function kartenBearbeitbar(b) { return !istGefuehrt(b || currentBereich()); }
+/* Darf diese Speicherkarte umbenannt, geloescht oder umsortiert werden?
+   In einem gefuehrten Satz gehoeren Kategorien und Lektionen dem Autor;
+   eigene Speicherkarten legt sich jede:r selbst an und darf sie auch wieder
+   wegwerfen. */
+function setBearbeitbar(s, b) { return !istGefuehrt(b || currentBereich()) || s.art === "eigen"; }
+async function hinweisGefuehrt(was) {
+  await dlgAlert(was + ' geht in „' + currentBereich().name + '" nicht: Das ist ein geführter Kartensatz, ' +
+    'er soll bei allen gleich bleiben. Für eigene Karten leg dir über „+ Bereich" oben einen eigenen Bereich an.',
+    "Geführter Kartensatz");
+}
 /* Speicherkarte = benannte Merkliste. Sie speichert NUR Karten-IDs, keine Kopien
    der Karten. Dadurch bleibt jede Karte genau einmal im Bereich vorhanden:
    Änderungen am Wort oder an der Stufe wirken automatisch auch hier, und Üben
    über eine Speicherkarte verändert den Lernfortschritt genauso wenig wie der
    normale Übungsmodus. */
+/* 2.3.0: Jede Speicherkarte hat eine Art. Sie entscheidet ueber das Verhalten,
+   nicht nur ueber die Einsortierung:
+
+     kategorie - die grossen Sammelmappen (Nomen, Verben, Grammatik, ...).
+                 Immer offen, nie sperrbar. Sie geben NICHTS frei.
+     lektion   - eine Einheit des Buchs bzw. ein Video der Playlist. Nur sie
+                 laesst sich sperren, und nur sie gibt Karten frei.
+     eigen     - selbst zusammengestellt, z.B. "schwierige Woerter". Genau
+                 dafuer waren die Speicherkarten urspruenglich gedacht.
+
+   Datenstaende vor 2.3.0 kennen das Feld nicht; sie gelten deshalb als
+   "eigen" und verhalten sich damit exakt wie bisher. */
+const SET_ARTEN = ["kategorie", "lektion", "eigen"];
+const SET_ART_ZEICHEN = { kategorie: "\u{1F4DA}", lektion: "\u{1F4D6}", eigen: "\u2B50" };
+const SET_ART_TITEL = { kategorie: "Kategorien", lektion: "Lektionen", eigen: "Eigene" };
+const SET_ART_ERKLAERUNG = {
+  kategorie: "Sammelmappen quer durch den Stoff. Sie sind immer offen und schalten selbst nichts frei.",
+  lektion: "Eine Einheit des Buchs bzw. ein Video. Nur Lektionen lassen sich sperren – und nur sie geben Karten frei.",
+  eigen: "Selbst zusammengestellt, zum gezielten Üben. Aufnehmen lassen sich nur freigeschaltete Karten."
+};
 function normSet(s) {
+  const art = SET_ARTEN.indexOf(s.art) !== -1 ? s.art : "eigen";
   return {
     id: typeof s.id === "string" && s.id ? s.id : genId(),
     name: typeof s.name === "string" && s.name ? s.name.slice(0, 40) : "Speicherkarte",
+    art: art,
+    /* Das Schloss haengt ausschliesslich an Lektionen. Stuende es auch an
+       einer Kategorie, waere die Freigabe-Regel nicht mehr eindeutig. */
+    gesperrt: art === "lektion" && s.gesperrt === true,
+    quelleId: typeof s.quelleId === "string" && s.quelleId ? s.quelleId : null,
     cardIds: (Array.isArray(s.cardIds) ? s.cardIds : []).filter(x => typeof x === "string" && x)
   };
 }
@@ -588,6 +692,9 @@ function normBereiche(arr) {
       out.push({
         id: typeof b.id === "string" && b.id ? b.id : genId(),
         name: b.name.slice(0, 40),
+        gefuehrt: b.gefuehrt === true,
+        satzId: typeof b.satzId === "string" && b.satzId ? b.satzId : null,
+        satzVersion: Number.isInteger(b.satzVersion) && b.satzVersion > 0 ? b.satzVersion : 0,
         karten: (Array.isArray(b.karten) ? b.karten : [])
           .filter(c => c && typeof c === "object" && c.wort != null && c.uebersetzung != null)
           .map(normCard),
@@ -615,7 +722,20 @@ function kartenFelder(c, order) {
     stufe: c.stufe, nextReview: c.nextReview,
     ersteBewertung: c.ersteBewertung === undefined ? null : c.ersteBewertung,
     rueckfaelle: c.rueckfaelle || 0,
+    quelleId: c.quelleId || null,
     order: order
+  };
+}
+/* Eine Speicherkarte in der Form, wie sie in der Cloud steht. Wie bei den
+   Karten steht die Feldliste nur an dieser einen Stelle, damit gezielte
+   Patches und das Vollschreiben nicht auseinanderlaufen koennen. */
+function setFelder(st, order) {
+  return {
+    name: st.name, order: order,
+    art: st.art || "eigen",
+    gesperrt: !!st.gesperrt,
+    quelleId: st.quelleId || null,
+    cardIds: st.cardIds
   };
 }
 function bereichFelder(b, order) {
@@ -623,9 +743,15 @@ function bereichFelder(b, order) {
   b.karten.forEach((c, ci) => { kartenMap[c.id] = kartenFelder(c, ci); });
   const setsMap = {};
   (Array.isArray(b.sets) ? b.sets : []).forEach((st, si) => {
-    setsMap[st.id] = { name: st.name, order: si, cardIds: st.cardIds };
+    setsMap[st.id] = setFelder(st, si);
   });
-  return { name: b.name, order: order, karten: kartenMap, sets: setsMap };
+  return {
+    name: b.name, order: order,
+    gefuehrt: !!b.gefuehrt,
+    satzId: b.satzId || null,
+    satzVersion: b.satzVersion || 0,
+    karten: kartenMap, sets: setsMap
+  };
 }
 function bereicheMapToArray(mapObj) {
   const ids = Object.keys(mapObj || {});
@@ -634,14 +760,14 @@ function bereicheMapToArray(mapObj) {
     const kartenMap = b.karten && typeof b.karten === "object" ? b.karten : {};
     const karten = Object.keys(kartenMap).map(cid => {
       const c = kartenMap[cid] || {};
-      return { card: normCard({ id: cid, wort: c.wort, uebersetzung: c.uebersetzung, extra: c.extra, stufe: c.stufe, nextReview: c.nextReview, ersteBewertung: c.ersteBewertung, rueckfaelle: c.rueckfaelle }), order: Number.isFinite(c.order) ? c.order : 0 };
+      return { card: normCard({ id: cid, wort: c.wort, uebersetzung: c.uebersetzung, extra: c.extra, stufe: c.stufe, nextReview: c.nextReview, ersteBewertung: c.ersteBewertung, rueckfaelle: c.rueckfaelle, quelleId: c.quelleId }), order: Number.isFinite(c.order) ? c.order : 0 };
     }).sort((x, y) => x.order - y.order).map(x => x.card);
     const setsMap = b.sets && typeof b.sets === "object" ? b.sets : {};
     const sets = Object.keys(setsMap).map(sid => {
       const s = setsMap[sid] || {};
-      return { set: normSet({ id: sid, name: s.name, cardIds: s.cardIds }), order: Number.isFinite(s.order) ? s.order : 0 };
+      return { set: normSet({ id: sid, name: s.name, art: s.art, gesperrt: s.gesperrt, quelleId: s.quelleId, cardIds: s.cardIds }), order: Number.isFinite(s.order) ? s.order : 0 };
     }).sort((x, y) => x.order - y.order).map(x => x.set);
-    return { id: id, name: typeof b.name === "string" && b.name ? b.name.slice(0, 40) : "Vokabeln", karten: karten, sets: sets, order: Number.isFinite(b.order) ? b.order : 0 };
+    return { id: id, name: typeof b.name === "string" && b.name ? b.name.slice(0, 40) : "Vokabeln", gefuehrt: b.gefuehrt === true, satzId: typeof b.satzId === "string" && b.satzId ? b.satzId : null, satzVersion: Number.isInteger(b.satzVersion) ? b.satzVersion : 0, karten: karten, sets: sets, order: Number.isFinite(b.order) ? b.order : 0 };
   }).sort((x, y) => x.order - y.order).map(({ order, ...rest }) => rest);
   return list.length ? list : [{ id: genId(), name: "Vokabeln", karten: [], sets: [] }];
 }
@@ -653,10 +779,13 @@ function normStreak(s) {
     lastEvaluatedDate: /^\d{4}-\d{2}-\d{2}$/.test(s.lastEvaluatedDate) ? s.lastEvaluatedDate : null
   };
 }
-/* B3: Einstellungen liegen im selben Nutzerdokument. Aktuell nur das Tageslimit
-   fuer neue Karten - der Standard 20 ist derselbe wie bei Anki. */
-const NEU_PRO_TAG_STANDARD = 20;
-const NEU_PRO_TAG_MAX = 500;
+/* Einstellungen liegen im selben Nutzerdokument.
+
+   2.3.0: Das Tageslimit fuer neue Karten ist entfallen. Es war die Notbremse
+   gegen 500 faellige Karten am ersten Tag nach einem grossen Import. Diese
+   Aufgabe uebernimmt jetzt das Schloss an den Lektionen - und zwar besser,
+   weil es am Stoff haengt statt an einer Zahl, die niemand einstellen will.
+   Ein alter Wert im Konto wird beim naechsten Speichern still verworfen. */
 /* E7 (1.8.0): drei feste Stufen statt eines Zahlenfeldes. Fatha, Kasra und
    Sukuun sind bei 1,7 rem auf dem Handy kaum auseinanderzuhalten - und genau
    die entscheiden, ob richtig gelesen wird. */
@@ -670,14 +799,12 @@ function arabFaktor() {
   return st ? st.faktor : 1;
 }
 function normSettings(s) {
-  const n = s && Number.isInteger(s.neuProTag) ? s.neuProTag : NEU_PRO_TAG_STANDARD;
   const g = s && ARAB_STUFEN.some(x => x.id === s.arabGroesse) ? s.arabGroesse : "normal";
   /* D5 (1.8.0): Datum des letzten Voll-Backups. Lag frueher in localStorage
      und war damit geraetelokal - auf einem neuen Handy hiess es immer "noch
      nie gesichert", was aussieht, als waeren die Daten weg. */
   const b = s && /^\d{4}-\d{2}-\d{2}$/.test(s.lastBackup) ? s.lastBackup : null;
   return {
-    neuProTag: Math.min(Math.max(n, 0), NEU_PRO_TAG_MAX),
     arabGroesse: g,
     lastBackup: b
   };
@@ -714,7 +841,7 @@ let bereiche = null;         // Array [{name, karten:[]}] – null solange Cloud
 let cloudDocExists = false;
 let syncError = null;
 let streak = normStreak(null); // { count, lastCompletedDate, lastEvaluatedDate } – nur echte Lernsessions zählen, Üben nicht
-let settings = normSettings(null); // { neuProTag, arabGroesse, lastBackup }
+let settings = normSettings(null); // { arabGroesse, lastBackup }
 
 let ui = {
   authMode: "login",         // "login" | "register" | "reset"
@@ -862,11 +989,14 @@ function bereicheAusSammlungen(bDocs, kDocs) {
     const setsMap = b.sets && typeof b.sets === "object" ? b.sets : {};
     const sets = Object.keys(setsMap).map(sid => {
       const st = setsMap[sid] || {};
-      return { set: normSet({ id: sid, name: st.name, cardIds: st.cardIds }), ord: Number.isFinite(st.order) ? st.order : 0 };
+      return { set: normSet({ id: sid, name: st.name, art: st.art, gesperrt: st.gesperrt, quelleId: st.quelleId, cardIds: st.cardIds }), ord: Number.isFinite(st.order) ? st.order : 0 };
     }).sort((x, y) => x.ord - y.ord).map(x => x.set);
     return {
       id: b.id,
       name: typeof b.name === "string" && b.name ? b.name.slice(0, 40) : "Vokabeln",
+      gefuehrt: b.gefuehrt === true,
+      satzId: typeof b.satzId === "string" && b.satzId ? b.satzId : null,
+      satzVersion: Number.isInteger(b.satzVersion) ? b.satzVersion : 0,
       karten: karten, sets: sets,
       order: Number.isFinite(b.order) ? b.order : 0
     };
@@ -1227,19 +1357,19 @@ function persistSettings() {
 }
 
 /* ---------- Streak: zählt nur echte, vollständig erledigte Lerntage (kein Üben) ---------- */
-/* A7: Die Streak zaehlt weiterhin fuer ALLE Bereiche gemeinsam - aber sie misst
-   ab jetzt genau das, was die App auch verlangt hat. Zwei Korrekturen:
+/* A7: Die Streak zaehlt fuer ALLE Bereiche gemeinsam und misst genau das, was
+   die App auch verlangt hat.
 
-   1. Neue, noch nie bewertete Karten zaehlen nicht als "verpasst". Sie werden vom
-      Tageslimit absichtlich zurueckgehalten; wuerden sie zaehlen, koennte nach
-      einem Import von 500 Vokabeln nie wieder eine Streak entstehen.
-   2. "Fertig" heisst: in keinem Bereich ist noch etwas offen, das heute dran
-      gewesen waere - gemessen mit derselben Funktion, die auch die Lernsession
-      fuellt (offeneKarten), nicht mit einer eigenen, strengeren Regel.
+   2.3.0: Fuer die Streak zaehlen nur noch WIEDERHOLUNGEN. Neuer Stoff ist
+   freiwillig, Wiederholungen sind die Pflicht - und ohne diese Trennung
+   koennte einen das Freischalten einer Lektion die Flamme kosten: Wer abends
+   Lektion 3 aufschliesst und sie nicht mehr durcharbeitet, haette sonst
+   plaetzlich 25 offene Karten, obwohl er alles Faellige erledigt hatte. Vor
+   2.3.0 hielt das Tageslimit neue Karten zurueck und das Problem fiel nicht
+   auf; ohne Limit faellt es sofort auf.
 
-   Wer mehrere Bereiche hat, sieht auf dem Lernen-Tab jetzt ausserdem
-   ausdruecklich, welcher Bereich noch offen ist. Vorher blieb die Streak
-   kommentarlos aus. */
+   Gesperrte Karten zaehlen nirgends mit: nicht als faellig, nicht als
+   verpasst, nicht im Fortschritt. Sie existieren fuer die Rechnung nicht. */
 function evaluateStreakForNewDay() {
   if (bereiche === null) return;
   const t = todayStr();
@@ -1247,7 +1377,10 @@ function evaluateStreakForNewDay() {
   // Gab es eine bereits eingeführte Karte, die schon VOR heute fällig war und
   // liegen geblieben ist? -> ein Tag wurde verpasst, die Streak reißt.
   // (Tage ganz ohne fällige Karten zählen nicht als verpasst.)
-  const hadOverdue = bereiche.some(b => b.karten.some(c => !istNeueKarte(c) && c.nextReview < t));
+  const hadOverdue = bereiche.some(b => {
+    const frei = freieIdsFor(b);
+    return b.karten.some(c => !istNeueKarte(c) && c.nextReview < t && (frei === null || frei.has(c.id)));
+  });
   if (hadOverdue && streak.lastCompletedDate !== t) {
     streak.count = 0;
   }
@@ -1263,38 +1396,19 @@ function checkStreakOnSessionComplete() {
   streak.lastCompletedDate = t;
   persistStreak();
 }
-/* Alle Bereiche, in denen heute noch etwas zu tun ist – Grundlage für die
-   Streak-Prüfung UND für die Anzeige „Noch offen: …" auf dem Lernen-Tab. */
-/* 2.1.0: Die Bereiche teilen sich das Tageslimit fuer neue Karten - vorher
-   fragte diese Funktion jeden Bereich einzeln, und jeder rechnete mit dem
-   VOLLEN Restbudget, weil keiner von den anderen weiss. Bei Limit 10 und drei
-   Bereichen voller neuer Karten stand in der Zeile "noch offen" 30, obwohl
-   heute 10 eingefuehrt werden. Kaputt ging dadurch nichts (nach 10 gelernten
-   Karten sprang die Anzeige von selbst auf 0), die Zahl versprach nur zu viel.
-
-   Jetzt wird das Budget der Reihe nach verteilt. Der offene Bereich kommt
-   zuerst dran, denn er ist der, in dem als naechstes gelernt wird - sonst
-   koennte die Zeile ihm 0 neue zuweisen, waehrend der Knopf "Session starten"
-   daneben noch welche anbietet. */
+/* Alle Bereiche, in denen heute noch eine WIEDERHOLUNG offen ist – Grundlage
+   für die Streak-Prüfung UND für die Anzeige „Noch offen: …" auf dem
+   Lernen-Tab. Neue Karten stehen hier bewusst nicht drin (siehe oben). */
 function bereicheMitOffenem() {
   if (bereiche === null) return [];
   const t = todayStr();
-  let budget = freieNeuPlaetze();
-  const offenerId = currentBereich().id;
-  const reihenfolge = bereiche.slice().sort((a, b) =>
-    (a.id === offenerId ? 0 : 1) - (b.id === offenerId ? 0 : 1));
-  const ergebnis = new Map();
-  for (const b of reihenfolge) {
-    const wiederholungen = b.karten.filter(c => !istNeueKarte(c) && c.nextReview <= t).length;
-    const neue = b.karten.filter(c => istNeueKarte(c) && c.nextReview <= t).length;
-    const nimm = Math.min(neue, budget);
-    budget -= nimm;
-    ergebnis.set(b.id, wiederholungen + nimm);
-  }
-  /* In der Reihenfolge der Bereiche ausgeben, nicht in der Verteilreihenfolge -
-     die Zeile soll aussehen wie die Bereichsleiste oben. */
   return bereiche
-    .map(b => ({ bereich: b, offen: ergebnis.get(b.id) || 0 }))
+    .map(b => {
+      const frei = freieIdsFor(b);
+      const offen = b.karten.filter(c =>
+        !istNeueKarte(c) && c.nextReview <= t && (frei === null || frei.has(c.id))).length;
+      return { bereich: b, offen: offen };
+    })
     .filter(x => x.offen > 0);
 }
 
@@ -1408,56 +1522,43 @@ function setCards(set) {
   const ids = new Set(set.cardIds);
   return currentCards().filter(c => ids.has(c.id));
 }
-/* ---------- B3: Tageslimit für neue Karten ----------
-   Wer 500 Vokabeln importiert, hat sonst am ersten Tag 500 faellige Karten,
-   am naechsten Tag wieder 500 auf Stufe 1, dazu die des Vortags. Nach zwei
+/* ---------- Was ist heute fällig? ----------
+   Wer 500 Vokabeln auf einmal bekommt, hat ohne Bremse am ersten Tag 500
+   faellige Karten, am naechsten wieder 500 auf Stufe 1 dazu - nach zwei
    Wochen sind es Tausende und die App wird nie wieder geoeffnet. Das ist der
    haeufigste Grund, warum Karteikarten-Apps aufgegeben werden.
 
-   Deshalb: Wiederholungen kommen IMMER dran (sie sind bereits Arbeit von
-   gestern), neue Karten nur, solange heute noch Plaetze frei sind. Gezaehlt
-   wird ueber alle Bereiche hinweg, damit drei Bereiche nicht dreimal das Limit
-   ergeben. Die Zaehlung steckt in den Karten selbst (ersteBewertung == heute)
-   und nicht in einem eigenen Zaehler - so stimmt sie auch dann noch, wenn
-   zwischendurch auf einem zweiten Geraet gelernt wurde. */
-function neueKartenHeute() {
-  if (bereiche === null) return 0;
-  const t = todayStr();
-  let n = 0;
-  for (const b of bereiche) for (const c of b.karten) if (c.ersteBewertung === t) n++;
-  return n;
-}
-function freieNeuPlaetze() {
-  return Math.max(0, settings.neuProTag - neueKartenHeute());
-}
+   Bis 2.2.0 war die Bremse ein Tageslimit fuer neue Karten. Seit 2.3.0 ist es
+   das Schloss: In einem gefuehrten Satz existieren nur die Karten der
+   freigeschalteten Lektionen, alles andere ist gar nicht erst faellig. Das
+   bremst am Stoff statt an einer Zahl - und man sieht, WARUM heute nicht mehr
+   kommt, statt nur dass etwas fehlt.
+
+   In einem eigenen Bereich gibt es keine Bremse mehr. Dort entscheidet, wie
+   viele Karten man selbst anlegt. */
 function dueCardsFor(bereich) {
   const b = bereich || currentBereich();
   const t = todayStr();
-  const wiederholungen = b.karten.filter(c => !istNeueKarte(c) && c.nextReview <= t);
-  const neue = b.karten.filter(c => istNeueKarte(c) && c.nextReview <= t);
-  return wiederholungen.concat(neue.slice(0, freieNeuPlaetze()));
+  const frei = freieIdsFor(b);
+  const dran = b.karten.filter(c => c.nextReview <= t && (frei === null || frei.has(c.id)));
+  /* Wiederholungen zuerst: sie sind Arbeit von gestern und verfallen, neuer
+     Stoff kann warten. */
+  return dran.filter(c => !istNeueKarte(c)).concat(dran.filter(istNeueKarte));
 }
 function dueCards() { return dueCardsFor(currentBereich()); }
-/* Wie viele neue Karten warten heute noch hinter dem Limit? (nur zur Anzeige) */
-function zurueckgehalteneNeue(bereich) {
+/* Wie viele Karten warten in diesem Bereich noch hinter einem Schloss?
+   (nur zur Anzeige auf dem Lernen-Tab) */
+function gesperrteKarten(bereich) {
   const b = bereich || currentBereich();
-  const t = todayStr();
-  const neue = b.karten.filter(c => istNeueKarte(c) && c.nextReview <= t).length;
-  return Math.max(0, neue - freieNeuPlaetze());
+  const frei = freieIdsFor(b);
+  if (frei === null) return 0;
+  return b.karten.filter(c => !frei.has(c.id)).length;
 }
 /* E7 (1.8.0) */
 function setArabGroesse(id) {
   if (!ARAB_STUFEN.some(x => x.id === id)) return;
   if (id === settings.arabGroesse) return;
   settings.arabGroesse = id;
-  persistSettings();
-  render();
-}
-function setNeuProTag(n) {
-  if (!Number.isInteger(n)) return;
-  const v = Math.min(Math.max(n, 0), NEU_PRO_TAG_MAX);
-  if (v === settings.neuProTag) return;
-  settings.neuProTag = v;
   persistSettings();
   render();
 }
@@ -1469,11 +1570,19 @@ function setNeuProTag(n) {
    der A4 (Vollueberschreiben) noch offen ist. Was sich nicht ableiten laesst,
    steht deshalb hier auch nicht. */
 
-/* Welche Karten zaehlen: alle Bereiche zusammen oder nur der offene? */
+/* Welche Karten zaehlen: alle Bereiche zusammen oder nur der offene?
+   2.3.0: Gesperrte Karten bleiben draussen. Sonst stuenden bei einem frisch
+   eingespielten Satz 500 Karten in der Gruppe "neu" und der Fortschritt saehe
+   aus, als haette man nichts geschafft - obwohl die erste Lektion sitzt. */
 function statsCards() {
   if (bereiche === null) return [];
-  if (ui.statsScope === "bereich") return currentCards().slice();
-  return bereiche.reduce((alle, b) => alle.concat(b.karten), []);
+  const quelle = ui.statsScope === "bereich" ? [currentBereich()] : bereiche;
+  const out = [];
+  for (const b of quelle) {
+    const frei = freieIdsFor(b);
+    for (const c of b.karten) if (frei === null || frei.has(c.id)) out.push(c);
+  }
+  return out;
 }
 
 /* Die vier Gruppen der Stufenverteilung. Die Grenzen folgen den Intervallen:
@@ -1527,7 +1636,11 @@ function verbrannteKarten() {
   const quelle = ui.statsScope === "bereich" ? [currentBereich()] : bereiche;
   const out = [];
   for (const b of quelle) {
-    for (const c of b.karten) if (istVerbrannt(c)) out.push({ card: c, bereich: b });
+    const frei = freieIdsFor(b);
+    for (const c of b.karten) {
+      if (frei !== null && !frei.has(c.id)) continue;   // gesperrt = zaehlt nirgends
+      if (istVerbrannt(c)) out.push({ card: c, bereich: b });
+    }
   }
   return out.sort((x, y) => y.card.rueckfaelle - x.card.rueckfaelle);
 }
@@ -1578,22 +1691,30 @@ function daysSinceLastBackup() {
   const now = new Date(todayStr() + "T00:00:00");
   return Math.round((now - last) / 86400000);
 }
+function slugName(s) {
+  return String(s).toLowerCase().replace(/[^a-z0-9äöüß]+/g, "-").replace(/(^-|-$)/g, "");
+}
+/* Datei herunterladen. Steht fuer sich, weil es drei Knoepfe gibt, die
+   dasselbe tun und sich nur im Inhalt unterscheiden. */
+function dateiSpeichern(daten, dateiname) {
+  const blob = new Blob([JSON.stringify(daten, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = dateiname;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
 function exportBackup(onlyCurrent) {
   const data = {
     exportedAt: new Date().toISOString(),
     profil: displayName,
     bereiche: onlyCurrent ? [currentBereich()] : bereiche
   };
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  const nameSlug = onlyCurrent ? "-" + currentBereich().name.toLowerCase().replace(/[^a-z0-9äöüß]+/g, "-").replace(/(^-|-$)/g, "") : "";
-  a.download = "lernkarten-backup" + nameSlug + "-" + todayStr() + ".json";
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+  const nameSlug = onlyCurrent ? "-" + slugName(currentBereich().name) : "";
+  dateiSpeichern(data, "lernkarten-backup" + nameSlug + "-" + todayStr() + ".json");
   if (!onlyCurrent) {
     /* Nur das Voll-Backup zaehlt - ein Export eines einzelnen Bereichs
        sichert eben nicht alles. */
@@ -1603,6 +1724,86 @@ function exportBackup(onlyCurrent) {
   }
   render();
 }
+/* ---------- 2.3.0: Backup zum Weitergeben ----------
+   Der Unterschied zu einem normalen Backup faellt hier, beim ERZEUGEN der
+   Datei - nicht beim Einspielen. Das ist Absicht: So gibt es keinen
+   Import-Knopf, mit dem man aus Versehen den eigenen Lernstand auf Null
+   setzen kann. Der Import liest schlicht, was in der Datei steht.
+
+   In die Datei kommt:
+     - jede Karte mit Stufe 0, ohne Erstbewertung, ohne Rueckfaelle
+       (nextReview wird weggelassen; normCard setzt beim Einspielen den
+       Tag des Imports ein, nicht meinen Tag hier)
+     - die Speicherkarten mit ihrer Art
+     - alle Lektionen gesperrt, ausser der ersten
+     - die Markierung "gefuehrt" - daran haengt der Schreibschutz
+     - Kennung und laufende Nummer des Satzes, sowie eine Herkunfts-Nummer
+       an jeder Karte und jeder Speicherkarte
+
+   Die letzten beiden Punkte tun heute noch nichts. Sie muessen trotzdem
+   schon in der allerersten Datei stehen, denn Dateien, die einmal draussen
+   sind, lassen sich nicht nachruesten - und ohne sie kann ein spaeteres
+   Update den vorhandenen Satz nicht wiedererkennen und legt stattdessen
+   einen zweiten Bereich mit allem doppelt an. */
+async function exportWeitergabe() {
+  const b = currentBereich();
+  if (istGefuehrt(b)) {
+    await dlgAlert('„' + b.name + '" ist selbst ein geführter Satz. Weitergeben kann ihn nur, wer ihn zusammengestellt hat.',
+      "Nicht möglich");
+    return;
+  }
+  const lektionen = lektionenVon(b);
+  if (lektionen.length === 0) {
+    await dlgAlert('In „' + b.name + '" gibt es noch keine Speicherkarte der Art „Lektion". ' +
+      'Ohne Lektionen gäbe es nichts zum Freischalten – wer den Satz einspielt, hätte gar keine Karte zum Lernen.\n\n' +
+      'Leg im Verwalten-Tab unter „⭐ Speicherkarten" mindestens eine Lektion an.', "Noch keine Lektionen");
+    return;
+  }
+  const ohneLektion = b.karten.filter(c => !lektionen.some(s => s.cardIds.indexOf(c.id) !== -1)).length;
+  const version = (b.satzVersion || 0) + 1;
+  const ok = await dlgConfirm(
+    b.karten.length + ' Karten, ' + lektionen.length + ' Lektionen. Nur „' + lektionen[0].name + '" ist offen, der Rest kommt gesperrt an.' +
+    (ohneLektion > 0 ? '\n\nAchtung: ' + ohneLektion + ' Karte(n) liegen in keiner Lektion. Die bleiben beim Empfänger für immer gesperrt.' : '') +
+    '\n\nDas wird Veröffentlichung Nr. ' + version + '.',
+    { title: "Backup zum Weitergeben", okLabel: "Datei erzeugen" });
+  if (!ok) return;
+
+  /* Die Kennung entsteht beim ersten Mal und bleibt danach. Sie ist das
+     einzige, woran ein Update spaeter den Satz wiedererkennt. */
+  if (!b.satzId) b.satzId = slugName(b.name) + "-" + genId();
+  b.satzVersion = version;
+  patchDoc({ [pfadBereich(b.id) + ".satzId"]: b.satzId, [pfadBereich(b.id) + ".satzVersion"]: version });
+
+  const karten = b.karten.map(c => ({
+    id: c.id,
+    quelleId: c.quelleId || c.id,
+    wort: c.wort,
+    uebersetzung: c.uebersetzung,
+    extra: c.extra,
+    stufe: 0
+  }));
+  const sets = (b.sets || []).map(s => ({
+    id: s.id,
+    quelleId: s.quelleId || s.id,
+    name: s.name,
+    art: s.art,
+    gesperrt: s.art === "lektion" && s.id !== lektionen[0].id,
+    cardIds: s.cardIds.slice()
+  }));
+  dateiSpeichern({
+    exportedAt: new Date().toISOString(),
+    profil: displayName,
+    weitergabe: true,
+    satz: { id: b.satzId, version: version, name: b.name },
+    bereiche: [{
+      id: b.id, name: b.name,
+      gefuehrt: true, satzId: b.satzId, satzVersion: version,
+      karten: karten, sets: sets
+    }]
+  }, "kartensatz-" + slugName(b.name) + "-v" + version + ".json");
+  render();
+}
+
 function importBackupFile(file) {
   if (!file) return;
   const reader = new FileReader();
@@ -1647,7 +1848,16 @@ function importBackupFile(file) {
         st.id = frisch();
         st.cardIds = st.cardIds.map(x => nummernTausch.get(x)).filter(Boolean);
       });
-      const neu = { id: genId(), name: name, karten: b.karten, sets: b.sets || [] };
+      const neu = {
+        id: genId(), name: name,
+        /* 2.3.0: Schreibschutz, Kennung und Nummer kommen aus der Datei. Ein
+           normales Backup hat sie nicht - dann entsteht wie bisher ein ganz
+           gewoehnlicher, frei bearbeitbarer Bereich. */
+        gefuehrt: b.gefuehrt === true,
+        satzId: b.satzId || null,
+        satzVersion: b.satzVersion || 0,
+        karten: b.karten, sets: b.sets || []
+      };
       bereiche.push(neu);
       patch[pfadBereich(neu.id)] = bereichFelder(neu, bereiche.length - 1);
     }
@@ -1728,6 +1938,7 @@ async function deleteBereich() {
 async function reverseOrder() {
   const cards = currentCards();
   if (cards.length < 2) return;
+  if (!kartenBearbeitbar()) { await hinweisGefuehrt("Die Reihenfolge ändern"); return; }
   const ok = await dlgConfirm('Die Reihenfolge aller ' + cards.length + ' Karten in „' +
     currentBereich().name + '" wird einmalig umgekehrt.',
     { title: "Reihenfolge umkehren?", okLabel: "Umkehren" });
@@ -1764,6 +1975,7 @@ function toggleCardSelected(id) {
 async function deleteSelectedCards() {
   const n = ui.selectedIds.size;
   if (n === 0) return;
+  if (!kartenBearbeitbar()) { await hinweisGefuehrt("Karten löschen"); return; }
   const ok = await dlgConfirm(n + " Karte(n) werden endgültig gelöscht. Das lässt sich nicht rückgängig machen.",
     { title: "Karten löschen?", okLabel: "Endgültig löschen", danger: true });
   if (!ok) return;
@@ -1795,6 +2007,10 @@ function moveSelectedCardsTo(targetId) {
   const quelle = currentBereich();
   const target = bereiche.find(b => b.id === targetId);
   if (!target || target === quelle) return;
+  /* In beide Richtungen gesperrt: aus einem gefuehrten Satz darf nichts
+     verschwinden, und hinein darf nichts, was der Autor nicht kennt. */
+  if (istGefuehrt(quelle)) { hinweisGefuehrt("Karten verschieben"); return; }
+  if (istGefuehrt(target)) { dlgAlert('„' + target.name + '" ist ein geführter Kartensatz – da lässt sich nichts hineinschieben.', "Nicht möglich"); return; }
   const cards = quelle.karten;
   const moved = [];
   for (let i = cards.length - 1; i >= 0; i--) {
@@ -1840,8 +2056,18 @@ function purgeFromSets(ids) {
   return geaendert;
 }
 async function saveSelectedToSet(targetId) {
-  const ids = [...ui.selectedIds];
-  if (ids.length === 0) return;
+  const b0 = currentBereich();
+  const frei = freieIdsFor(b0);
+  /* In einem gefuehrten Satz laesst sich nur ablegen, was freigeschaltet ist.
+     Sonst koennte man sich ueber die Kategorien den ganzen Stoff nach vorn
+     holen, statt bei der ersten Lektion anzufangen - und genau davor soll das
+     Schloss schuetzen. */
+  const ids = [...ui.selectedIds].filter(id => frei === null || frei.has(id));
+  if (ids.length === 0) {
+    if (ui.selectedIds.size > 0) await dlgAlert("Von der Auswahl ist keine Karte freigeschaltet. Gesperrte Karten lassen sich nicht ablegen.", "Nichts zum Ablegen");
+    return;
+  }
+  const uebersprungen = ui.selectedIds.size - ids.length;
   let set, neu = false;
   if (targetId === "__new__") {
     const name = await dlgPrompt("Wie soll die neue Speicherkarte heißen?", "Schwierige Wörter",
@@ -1852,12 +2078,13 @@ async function saveSelectedToSet(targetId) {
       await dlgAlert('Eine Speicherkarte namens „' + n + '" existiert schon.', "Name schon vergeben");
       return;
     }
-    set = { id: genId(), name: n, cardIds: [] };
+    set = { id: genId(), name: n, art: "eigen", gesperrt: false, quelleId: null, cardIds: [] };
     currentSets().push(set);
     neu = true;
   } else {
     set = findSet(targetId);
     if (!set) return;
+    if (!setBearbeitbar(set)) { await hinweisGefuehrt("In diese Speicherkarte etwas ablegen"); return; }
   }
   const known = new Set(set.cardIds);
   ids.forEach(id => { if (!known.has(id)) set.cardIds.push(id); });
@@ -1866,13 +2093,55 @@ async function saveSelectedToSet(targetId) {
   ui.openSetId = set.id;
   const b = currentBereich();
   patchDoc(neu
-    ? { [pfadSet(b.id, set.id)]: { name: set.name, order: currentSets().length - 1, cardIds: set.cardIds } }
+    ? { [pfadSet(b.id, set.id)]: setFelder(set, currentSets().length - 1) }
     : { [pfadSet(b.id, set.id) + ".cardIds"]: set.cardIds });
+  render();
+  if (uebersprungen > 0) {
+    dlgAlert(uebersprungen + " gesperrte Karte(n) aus der Auswahl wurden übersprungen.", "Teilweise abgelegt");
+  }
+}
+/* 2.3.0: Die Art einer Speicherkarte umstellen. Nur im eigenen Bereich -
+   in einem gefuehrten Satz gibt der Autor sie vor. */
+function setArtAendern(id, art) {
+  const set = findSet(id);
+  if (!set || SET_ARTEN.indexOf(art) === -1) return;
+  if (!setBearbeitbar(set)) { hinweisGefuehrt("Die Art ändern"); return; }
+  if (set.art === art) return;
+  set.art = art;
+  /* Wer eine Lektion zur Kategorie macht, macht sie damit auch auf: das
+     Schloss gibt es nur an Lektionen, ein zurueckbleibendes gesperrt=true
+     wuerde die Karten sonst unsichtbar festhalten. */
+  if (art !== "lektion") set.gesperrt = false;
+  patchDoc({
+    [pfadSet(currentBereich().id, set.id) + ".art"]: art,
+    [pfadSet(currentBereich().id, set.id) + ".gesperrt"]: !!set.gesperrt
+  });
+  render();
+}
+/* Schloss auf und wieder zu. Beides geht jederzeit: Wer merkt, dass eine
+   Lektion noch zu frueh kommt, macht sie wieder zu. Die Stufen der schon
+   gelernten Karten bleiben dabei stehen - sie kommen nur nicht mehr dran und
+   sind beim Wiederaufschliessen sofort faellig, weil ihr Datum inzwischen in
+   der Vergangenheit liegt. */
+async function toggleSetLock(id) {
+  const set = findSet(id);
+  if (!set || set.art !== "lektion") return;
+  if (set.gesperrt) {
+    const anzahl = setCards(set).length;
+    const ok = await dlgConfirm('„' + set.name + '" wird freigeschaltet. ' + anzahl +
+      ' Karte(n) kommen damit ins Lernen.', { title: "Lektion freischalten?", okLabel: "Freischalten" });
+    if (!ok) return;
+  }
+  set.gesperrt = !set.gesperrt;
+  if (set.gesperrt && ui.openSetId === set.id) ui.openSetId = null;
+  if (set.gesperrt && ui.drillSource === set.id) ui.drillSource = "stufen";
+  patchDoc({ [pfadSet(currentBereich().id, set.id) + ".gesperrt"]: set.gesperrt });
   render();
 }
 async function renameSet(id) {
   const set = findSet(id);
   if (!set) return;
+  if (!setBearbeitbar(set)) { await hinweisGefuehrt("Diese Speicherkarte umbenennen"); return; }
   const name = await dlgPrompt("Neuer Name für die Speicherkarte:", set.name,
     { title: "Speicherkarte umbenennen", okLabel: "Speichern" });
   if (!name || !name.trim()) return;
@@ -1890,6 +2159,7 @@ async function deleteSet(id) {
   const sets = currentSets();
   const idx = sets.findIndex(s => s.id === id);
   if (idx === -1) return;
+  if (!setBearbeitbar(sets[idx])) { await hinweisGefuehrt("Diese Speicherkarte löschen"); return; }
   const ok = await dlgConfirm('Die Speicherkarte „' + sets[idx].name +
     '" wird gelöscht. Die Vokabeln selbst bleiben erhalten.',
     { title: "Speicherkarte löschen?", okLabel: "Löschen", danger: true });
@@ -1903,18 +2173,28 @@ async function deleteSet(id) {
 function removeCardFromSet(setId, cardId) {
   const set = findSet(setId);
   if (!set) return;
+  if (!setBearbeitbar(set)) { hinweisGefuehrt("Karten hier herausnehmen"); return; }
   set.cardIds = set.cardIds.filter(x => x !== cardId);
   patchDoc({ [pfadSet(currentBereich().id, setId) + ".cardIds"]: set.cardIds });
   render();
 }
 function toggleSetOpen(id) {
+  const set = findSet(id);
+  if (set && set.gesperrt) return;   // zu ist zu: auch kein Reinschauen
   ui.openSetId = ui.openSetId === id ? null : id;
   render();
 }
 
 /* ---------- Übungsmodus: Stufen-Range, ändert nichts am echten Fortschritt ---------- */
+/* 2.3.0: Gesperrte Karten sind auch vom Ueben ausgenommen - "zu" heisst zu,
+   sonst waere das Schloss nur eine Empfehlung. */
+function uebbareKarten() {
+  const b = currentBereich();
+  const frei = freieIdsFor(b);
+  return b.karten.filter(c => frei === null || frei.has(c.id));
+}
 function availableStufen() {
-  const set = new Set(currentCards().map(c => c.stufe));
+  const set = new Set(uebbareKarten().map(c => c.stufe));
   return [...set].sort((a, b) => a - b);
 }
 function openDrillPicker(source) {
@@ -1924,7 +2204,7 @@ function openDrillPicker(source) {
   render();
 }
 async function startDrill(min, max, handwriting) {
-  const cards = currentCards().filter(c => c.stufe >= min && c.stufe <= max);
+  const cards = uebbareKarten().filter(c => c.stufe >= min && c.stufe <= max);
   if (cards.length === 0) {
     await dlgAlert("In diesem Stufenbereich gibt es keine Karten.", "Nichts zu üben");
     return;
@@ -1934,7 +2214,12 @@ async function startDrill(min, max, handwriting) {
 async function startDrillFromSet(setId, handwriting) {
   const set = findSet(setId);
   if (!set) return;
-  const cards = setCards(set);
+  if (set.gesperrt) {
+    await dlgAlert('„' + set.name + '" ist noch gesperrt. Schalte sie erst frei – dann kannst du sie auch üben.', "Noch gesperrt");
+    return;
+  }
+  const frei = freieIdsFor(currentBereich());
+  const cards = setCards(set).filter(c => frei === null || frei.has(c.id));
   if (cards.length === 0) {
     await dlgAlert('Die Speicherkarte „' + set.name + '" enthält keine Karten (mehr).', "Nichts zu üben");
     return;
@@ -1985,6 +2270,7 @@ function findeDuplikat(wort, exceptId, cards) {
   return (cards || currentCards()).find(c => c.id !== exceptId && vergleichsWort(c.wort) === key) || null;
 }
 async function submitCardForm() {
+  if (!kartenBearbeitbar()) { await hinweisGefuehrt("Karten anlegen oder ändern"); return; }
   const wort = val("f-wort").trim();
   const ueb = val("f-ueb").trim();
   const extra = val("f-extra").trim();
@@ -2067,6 +2353,9 @@ async function submitCardForm() {
   if (wortEl) wortEl.focus();
 }
 function editCard(id) {
+  /* hinweisGefuehrt zeichnet ueber den Dialog selbst neu - wichtig, weil der
+     Sprung aus dem Fortschritts-Tab schon den Bereich gewechselt hat. */
+  if (!kartenBearbeitbar()) { hinweisGefuehrt("Karten ändern"); return; }
   ui.editId = id;
   const c = findCard(id);
   formDraft = c ? { wort: c.wort, ueb: c.uebersetzung, extra: c.extra } : { wort: "", ueb: "", extra: "" };
@@ -2077,6 +2366,7 @@ function cancelEdit() { ui.editId = null; resetFormDraft(); render(); }
 async function deleteCard(id) {
   const card = findCard(id);
   if (!card) return;
+  if (!kartenBearbeitbar()) { await hinweisGefuehrt("Karten löschen"); return; }
   const ok = await dlgConfirm('Die Karte „' + card.wort + '" (' + card.uebersetzung + ') wird gelöscht.',
     { title: "Karte löschen?", okLabel: "Löschen", danger: true });
   if (!ok) return;
@@ -2453,9 +2743,15 @@ function renderMain() {
     (syncError ? ' <span class="sync-dot">⚠ ' + esc(syncError) + '</span>' : '') + '</div>';
   html += '<div>';
   html += '<button class="ghost" data-action="logout">Abmelden</button>';
-  html += '<button class="tiny-link" data-action="export-backup" title="Lädt alle Bereiche mit allen Karten herunter">Backup (alle Bereiche)</button>';
-  html += '<button class="tiny-link" data-action="export-backup-current" title="Lädt nur den gerade geöffneten Bereich &quot;' + esc(currentBereich().name) + '&quot; herunter">Nur „' + esc(currentBereich().name) + '" exportieren</button>';
-  html += '<button class="tiny-link" data-action="import-trigger" title="Karten aus einer Backup-Datei importieren">Import</button>';
+  /* 2.3.0: Vier Knoepfe statt drei, und alle heissen jetzt nach dem, was sie
+     tun. "Backup" und "exportieren" bezeichneten vorher dasselbe und sahen
+     nach zwei verschiedenen Funktionen aus. */
+  html += '<button class="tiny-link" data-action="export-backup" title="Lädt alle Bereiche mit allen Karten herunter">💾 Backup · alles</button>';
+  html += '<button class="tiny-link" data-action="export-backup-current" title="Lädt nur den gerade geöffneten Bereich &quot;' + esc(currentBereich().name) + '&quot; herunter">💾 Backup · nur „' + esc(currentBereich().name) + '"</button>';
+  if (!istGefuehrt(currentBereich())) {
+    html += '<button class="tiny-link" data-action="export-weitergabe" title="Erzeugt aus diesem Bereich einen Kartensatz zum Weitergeben: alles auf Stufe 0, alle Lektionen bis auf die erste gesperrt">💾 Backup · zum Weitergeben</button>';
+  }
+  html += '<button class="tiny-link" data-action="import-trigger" title="Karten aus einer Backup-Datei einspielen">📥 Import</button>';
   html += '<input type="file" id="import-file-input" accept="application/json" style="display:none">';
   html += '</div>';
   html += '</div>';
@@ -2574,15 +2870,6 @@ function renderMain() {
     }
   }
 
-  if (ui.tab === "lernen") {
-    /* B3: "change" statt "input" - sonst wuerde bei jeder getippten Ziffer
-       einmal in die Cloud geschrieben (aus "20" wird sonst kurz "2"). */
-    const limitEl = document.getElementById("f-neu-pro-tag");
-    if (limitEl) limitEl.addEventListener("change", e => {
-      const n = parseInt(e.target.value, 10);
-      setNeuProTag(Number.isInteger(n) ? n : NEU_PRO_TAG_STANDARD);
-    });
-  }
 }
 
 function renderLernen() {
@@ -2594,7 +2881,7 @@ function renderLernen() {
     html += '<p class="hint" style="margin-bottom:10px">🔥 <strong>' + streak.count + '</strong> Tag' + (streak.count === 1 ? "" : "e") + ' am Stück</p>';
   }
   const neuImStapel = due.filter(istNeueKarte).length;
-  const wartend = zurueckgehalteneNeue();
+  const zu = gesperrteKarten();
   html += '<div class="panel">';
   if (cards.length === 0) {
     html += '<p class="hint">Noch keine Karten in diesem Bereich – leg welche unter <strong>Verwalten</strong> an. 📝</p>';
@@ -2605,18 +2892,13 @@ function renderLernen() {
       (neuImStapel > 0 ? ' <span class="badge">' + neuImStapel + ' neu</span>' : '') + '</p>';
     html += '<button data-action="start-session">Lernsession starten (' + due.length + ')</button>';
   }
-  /* B3: Das Tageslimit muss sichtbar sein. Sonst wirkt es wie ein Fehler,
-     wenn nach einem Import von 500 Vokabeln nur 20 Karten auftauchen. */
-  if (wartend > 0) {
-    html += '<p class="hint" style="margin-top:12px">⏳ <strong>' + wartend + '</strong> neue Karte' + (wartend === 1 ? '' : 'n') +
-      ' warten – heute sind ' + settings.neuProTag + ' neue vorgesehen und davon schon ' + neueKartenHeute() + ' vergeben. ' +
-      'Der Rest kommt an den nächsten Tagen automatisch dazu.</p>';
+  /* 2.3.0: Was hinter einem Schloss wartet, muss sichtbar sein - sonst wirkt
+     es wie ein Fehler, wenn ein Satz mit 500 Karten nur 25 anzeigt. */
+  if (zu > 0) {
+    html += '<p class="hint" style="margin-top:12px">🔒 <strong>' + zu + '</strong> Karte' + (zu === 1 ? '' : 'n') +
+      ' liegen in Lektionen, die noch gesperrt sind. Die nächste Lektion schaltest du unter <strong>Verwalten</strong> ' +
+      'bei den Speicherkarten mit dem 🔓 frei – dann kommen ihre Karten hier dazu.</p>';
   }
-  html += '<div class="limit-row">';
-  html += '<label for="f-neu-pro-tag" style="margin:0">Neue Karten pro Tag</label>';
-  html += '<input type="number" id="f-neu-pro-tag" min="0" max="' + NEU_PRO_TAG_MAX + '" step="5" value="' + settings.neuProTag + '">';
-  html += '<span class="hint" style="padding:0">heute ' + neueKartenHeute() + ' eingeführt (gilt für alle Bereiche zusammen)</span>';
-  html += '</div>';
   /* E7: Bewusst drei feste Stufen statt eines Zahlenfeldes - es gibt nichts
      einzustellen, nur auszuprobieren, was man lesen kann. */
   html += '<div class="seg-row">';
@@ -2637,7 +2919,7 @@ function renderLernen() {
      und erfuhr nirgends, warum. Jetzt steht es hier. */
   const offen = bereicheMitOffenem().filter(x => x.bereich.id !== currentBereich().id);
   if (offen.length > 0) {
-    html += '<p class="hint" style="margin-top:-4px">📌 Noch offen für die Streak: ' +
+    html += '<p class="hint" style="margin-top:-4px">📌 Noch offene Wiederholungen für die Streak: ' +
       offen.map(x => esc(x.bereich.name) + ' (' + x.offen + ')').join(", ") +
       '</p>';
   } else if (due.length === 0 && streak.lastCompletedDate === todayStr()) {
@@ -2727,7 +3009,7 @@ function renderFortschritt() {
   const maxTag = Math.max(1, ...tage.map(x => x.anzahl));
   html += '<div class="stat-block">';
   html += '<h3>Die nächsten 7 Tage</h3>';
-  html += '<p class="stat-sub">nur Wiederholungen – neue Karten kommen über das Tageslimit dazu (heute: ' + settings.neuProTag + ')</p>';
+  html += '<p class="stat-sub">nur Wiederholungen – noch nie bewertete Karten stehen hier nicht drin</p>';
   html += '<div class="spark-reihe oben">';
   tage.forEach(x => { html += '<span>' + (x.anzahl > 0 ? x.anzahl : "") + '</span>'; });
   html += '</div>';
@@ -3096,8 +3378,24 @@ function markiere(text, tokens) {
 
 function renderVerwalten() {
   const cards = currentCards();
+  const bAkt = currentBereich();
+  const gefuehrt = istGefuehrt(bAkt);
   const editing = ui.editId ? findCard(ui.editId) : null;
-  let html = '<div class="panel">';
+  let html = "";
+  /* 2.3.0: In einem gefuehrten Satz gibt es kein Formular. Ein ausgegrautes
+     Formular waere schlechter als keins - es sieht aus, als waere etwas
+     kaputt. Stattdessen steht hier, warum das so ist und wohin man geht,
+     wenn man doch eigene Karten will. */
+  if (gefuehrt) {
+    const lekt = lektionenVon(bAkt);
+    const offen = lekt.filter(s => !s.gesperrt).length;
+    html += '<div class="satz-banner">🔒 <strong>' + esc(bAkt.name) + '</strong> ist ein geführter Kartensatz. ' +
+      'Die Karten stehen fest, damit der Stoff bei allen in derselben Reihenfolge steht und Nachschub sauber nachziehen kann. ' +
+      offen + ' von ' + lekt.length + ' Lektionen freigeschaltet – die nächste schaltest du unten bei den Speicherkarten mit dem 🔓 frei. ' +
+      'Eigene Karten kommen in einen eigenen Bereich (oben „+ Bereich").</div>';
+    return html + renderVerwaltenListe(cards, gefuehrt);
+  }
+  html += '<div class="panel">';
   html += '<h2>' + (editing ? "Karte bearbeiten" : "Neue Karte") + '</h2>';
   html += '<label for="f-wort">Wort *</label>';
   html += '<input type="text" id="f-wort" class="arabic" dir="rtl" lang="ar" value="' + esc(formDraft.wort) + '">';
@@ -3112,21 +3410,27 @@ function renderVerwalten() {
   html += '<div class="form-actions">';
   html += '<button data-action="submit-card">' + (editing ? "Änderungen speichern" : "Karte hinzufügen") + '</button>';
   if (editing) html += '<button class="secondary" data-action="cancel-edit">Abbrechen</button>';html += '</div></div>';
+  return html + renderVerwaltenListe(cards, gefuehrt);
+}
 
-  html += '<div class="panel">';
+/* Der untere Teil des Verwalten-Tabs: Werkzeugleiste, Speicherkarten,
+   Kartenliste. Steht seit 2.3.0 fuer sich, weil ein gefuehrter Satz oben kein
+   Formular hat, hier unten aber genau dasselbe zeigt. */
+function renderVerwaltenListe(cards, gefuehrt) {
+  let html = '<div class="panel">';
   html += '<div class="bereich-manage-row">';
   html += '<h2 style="margin-bottom:0">Karten in „' + esc(currentBereich().name) + '" (' + cards.length + ')</h2>';
   html += '<div>';
   if (cards.length > 0) html += '<button class="ghost" data-action="open-drill" title="Bestimmte Stufen beliebig oft üben">🔁 Üben</button>';
-  if (cards.length > 1) html += '<button class="ghost" data-action="reverse-order" title="Reihenfolge aller Karten in diesem Bereich einmalig umkehren">🔃 Umkehren</button>';
+  if (cards.length > 1 && !gefuehrt) html += '<button class="ghost" data-action="reverse-order" title="Reihenfolge aller Karten in diesem Bereich einmalig umkehren">🔃 Umkehren</button>';
   if (cards.length > 0) html += '<button class="ghost" data-action="toggle-select-mode" title="Mehrere Karten auswählen">' + (ui.selectMode ? "✕ Fertig" : "☑️ Auswählen") + '</button>';
-  html += '<button class="ghost" data-action="rename-bereich" title="Bereich umbenennen">✏️ Umbenennen</button>';
+  if (!gefuehrt) html += '<button class="ghost" data-action="rename-bereich" title="Bereich umbenennen">✏️ Umbenennen</button>';
   html += '<button class="ghost" data-action="delete-bereich" title="Bereich löschen">🗑️ Löschen</button>';
   html += '</div></div>';
 
   if (ui.drillOpen) {
     const stufen = availableStufen();
-    const sets = currentSets();
+    const sets = currentSets().filter(s => !s.gesperrt);
     const srcSet = ui.drillSource === "stufen" ? null : findSet(ui.drillSource);
     html += '<div class="drill-picker">';
     html += '<p class="hint" style="padding-top:0">Was üben? (Fortschritt bleibt dabei unverändert)</p>';
@@ -3134,11 +3438,20 @@ function renderVerwalten() {
     if (sets.length > 0) {
       html += '<select id="drill-source">';
       html += '<option value="stufen"' + (srcSet ? "" : " selected") + '>Nach Stufen</option>';
-      html += sets.map(s => '<option value="' + esc(s.id) + '"' + (srcSet && srcSet.id === s.id ? " selected" : "") + '>⭐ ' + esc(s.name) + ' (' + setCards(s).length + ')</option>').join("");
+      /* 2.3.0: Zeichen nach Art, und gezaehlt wird, was tatsaechlich uebbar
+         ist - eine Kategorie kann gesperrte Karten enthalten, die hier nicht
+         mitkommen duerfen. */
+      const freiDrill = freieIdsFor(currentBereich());
+      html += sets.map(s => {
+        const n = setCards(s).filter(c => freiDrill === null || freiDrill.has(c.id)).length;
+        return '<option value="' + esc(s.id) + '"' + (srcSet && srcSet.id === s.id ? " selected" : "") +
+          '>' + SET_ART_ZEICHEN[s.art || "eigen"] + ' ' + esc(s.name) + ' (' + n + ')</option>';
+      }).join("");
       html += '</select>';
     }
     if (srcSet) {
-      html += '<span class="hint" style="padding:0">' + setCards(srcSet).length + ' Karte(n)</span>';
+      const freiDrill2 = freieIdsFor(currentBereich());
+      html += '<span class="hint" style="padding:0">' + setCards(srcSet).filter(c => freiDrill2 === null || freiDrill2.has(c.id)).length + ' Karte(n)</span>';
     } else {
       html += 'von <select id="drill-min">' + stufen.map(s => '<option value="' + s + '">' + s + '</option>').join("") + '</select>';
       html += 'bis <select id="drill-max">' + stufen.map(s => '<option value="' + s + '"' + (s === stufen[stufen.length - 1] ? " selected" : "") + '>' + s + '</option>').join("") + '</select>';
@@ -3156,14 +3469,14 @@ function renderVerwalten() {
   if (ui.selectMode && ui.selectedIds.size > 0) {
     html += '<div class="select-actionbar">';
     html += '<strong>' + ui.selectedIds.size + '</strong> ausgewählt &nbsp;';
-    html += '<button class="ghost" data-action="delete-selected">🗑️ Löschen</button>';
-    if (bereiche.length > 1) {
+    if (kartenBearbeitbar()) html += '<button class="ghost" data-action="delete-selected">🗑️ Löschen</button>';
+    if (bereiche.length > 1 && kartenBearbeitbar()) {
       html += '<select id="move-target-select">' +
         bereiche.filter(b => b.id !== ui.bereichId).map(b => '<option value="' + esc(b.id) + '">' + esc(b.name) + '</option>').join("") +
         '</select>';
       html += '<button class="ghost" data-action="move-selected">↪ Verschieben</button>';
     }
-    const sets = currentSets();
+    const sets = currentSets().filter(s => setBearbeitbar(s));
     if (sets.length > 0) {
       html += '<select id="save-set-select">';
       html += '<option value="__new__">＋ Neue Speicherkarte</option>';
@@ -3257,7 +3570,10 @@ function kartenListeInhalt() {
       shownCards.length + (shownCards.length === 1 ? ' Karte' : ' Karten') + '</p>';
   }
 
-  const draggable = tokens.length === 0 && !ui.selectMode;
+  const bAkt = currentBereich();
+  const freiIds = freieIdsFor(bAkt);
+  const bearbeitbar = kartenBearbeitbar(bAkt);
+  const draggable = tokens.length === 0 && !ui.selectMode && bearbeitbar;
   /* C2: Seiten erst ab SEITEN_SCHWELLE. Darunter ist shownCards die ganze
      Liste und es erscheint keine Seitenleiste. */
   const seiten = shownCards.length > SEITEN_SCHWELLE ? Math.ceil(shownCards.length / SEITE_GROESSE) : 1;
@@ -3271,19 +3587,28 @@ function kartenListeInhalt() {
      Ziehen ist ohnehin nur ohne Suche moeglich, deshalb entspricht der
      Ausschnitt dann genau currentCards().slice(start, ...). */
   listenFenster = { start: start, anzahl: seitenKarten.length };
+  if (!bearbeitbar && tokens.length === 0) html += '<p class="hint" style="margin-bottom:10px">🔒 Geführter Kartensatz – die Karten und ihre Reihenfolge stehen fest. Hervorgehoben ist, was freigeschaltet ist.</p>';
   if (draggable) html += '<p class="hint" style="margin-bottom:10px">↕ Ziehe eine Karte am ⠿-Griff, um die Reihenfolge zu ändern.' +
     (seiten > 1 ? ' Verschieben über die Seitengrenze hinaus geht nicht – dafür „↪ Verschieben" im Auswahlmodus.' : '') + '</p>';
   if (seiten > 1) html += seitenLeiste(ui.kartenSeite, seiten, shownCards.length);
   for (let i = 0; i < seitenKarten.length; i++) {
     const c = seitenKarten[i];
     const fremd = fremdeBereiche.get(c.id) || null;
-    if (ui.selectMode && !fremd) {
+    /* Bei Treffern aus einem anderen Bereich gilt dessen Freigabe, nicht die
+       des offenen - sonst stuende eine fremde Karte faelschlich als gesperrt
+       da. */
+    const freiHier = fremd ? freieIdsFor(fremd) : freiIds;
+    const kartenZu = freiHier !== null && !freiHier.has(c.id);
+    const hervor = freiHier !== null && !kartenZu;
+    const zeilenKlasse = "card-row" + (kartenZu ? " card-locked" : "") + (hervor ? " card-frei" : "");
+    if (ui.selectMode && !fremd && !kartenZu) {
       const checked = ui.selectedIds.has(c.id);
-      html += '<div class="card-row" data-action="toggle-card-select" data-id="' + esc(c.id) + '" style="cursor:pointer">';
+      html += '<div class="' + zeilenKlasse + '" data-action="toggle-card-select" data-id="' + esc(c.id) + '" style="cursor:pointer">';
       html += '<input type="checkbox" style="pointer-events:none" ' + (checked ? "checked" : "") + '>';
     } else {
-      html += '<div class="card-row"' + (draggable ? ' data-cardid="' + esc(c.id) + '"' : '') + '>';
+      html += '<div class="' + zeilenKlasse + '"' + (draggable ? ' data-cardid="' + esc(c.id) + '"' : '') + '>';
       if (draggable) html += '<span class="drag-handle" title="Ziehen zum Sortieren" aria-hidden="true">⠿</span>';
+      else if (ui.selectMode && kartenZu) html += '<span title="Gesperrt – lässt sich nicht auswählen" aria-hidden="true">🔒</span>';
     }
     html += '<div class="words">';
     html += '<div class="wort arabic" lang="ar" dir="rtl">' + markiere(c.wort, tokens) + '</div>';
@@ -3291,6 +3616,7 @@ function kartenListeInhalt() {
     if (c.extra) html += '<div class="extra-note">' + renderExtra(c.extra, tokens) + '</div>';
     html += '</div>';
     if (fremd) html += '<span class="badge" title="Diese Karte liegt in einem anderen Bereich">' + esc(fremd.name) + '</span>';
+    if (kartenZu && !ui.selectMode) html += '<span class="badge" title="Noch in keiner freigeschalteten Lektion">🔒</span>';
     html += '<span class="badge">Stufe ' + c.stufe + '</span>';
     /* E6: In der Liste sichtbar machen, damit beim Durchsehen sofort
        auffaellt, welche Karte umformuliert gehoert. */
@@ -3298,7 +3624,7 @@ function kartenListeInhalt() {
     if (fremd) {
       html += '<button class="ghost" data-action="edit-card-in-bereich" data-bereich="' + esc(fremd.id) + '" data-id="' + esc(c.id) +
         '" title="In „' + esc(fremd.name) + '" öffnen" aria-label="Karte im Bereich ' + esc(fremd.name) + ' bearbeiten">✏️</button>';
-    } else if (!ui.selectMode) {
+    } else if (!ui.selectMode && bearbeitbar) {
       html += '<button class="ghost" data-action="edit-card" data-id="' + esc(c.id) + '" title="Bearbeiten" aria-label="Karte bearbeiten">✏️</button>';
       html += '<button class="ghost" data-action="delete-card" data-id="' + esc(c.id) + '" title="Löschen" aria-label="Karte löschen">🗑️</button>';
     }
@@ -3327,45 +3653,95 @@ function seitenLeiste(seite, seiten, gesamt) {
 }
 
 /* Liste der Speicherkarten. Wird nur gezeigt, wenn es welche gibt – solange
-   keine existiert, bleibt der Verwalten-Tab unverändert schlicht. */
+   keine existiert, bleibt der Verwalten-Tab unverändert schlicht.
+
+   2.3.0: Die Liste ist nach Art gruppiert (Kategorien, Lektionen, Eigene).
+   Die Gruppen sind keine Ordner: Gezogen wird weiterhin per ⠿-Griff, aber nur
+   innerhalb der eigenen Gruppe - die Art wechselt man ueber das Auswahlfeld
+   in der Zeile, nicht durch Ziehen. */
 function renderSetsPanel() {
+  const b = currentBereich();
   const sets = currentSets();
   if (sets.length === 0) return "";
+  const frei = freieIdsFor(b);
+  const gefuehrt = istGefuehrt(b);
+  const zuAnzahl = sets.filter(s => s.gesperrt).length;
   let html = '<div class="drill-picker" style="margin-bottom:14px">';
   /* 2.2.0: Kopfzeile zum Auf- und Zuklappen. Zu ist der Normalzustand. */
   html += '<button class="sets-kopf" data-action="toggle-sets" aria-expanded="' + (ui.setsOffen ? "true" : "false") + '">';
   html += '<span>' + (ui.setsOffen ? "▾" : "▸") + '</span><span>⭐ Speicherkarten</span>';
-  html += '<span class="badge">' + sets.length + '</span></button>';
+  html += '<span class="badge">' + sets.length + '</span>';
+  if (zuAnzahl > 0) html += '<span class="badge" title="' + zuAnzahl + ' Lektion(en) noch gesperrt">🔒 ' + zuAnzahl + '</span>';
+  html += '</button>';
   if (!ui.setsOffen) { html += '</div>'; return html; }
-  html += '<p class="hint" style="padding:6px 0">Feste Auswahl an Vokabeln, jederzeit beliebig oft übbar. Reihenfolge per ⠿-Griff ändern.</p>';
-  for (const s of sets) {
-    const cards = setCards(s);
-    const open = ui.openSetId === s.id;
-    html += '<div class="set-block" data-setid="' + esc(s.id) + '">';
-    html += '<div class="set-row">';
-    html += '<span class="drag-handle" title="Ziehen zum Sortieren" aria-hidden="true">⠿</span>';
-    html += '<span class="set-name">' + esc(s.name) + '</span>';
-    html += '<span class="badge">' + cards.length + ' Karte' + (cards.length === 1 ? "" : "n") + '</span>';
-    html += '<button class="ghost" data-action="drill-set" data-id="' + esc(s.id) + '" title="Diese Auswahl üben">🔁 Üben</button>';
+  for (const art of SET_ARTEN) {
+    const gruppe = sets.filter(s => (s.art || "eigen") === art);
+    if (gruppe.length === 0) continue;
+    html += '<div class="set-gruppe">';
+    html += '<div class="set-gruppe-kopf">' + SET_ART_ZEICHEN[art] + ' ' + SET_ART_TITEL[art] +
+      '<span class="badge">' + gruppe.length + '</span></div>';
+    html += '<p class="hint" style="padding:4px 0 2px; font-size:0.84rem">' + SET_ART_ERKLAERUNG[art] + '</p>';
+    html += '<div class="set-liste" data-gruppe="' + art + '">';
+    for (const s of gruppe) html += setBlock(s, b, frei, gefuehrt);
+    html += '</div></div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+/* Eine einzelne Speicherkarte samt (optional) aufgeklappter Kartenliste. */
+function setBlock(s, b, frei, gefuehrt) {
+  const zu = !!s.gesperrt;
+  const cards = setCards(s);
+  const open = ui.openSetId === s.id && !zu;
+  const eigenerBesitz = setBearbeitbar(s, b);
+  let html = '<div class="set-block' + (zu ? " set-locked" : "") + '" data-setid="' + esc(s.id) + '">';
+  html += '<div class="set-row">';
+  if (eigenerBesitz) html += '<span class="drag-handle" title="Ziehen zum Sortieren" aria-hidden="true">⠿</span>';
+  if (s.art === "lektion") {
+    html += '<button class="ghost lock-btn" data-action="toggle-set-lock" data-id="' + esc(s.id) + '" title="' +
+      (zu ? 'Freischalten – die Karten kommen ins Lernen' : 'Wieder sperren – die Karten kommen nicht mehr dran') +
+      '" aria-label="' + (zu ? "Lektion freischalten" : "Lektion sperren") + '">' + (zu ? "🔒" : "🔓") + '</button>';
+  }
+  html += '<span class="set-name">' + esc(s.name) + '</span>';
+  html += '<span class="badge">' + cards.length + ' Karte' + (cards.length === 1 ? "" : "n") + '</span>';
+  if (zu) {
+    html += '<span class="badge">gesperrt</span>';
+  } else {
+    if (cards.length > 0) html += '<button class="ghost" data-action="drill-set" data-id="' + esc(s.id) + '" title="Diese Auswahl üben">🔁 Üben</button>';
     html += '<button class="ghost" data-action="toggle-set-open" data-id="' + esc(s.id) + '" title="Karten anzeigen" aria-label="' + (open ? "Karten dieser Speicherkarte verbergen" : "Karten dieser Speicherkarte anzeigen") + '" aria-expanded="' + (open ? "true" : "false") + '">' + (open ? "▾" : "▸") + '</button>';
+  }
+  if (!gefuehrt) {
+    html += '<select class="set-art-wahl" data-action="set-art" data-id="' + esc(s.id) + '" title="Art dieser Speicherkarte" aria-label="Art dieser Speicherkarte">';
+    for (const a of SET_ARTEN) {
+      html += '<option value="' + a + '"' + ((s.art || "eigen") === a ? " selected" : "") + '>' + SET_ART_ZEICHEN[a] + ' ' + SET_ART_TITEL[a] + '</option>';
+    }
+    html += '</select>';
+  }
+  if (eigenerBesitz) {
     html += '<button class="ghost" data-action="rename-set" data-id="' + esc(s.id) + '" title="Umbenennen" aria-label="Speicherkarte umbenennen">✏️</button>';
     html += '<button class="ghost" data-action="delete-set" data-id="' + esc(s.id) + '" title="Speicherkarte löschen (Vokabeln bleiben erhalten)" aria-label="Speicherkarte löschen">🗑️</button>';
-    html += '</div>';
-    if (open) {
-      html += '<div class="set-cards">';
-      if (cards.length === 0) {
-        html += '<p class="hint">Keine Karten mehr in dieser Speicherkarte.</p>';
-      } else {
-        for (const c of cards) {
-          html += '<div class="card-row">';
-          html += '<div class="words"><div class="wort arabic" lang="ar" dir="rtl">' + esc(c.wort) + '</div>';
-          html += '<div class="uebersetzung">' + esc(c.uebersetzung) + '</div></div>';
-          html += '<span class="badge">Stufe ' + c.stufe + '</span>';
-          html += '<button class="ghost" data-action="remove-from-set" data-set="' + esc(s.id) + '" data-id="' + esc(c.id) + '" title="Aus dieser Speicherkarte entfernen (Karte bleibt im Bereich)" aria-label="Aus dieser Speicherkarte entfernen">✕</button>';
-          html += '</div>';
-        }
+  }
+  html += '</div>';
+  if (open) {
+    html += '<div class="set-cards">';
+    if (cards.length === 0) {
+      html += '<p class="hint">Keine Karten mehr in dieser Speicherkarte.</p>';
+    } else {
+      for (const c of cards) {
+        /* In einer Lektion sind ohnehin alle Karten gleich dran - dort waere
+           eine Hervorhebung nur Unruhe. In den Kategorien steht dagegen alles
+           gemischt, und genau dort ist die Frage "was darf ich schon?" echt. */
+        const kartenZu = frei !== null && !frei.has(c.id);
+        const hervor = frei !== null && !kartenZu && s.art !== "lektion";
+        html += '<div class="card-row' + (kartenZu ? " card-locked" : "") + (hervor ? " card-frei" : "") + '">';
+        html += '<div class="words"><div class="wort arabic" lang="ar" dir="rtl">' + esc(c.wort) + '</div>';
+        html += '<div class="uebersetzung">' + esc(c.uebersetzung) + '</div></div>';
+        if (kartenZu) html += '<span class="badge" title="Noch in keiner freigeschalteten Lektion">🔒</span>';
+        html += '<span class="badge">Stufe ' + c.stufe + '</span>';
+        if (eigenerBesitz) html += '<button class="ghost" data-action="remove-from-set" data-set="' + esc(s.id) + '" data-id="' + esc(c.id) + '" title="Aus dieser Speicherkarte entfernen (Karte bleibt im Bereich)" aria-label="Aus dieser Speicherkarte entfernen">✕</button>';
+        html += '</div>';
       }
-      html += '</div>';
     }
     html += '</div>';
   }
@@ -3411,6 +3787,15 @@ function autoScrollTick() {
   autoScrollRAF = requestAnimationFrame(autoScrollTick);
 }
 
+/* 2.3.0: Die Art-Auswahl steht in jeder Speicherkarten-Zeile. Ein einziger
+   delegierter Listener statt eines je Zeile - sonst muesste nach jedem
+   Neuzeichnen alles neu verdrahtet werden. */
+app.addEventListener("change", e => {
+  const sel = e.target.closest('select[data-action="set-art"]');
+  if (!sel) return;
+  setArtAendern(sel.dataset.id, sel.value);
+});
+
 app.addEventListener("pointerdown", e => {
   const handle = e.target.closest(".drag-handle");
   if (!handle) return;
@@ -3448,8 +3833,16 @@ function endDrag() {
     const sets = currentSets();
     const byId = new Map(sets.map(x => [x.id, x]));
     const neu = ids.map(id => byId.get(id)).filter(Boolean);
-    if (neu.length === sets.length) {
-      sets.splice(0, sets.length, ...neu);
+    /* 2.3.0: Gezogen wird innerhalb einer Gruppe (Kategorien, Lektionen,
+       Eigene). Die neue Reihenfolge ersetzt genau die Plaetze, die diese
+       Gruppe in der Gesamtliste belegt - die anderen Gruppen bleiben, wo sie
+       sind. Vorher wurde die ganze Liste ersetzt; mit Gruppen waeren dabei
+       alle anderen Speicherkarten verschwunden. */
+    const plaetze = [];
+    const inGruppe = new Set(ids);
+    sets.forEach((x, i) => { if (inGruppe.has(x.id)) plaetze.push(i); });
+    if (neu.length > 0 && neu.length === plaetze.length) {
+      plaetze.forEach((pos, i) => { sets[pos] = neu[i]; });
       const b = currentBereich();
       const patch = {};
       sets.forEach((x, i) => { patch[pfadSet(b.id, x.id) + ".order"] = i; });
@@ -3820,6 +4213,8 @@ app.addEventListener("click", e => {
     case "hw-fullscreen": hwFullscreen = !hwFullscreen; render(); break;
     case "export-backup": exportBackup(false); break;
     case "export-backup-current": exportBackup(true); break;
+    case "export-weitergabe": exportWeitergabe(); break;
+    case "toggle-set-lock": toggleSetLock(btn.dataset.id); break;
     case "import-trigger": {
       const el = document.getElementById("import-file-input");
       if (el) el.click();
