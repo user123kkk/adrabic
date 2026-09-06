@@ -40,6 +40,14 @@
   entsteht stattdessen eine geführte Kopie zum Ausprobieren, genau wie bei
   einem Bruder.
 
+### Behoben
+
+- **Eigene Speicherkarten landeten im weitergegebenen Kartensatz.** „Meine
+  schwierigen Wörter" ist eine persönliche Merkliste – sie in den Satz zu
+  legen hieße, jedem Empfänger die eigenen Schwächen als Lernstoff
+  mitzugeben. Weitergegeben werden jetzt nur Kategorien und Lektionen; der
+  Dialog sagt vorher, wie viele eigene Speicherkarten zu Hause bleiben.
+
 ### Geändert
 
 - **Schloss, Gruppen und der Modus „Lernen" erscheinen nur noch in einem
