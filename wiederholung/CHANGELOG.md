@@ -1,3 +1,34 @@
+## 2.6.0 – 6. September 2026 — „Eigene Reihenfolge"
+
+### Geändert
+
+- **Die Karten in einer Speicherkarte stehen in der Reihenfolge, die man
+  selbst gewählt hat** – also so, wie sie beim Auswählen angehakt oder danach
+  am ⠿-Griff zurechtgeschoben wurden.
+
+  Bis 2.5.0 wurden sie nach der Reihenfolge des Bereichs sortiert. Das war
+  eine *gerechnete* Reihenfolge, keine *gewählte*: Die Karten einer Lektion
+  ließen sich nicht in die Abfolge des Videos bringen, ohne den ganzen
+  Bereich umzusortieren. Jetzt gehört jeder Speicherkarte ihre eigene Ordnung.
+
+### Neu
+
+- **Sortieren innerhalb einer Speicherkarte.** In der aufgeklappten
+  Speicherkarte hat jede Kartenzeile einen ⠿-Griff. Er ändert nur die
+  Reihenfolge in dieser einen Speicherkarte – die Reihenfolge im Bereich und
+  damit die Nummern der Karten bleiben unberührt. Dieselbe Karte kann also in
+  „Lektion 1" an dritter und in „Nomen" an zwölfter Stelle stehen.
+
+### Behoben
+
+- **Der Griff an einer Karte innerhalb einer Speicherkarte hätte die ganze
+  Speicherkarte gezogen.** Beim Suchen nach der gezogenen Zeile wurde zuerst
+  nach dem Kasten der Speicherkarte gesucht und erst danach nach der
+  Kartenzeile – eine Kartenzeile liegt aber *innerhalb* dieses Kastens, also
+  gewann immer der Kasten. Die Reihenfolge der Prüfung ist umgedreht.
+
+---
+
 ## 2.5.0 – 6. September 2026 — „Nachschub"
 
 ### Neu
@@ -39,14 +70,6 @@
   ein Testimport der eigenen Datei den eigenen Meisterbereich umbauen. So
   entsteht stattdessen eine geführte Kopie zum Ausprobieren, genau wie bei
   einem Bruder.
-
-### Behoben
-
-- **Eigene Speicherkarten landeten im weitergegebenen Kartensatz.** „Meine
-  schwierigen Wörter" ist eine persönliche Merkliste – sie in den Satz zu
-  legen hieße, jedem Empfänger die eigenen Schwächen als Lernstoff
-  mitzugeben. Weitergegeben werden jetzt nur Kategorien und Lektionen; der
-  Dialog sagt vorher, wie viele eigene Speicherkarten zu Hause bleiben.
 
 ### Geändert
 
