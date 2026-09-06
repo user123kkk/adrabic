@@ -1,3 +1,67 @@
+## 2.5.0 – 6. September 2026 — „Nachschub"
+
+### Neu
+
+- **Eine zweite Ausgabe eines Kartensatzes ergänzt den vorhandenen, statt ihn
+  doppelt anzulegen.**
+
+  Bis 2.4.0 legte jeder Import einen neuen Bereich an. Für ein normales Backup
+  ist das richtig – es schützt davor, dass eine alte Datei einen neueren Stand
+  überbügelt. Für die zweite Ausgabe eines weitergegebenen Kartensatzes wäre es
+  fatal: Wer Lektion 6–10 nachbekommt, hätte danach zweimal „Medina 1", die
+  ersten 125 Karten doppelt, und seinen Lernstand von vier Wochen im falschen
+  der beiden Bereiche.
+
+  Möglich macht das die Kennung am Bereich und die Herkunfts-Nummer an jeder
+  Karte, beide seit 2.3.0 in jeder Weitergabe-Datei. Die Karten-Nummern ändern
+  sich beim Import – die Herkunfts-Nummer bleibt, sie ist das Einzige, was über
+  zwei Veröffentlichungen hinweg hält.
+
+- **Wer was bestimmt, ist klar getrennt.**
+
+  - Der **Autor** bestimmt den Inhalt: Text, Notiz, Reihenfolge, welche Karten
+    es gibt, welche Lektionen es gibt. Berichtigte Texte kommen an, weggefallene
+    Karten verschwinden, neue Lektionen kommen gesperrt dazu.
+  - Der **Lernende** behält seinen Fortschritt: Stufe, Fälligkeit, Rückfälle –
+    und welche Lektionen er freigeschaltet hat. Eine Lektion, die er offen hat,
+    wird nicht wieder zugesperrt, nur weil sie in der Datei gesperrt steht.
+  - **Eigene Speicherkarten** des Lernenden bleiben unangetastet; sie verlieren
+    nur Verweise auf Karten, die es nicht mehr gibt.
+
+- **Vor dem Übernehmen steht, was passiert.** Der Dialog zählt auf, wie viele
+  Karten dazukommen, wie viele im Text berichtigt werden und wie viele
+  wegfallen – und sagt zu, dass Lernstand und freigeschaltete Lektionen
+  bleiben. Dieselbe Ausgabe ein zweites Mal eingespielt ändert nichts und sagt
+  das auch.
+
+- **Zusammengeführt wird nur in einen geführten Bereich.** Der eigene Bereich,
+  aus dem der Satz stammt, trägt dieselbe Kennung – ohne diese Bedingung würde
+  ein Testimport der eigenen Datei den eigenen Meisterbereich umbauen. So
+  entsteht stattdessen eine geführte Kopie zum Ausprobieren, genau wie bei
+  einem Bruder.
+
+### Geändert
+
+- **Schloss, Gruppen und der Modus „Lernen" erscheinen nur noch in einem
+  weitergegebenen Kartensatz.** In 2.3.0 und 2.4.0 standen sie in jedem
+  Bereich – auch im eigenen, wo sie nichts zu suchen haben: Dort gibt es
+  niemanden, der etwas freischalten müsste, und ein Schloss hätte dort nicht
+  einmal eine Wirkung. Es wäre ein Knopf, der lügt.
+
+  Ein eigener Bereich sieht damit wieder aus wie vor 2.3.0: eine schlichte
+  Liste von Speicherkarten, ohne Abschnitte, ohne Schlösser, ohne ▶ Lernen.
+
+- **Die Art einer Speicherkarte vergibt man über einen Schalter.** Über der
+  Liste steht „🛠 Arten vergeben"; erst danach erscheinen die Auswahlfelder in
+  den Zeilen. Ein Auswahlfeld in jeder Zeile machte das Feld unruhig, obwohl
+  die Art einmal pro Speicherkarte vergeben und dann nie wieder angefasst
+  wird. Der Schalter erscheint nur im Autorenmodus.
+
+  Gruppiert wird trotzdem, sobald wirklich eine Art vergeben ist – sonst
+  stünden 20 Lektionen und 6 Kategorien wieder als flache Liste da.
+
+---
+
 ## 2.4.0 – 6. September 2026 — „Lernen"
 
 ### Neu
