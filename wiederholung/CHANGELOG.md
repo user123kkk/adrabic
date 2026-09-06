@@ -1,3 +1,81 @@
+## 2.4.0 – 6. September 2026 — „Lernen"
+
+### Neu
+
+- **Ein dritter Modus: „Lernen".** Neben dem ▶-Knopf steht bei jeder
+  Speicherkarte im Verwalten-Tab jetzt ein zweiter Weg hinein – und der ist
+  ausdrücklich **keine Abfrage**.
+
+  „Üben" deckt ab und fragt ab, der Lernen-Tab bewertet. Für die erste
+  Begegnung mit neuem Stoff taugt beides nicht: Wer ein Video schaut und das
+  Buch danebenliegen hat, will die Karten *sehen*. Genau das ist dieser Modus –
+  Wort, Übersetzung und die Notiz hinter dem ▸, nichts verdeckt.
+
+  Drei Entscheidungen machen ihn aus:
+
+  - **Reihenfolge statt Zufall.** Die Karten stehen in der Reihenfolge, in der
+    sie im Bereich liegen – also so, wie sie zurechtgeschoben wurden. Solange
+    alle auf derselben Stufe stehen, wäre Mischen sinnlos. Erst wenn die
+    Stufen auseinanderlaufen, ist Zufall richtig, und das ist der Lernen-Tab.
+  - **Ein Haken statt Bewertungsknöpfen.** Es gibt nichts zu bewerten, was man
+    gerade zum ersten Mal liest. „Gelernt" setzt die Karte auf Stufe 1; ab
+    morgen kommt sie im Lernen-Tab als Wiederholung.
+  - **Kein eigener Zwischenstand.** Wer 25 Karten offen hat, 17 abhakt und
+    rausgeht, findet beim nächsten Öffnen genau die 8 übrigen vor. „Abgehakt"
+    heißt schlicht „hat eine Stufe" – es gibt nichts zu speichern, was mit dem
+    Rest der App auseinanderlaufen könnte.
+
+- **Nummern an den Karten.** Jede Karte trägt ihre Position im Bereich, nicht
+  in der gerade geöffneten Auswahl. Damit lässt sich außerhalb der App sagen
+  „Video 3 = Karten 41–63", und die Zahl bleibt dieselbe, egal über welche
+  Speicherkarte man hereinkommt.
+
+- **Eine Liste statt einer Karte pro Bildschirm.** Wer mit einem Video mitgeht,
+  will blättern können und nicht 25-mal weitertippen. Auf dem Handy steht eine
+  Karte pro Zeile, auf einem breiten Bildschirm zwei nebeneinander – das macht
+  das Raster von selbst, ohne zweite Ansicht und ohne Zoomstufen.
+
+- **Der Blick wandert mit.** Nach jedem Haken rutscht die nächste noch offene
+  Karte in die Mitte. Gesucht wird dabei ab der gerade abgehakten Karte nach
+  vorn: Wer Karte 10 zuerst abhakt, wird nicht an den Anfang zurückgeworfen.
+  Und gescrollt wird nur, wenn die Zielkarte gerade nicht zu sehen ist – sonst
+  ruckelte die Seite bei jedem Tipp.
+
+- **Freischalten passiert dort, wo man ohnehin hinwill.** Ein Tipp auf ▶ Lernen
+  bei einer gesperrten Lektion fragt einmal nach und macht sie auf. Ein eigenes
+  Freischalt-Ritual müsste man erst finden; das Schloss in der Zeile bleibt
+  daneben als zweiter Weg.
+
+- **↩ Rückgängig.** Ein Fehltipp auf „Gelernt" lässt sich sofort zurücknehmen.
+  Ohne das wäre er nur über das Formular im Verwalten-Tab zu heilen.
+
+### Geändert
+
+- **„Backup · zum Weitergeben" ist nur noch für den Autor sichtbar.** Wäre der
+  Knopf für alle da, kämen früher oder später halbfertige Kartensätze mit
+  fremden Kennungen in Umlauf – und die Update-Erkennung hätte zwei
+  verschiedene Sätze mit derselben Kennung vor sich.
+
+  Eingerichtet wird das über die Konstante `AUTOR_UID` ganz oben in der
+  index.html. Dort kommt die eigene Nutzernummer hinein; solange sie leer ist,
+  zeigt die App oben eine rote Zeile mit der Nummer zum Abschreiben.
+
+  Bewusst die Nutzernummer und nicht die E-Mail-Adresse: Die Nummer ist eine
+  zufällige Zeichenfolge und verrät nichts über die Person, während eine
+  Adresse in einem öffentlichen Repo von Spam-Sammlern gelesen würde.
+
+  Was das leistet und was nicht: Wer nur in der App klickt, findet nichts. Wer
+  ein zweites Konto anlegt, kommt nicht weiter, weil die Nummer nicht stimmt.
+  Wer aber die index.html selbst öffnet und liest, sieht die Stelle – daran
+  kann keine Seite etwas ändern, die im Browser des Lesers läuft. Der Zweck
+  ist, dass niemand *versehentlich* etwas in Umlauf bringt.
+
+- **Eine schon gelernte Karte lässt sich im neuen Modus nicht zurückwerfen.**
+  Sie zeigt statt des Hakens ihre Stufe. Sonst könnte eine Durchsicht eine
+  Karte, die auf Stufe 5 sitzt, auf 1 zurücksetzen.
+
+---
+
 ## 2.3.0 – 6. September 2026 — „Gruppen und Schlösser"
 
 ### Neu
