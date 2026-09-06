@@ -300,6 +300,32 @@
      anfassen" ohne Erklaerung lesbar ist. */
   .card-row.card-frei { background: rgba(227, 200, 138, 0.10); border-radius: var(--radius); padding-left: 8px; padding-right: 8px; }
   .lock-btn { font-size: 1rem; padding: 4px 7px; }
+  /* 2.4.0: Modus „Lernen". Eine Liste zum Mitlesen, keine Abfrage - deshalb
+     keine grossen Bewertungsflaechen, sondern ruhige Zeilen mit einer
+     einzigen Handlung rechts. */
+  .lern-kopf { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+  .lern-kopf > div:last-child { display: flex; gap: 8px; flex-wrap: wrap; }
+  .lern-balken { height: 6px; background: var(--bg); border-radius: 999px; overflow: hidden; margin-top: 12px; }
+  .lern-balken span { display: block; height: 100%; background: var(--green); transition: width 0.25s ease; }
+  /* Ein Raster statt einer Spalte: auf dem Handy eine Karte pro Zeile, auf
+     einem breiten Bildschirm zwei nebeneinander. Ohne zweite Ansicht, ohne
+     Zoomstufen - die Breite entscheidet. */
+  .lern-raster { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
+  .lern-karte {
+    display: flex; gap: 10px; align-items: flex-start;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 12px 14px;
+  }
+  .lern-karte.ist-gelernt { opacity: 0.55; }
+  .lern-nr { font-size: 0.74rem; color: var(--ink-soft); min-width: 2ch; text-align: right; padding-top: 3px; flex-shrink: 0; }
+  .lern-inhalt { flex: 1; min-width: 0; }
+  .lern-inhalt .wort { font-weight: 600; word-break: break-word; }
+  .lern-inhalt .uebersetzung { color: var(--ink); font-size: 0.92rem; margin-top: 3px; word-break: break-word; }
+  .lern-notiz-knopf { background: transparent; color: var(--ink-soft); font-size: 0.78rem; padding: 4px 0; margin-top: 4px; }
+  .lern-notiz-knopf:hover { background: transparent; color: var(--accent); }
+  .lern-tat { flex-shrink: 0; }
+  .lern-haken { background: var(--green); color: #06251a; font-size: 0.82rem; padding: 7px 12px; }
+  .lern-haken:hover { filter: brightness(1.08); }
   .satz-banner { background: var(--accent-soft); color: var(--ink); border-radius: var(--radius); padding: 10px 14px; font-size: 0.86rem; margin-bottom: 14px; }
   .satz-banner strong { color: var(--accent-dark); }
   /* E4/D10: Fortschritt sichtbar. Balken und Saeulen bestehen bewusst aus
@@ -472,10 +498,39 @@ const firebaseConfig = {
 
 /* Versionsnummer: bei jeder Veroeffentlichung hochzaehlen und denselben Wert
    als CACHE_NAME in sw.js eintragen, damit alte Dateien verworfen werden. */
-const APP_VERSION = "2.3.0";
+const APP_VERSION = "2.4.0";
 
 const CONFIGURED = firebaseConfig.apiKey !== "HIER_EINFUEGEN";
 const app = document.getElementById("app");
+
+/* ---------- Wer darf Kartensätze weitergeben? ----------
+   "Backup zum Weitergeben" ist ein Werkzeug fuer den, der den Kartensatz
+   zusammenstellt, nicht fuer die, die ihn benutzen. Waere der Knopf fuer alle
+   da, kaemen frueher oder spaeter halbfertige Saetze mit fremden Kennungen in
+   Umlauf - und die Update-Erkennung haette zwei verschiedene Saetze mit
+   derselben Kennung vor sich.
+
+   Hier steht die Nutzernummer des Autors. Sie kommt von Firebase, ist eine
+   zufaellige Zeichenfolge und verraet nichts ueber die Person - anders als
+   eine E-Mail-Adresse, die in einem oeffentlichen Repo von Spam-Sammlern
+   gelesen wuerde.
+
+   SOLANGE HIER NICHTS STEHT, sieht JEDER den Knopf. Dann zeigt die App oben
+   eine Zeile mit der eigenen Nummer zum Abschreiben - das ist der
+   Einrichtungszustand, siehe renderMain().
+
+   Was das leistet und was nicht: Wer nur in der App klickt, findet nichts.
+   Wer ein zweites Konto anlegt, kommt nicht weiter, denn die Nummer stimmt
+   dann nicht. Wer aber die index.html selbst oeffnet und liest, sieht diese
+   Stelle - und daran kann keine Seite etwas aendern, die im Browser des
+   Lesers laeuft. Ihr Zweck ist, dass niemand VERSEHENTLICH etwas in Umlauf
+   bringt, nicht dass etwas geheim bleibt. */
+const AUTOR_UID = "";
+function istAutor() {
+  if (!AUTOR_UID) return true;              // noch nicht eingerichtet
+  return !!(currentUser && currentUser.uid === AUTOR_UID);
+}
+function autorNochNichtEingerichtet() { return !AUTOR_UID; }
 
 /* ---------- XSS-Schutz ---------- */
 function esc(s) {
@@ -864,6 +919,18 @@ let ui = {
   dialog: null,              // D2: { kind, title, text, value, okLabel, danger, resolve }
   selectMode: false,          // Mehrfachauswahl im Verwalten-Tab aktiv?
   selectedIds: new Set(),     // ausgewählte Karten-IDs
+  /* 2.4.0: Der Modus "Lernen" - eine Durchsicht statt einer Abfrage.
+     lernSetId = die Speicherkarte, die gerade durchgegangen wird (oder null).
+     lernOffen = welche Notizen aufgeklappt sind.
+     lernLetzte = die zuletzt abgehakte Karte, fuer "Rückgängig". */
+  lernSetId: null,
+  lernOffen: new Set(),
+  lernLetzte: null,
+  /* Nach welcher Karte als naechstes in den Blick gescrollt werden soll:
+     eine Karten-Nummer, "__start__" beim Oeffnen, oder null = nicht scrollen.
+     Steht hier statt in einer eigenen Variablen weiter unten, damit die
+     Reihenfolge im Skript keine Rolle spielt. */
+  lernFokusNach: null,
   drillOpen: false,           // Auswahl für Übungsmodus sichtbar?
   drillSource: "stufen",      // "stufen" oder die ID einer Speicherkarte
   openSetId: null,            // Speicherkarte, deren Kartenliste aufgeklappt ist
@@ -1746,6 +1813,7 @@ function exportBackup(onlyCurrent) {
    Update den vorhandenen Satz nicht wiedererkennen und legt stattdessen
    einen zweiten Bereich mit allem doppelt an. */
 async function exportWeitergabe() {
+  if (!istAutor()) return;   // Sicherung, falls der Knopf doch je woanders auftaucht
   const b = currentBereich();
   if (istGefuehrt(b)) {
     await dlgAlert('„' + b.name + '" ist selbst ein geführter Satz. Weitergeben kann ihn nur, wer ihn zusammengestellt hat.',
@@ -1888,6 +1956,10 @@ function selectBereich(bereichId) {
   if (!bereiche.some(b => b.id === bereichId)) return;
   ui.bereichId = bereichId;
   ui.session = null;
+  /* Die Speicherkarte gehoert zu ihrem Bereich - nach einem Wechsel zeigte
+     die Durchsicht sonst auf eine Auswahl, die es hier nicht gibt. */
+  ui.lernSetId = null;
+  ui.lernLetzte = null;
   ui.editId = null;
   resetFormDraft();
   ui.searchQuery = "";
@@ -2134,6 +2206,7 @@ async function toggleSetLock(id) {
   }
   set.gesperrt = !set.gesperrt;
   if (set.gesperrt && ui.openSetId === set.id) ui.openSetId = null;
+  if (set.gesperrt && ui.lernSetId === set.id) { ui.lernSetId = null; ui.lernLetzte = null; }
   if (set.gesperrt && ui.drillSource === set.id) ui.drillSource = "stufen";
   patchDoc({ [pfadSet(currentBereich().id, set.id) + ".gesperrt"]: set.gesperrt });
   render();
@@ -2166,6 +2239,7 @@ async function deleteSet(id) {
   if (!ok) return;
   sets.splice(idx, 1);
   if (ui.openSetId === id) ui.openSetId = null;
+  if (ui.lernSetId === id) { ui.lernSetId = null; ui.lernLetzte = null; }
   if (ui.drillSource === id) ui.drillSource = "stufen";
   patchDoc({ [pfadSet(currentBereich().id, id)]: LOESCHEN });
   render();
@@ -2243,6 +2317,109 @@ function startDrillWithCards(cards, label, handwriting) {
   };
   ui.drillOpen = false;
   ui.tab = "lernen";
+  render();
+}
+
+/* ---------- 2.4.0: der Modus „Lernen" ----------
+   Das ist bewusst KEINE Abfrage. „Üben" (der Drill) deckt ab und fragt ab,
+   der Lernen-Tab bewertet - fuer die erste Begegnung mit neuem Stoff taugt
+   beides nicht. Wer ein Video schaut und das Buch danebenliegen hat, will die
+   Karten SEHEN: in seiner Reihenfolge, nichts verdeckt, Notiz aufklappbar.
+
+   Drei Entscheidungen, die den Modus ausmachen:
+
+   1. Reihenfolge statt Zufall. Solange alle Karten auf derselben Stufe
+      stehen, ist Mischen sinnlos; die Reihenfolge im Bereich ist die
+      Reihenfolge des Buchs bzw. der Playlist. Erst wenn die Stufen
+      auseinanderlaufen, ist Zufall richtig - und das ist der Lernen-Tab.
+
+   2. Ein Haken statt Bewertungsknoepfen. Es gibt nichts zu bewerten, was man
+      gerade zum ersten Mal liest. Der Haken setzt die Karte auf Stufe 1, ab
+      morgen kommt sie im Lernen-Tab als Wiederholung.
+
+   3. Kein eigener Zwischenstand. Wer 25 Karten offen hat, 17 abhakt und
+      rausgeht, findet beim naechsten Mal genau die 8 uebrigen vor - denn
+      "abgehakt" heisst schlicht "hat eine Stufe". Es gibt nichts zu
+      speichern, was mit dem Rest der App auseinanderlaufen koennte. */
+function lernSet() {
+  return ui.lernSetId ? findSet(ui.lernSetId) : null;
+}
+/* Die Karten der Durchsicht: in Bereichsreihenfolge, ohne gesperrte. */
+function lernKarten(set) {
+  const frei = freieIdsFor(currentBereich());
+  return setCards(set).filter(c => frei === null || frei.has(c.id));
+}
+async function startLernen(setId) {
+  const set = findSet(setId);
+  if (!set) return;
+  /* Der natuerliche Weg, eine Lektion aufzuschliessen: draufdruecken. Ein
+     eigenes Freischalt-Ritual muesste man erst finden. */
+  if (set.gesperrt) {
+    const ok = await dlgConfirm('„' + set.name + '" ist noch gesperrt. Freischalten und durchgehen? ' +
+      setCards(set).length + ' Karte(n) kommen damit ins Lernen.',
+      { title: "Lektion freischalten?", okLabel: "Freischalten" });
+    if (!ok) return;
+    set.gesperrt = false;
+    patchDoc({ [pfadSet(currentBereich().id, set.id) + ".gesperrt"]: false });
+  }
+  if (lernKarten(set).length === 0) {
+    await dlgAlert('„' + set.name + '" enthält keine Karten (mehr).', "Nichts durchzugehen");
+    return;
+  }
+  ui.lernSetId = set.id;
+  ui.lernOffen = new Set();
+  ui.lernLetzte = null;
+  ui.session = null;
+  ui.drillOpen = false;
+  ui.selectMode = false;
+  ui.tab = "lernen";
+  ui.lernFokusNach = "__start__";
+  render();
+}
+function endeLernen() {
+  ui.lernSetId = null;
+  ui.lernOffen = new Set();
+  ui.lernLetzte = null;
+  ui.lernFokusNach = null;
+  render();
+}
+function toggleLernNotiz(id) {
+  if (ui.lernOffen.has(id)) ui.lernOffen.delete(id);
+  else ui.lernOffen.add(id);
+  render();
+}
+/* Abhaken. Nur fuer Karten, die noch nie bewertet wurden - eine Karte, die
+   schon auf Stufe 4 steht, darf eine Durchsicht nicht zurueckwerfen. */
+function lernAbhaken(id) {
+  const card = findCard(id);
+  if (!card || !istNeueKarte(card)) return;
+  ui.lernLetzte = { cardId: card.id, prevStufe: card.stufe, prevNextReview: card.nextReview, prevErsteBewertung: card.ersteBewertung };
+  card.ersteBewertung = todayStr();
+  card.stufe = 1;
+  card.nextReview = dateInDays(1);   // ab morgen im Lernen-Tab
+  persistCardGrade(currentBereich().id, card.id, {
+    stufe: card.stufe, nextReview: card.nextReview,
+    ersteBewertung: card.ersteBewertung, rueckfaelle: card.rueckfaelle || 0
+  });
+  ui.lernFokusNach = card.id;
+  render();
+}
+/* Vertippt: genau ein Schritt zurueck. Ohne das waere ein Fehltipp auf dem
+   Handy nur ueber das Formular im Verwalten-Tab zu heilen. */
+function lernRueckgaengig() {
+  const l = ui.lernLetzte;
+  if (!l) return;
+  const card = findCard(l.cardId);
+  if (card) {
+    card.stufe = l.prevStufe;
+    card.nextReview = l.prevNextReview;
+    card.ersteBewertung = l.prevErsteBewertung;
+    persistCardGrade(currentBereich().id, card.id, {
+      stufe: card.stufe, nextReview: card.nextReview,
+      ersteBewertung: card.ersteBewertung, rueckfaelle: card.rueckfaelle || 0
+    });
+  }
+  ui.lernLetzte = null;
   render();
 }
 
@@ -2748,13 +2925,22 @@ function renderMain() {
      nach zwei verschiedenen Funktionen aus. */
   html += '<button class="tiny-link" data-action="export-backup" title="Lädt alle Bereiche mit allen Karten herunter">💾 Backup · alles</button>';
   html += '<button class="tiny-link" data-action="export-backup-current" title="Lädt nur den gerade geöffneten Bereich &quot;' + esc(currentBereich().name) + '&quot; herunter">💾 Backup · nur „' + esc(currentBereich().name) + '"</button>';
-  if (!istGefuehrt(currentBereich())) {
+  if (istAutor() && !istGefuehrt(currentBereich())) {
     html += '<button class="tiny-link" data-action="export-weitergabe" title="Erzeugt aus diesem Bereich einen Kartensatz zum Weitergeben: alles auf Stufe 0, alle Lektionen bis auf die erste gesperrt">💾 Backup · zum Weitergeben</button>';
   }
   html += '<button class="tiny-link" data-action="import-trigger" title="Karten aus einer Backup-Datei einspielen">📥 Import</button>';
   html += '<input type="file" id="import-file-input" accept="application/json" style="display:none">';
   html += '</div>';
   html += '</div>';
+
+  /* Einrichtungszustand: Solange AUTOR_UID leer ist, sieht jeder den
+     Weitergabe-Knopf. Diese Zeile ist deshalb absichtlich laut - sie darf
+     nicht uebersehen werden, denn sie steht sonst irgendwann bei allen. */
+  if (autorNochNichtEingerichtet() && currentUser) {
+    html += '<p class="hint" style="margin:-4px 0 12px; color:var(--red)">⚠ <strong>Noch nicht eingerichtet:</strong> ' +
+      'Der Knopf „Backup · zum Weitergeben" ist gerade für <em>alle</em> sichtbar. ' +
+      'Trag deine Nutzernummer in <code>AUTOR_UID</code> oben in der index.html ein: <code>' + esc(currentUser.uid) + '</code></p>';
+  }
 
   const backupAge = daysSinceLastBackup();
   if (backupAge === null || backupAge >= 14) {
@@ -2811,6 +2997,39 @@ function renderMain() {
     });
   }
 
+  /* 2.4.0: Der Blick soll dort stehen, wo es weitergeht.
+
+     Gesucht wird ab der gerade abgehakten Karte NACH VORN, nicht von ganz
+     oben: Wer Karte 10 zuerst abhakt, wuerde sonst zurueck an den Anfang
+     geworfen. Erst wenn dahinter nichts Offenes mehr steht, faengt die Suche
+     vorn wieder an.
+
+     Gescrollt wird ausserdem nur, wenn die Zielkarte gerade nicht zu sehen
+     ist - sonst ruckelt die Seite bei jedem Tipp, obwohl alles schon im
+     Bild steht. */
+  if (ui.lernFokusNach) {
+    const woher = ui.lernFokusNach;
+    ui.lernFokusNach = null;
+    requestAnimationFrame(() => {
+      const alle = [...document.querySelectorAll(".lern-karte")];
+      if (alle.length === 0) return;
+      const offen = k => !k.classList.contains("ist-gelernt");
+      let ziel = null;
+      if (woher === "__start__") {
+        /* Beim Oeffnen nur springen, wenn schon etwas erledigt ist - sonst
+           steht man ohnehin an der richtigen Stelle. */
+        if (alle.some(k => !offen(k))) ziel = alle.find(offen);
+      } else {
+        const i = alle.findIndex(k => k.dataset.lernid === woher);
+        ziel = alle.slice(i + 1).find(offen) || alle.find(offen);
+      }
+      if (!ziel) return;
+      const r = ziel.getBoundingClientRect();
+      if (r.top < 60 || r.bottom > window.innerHeight - 60) {
+        ziel.scrollIntoView({ block: "center", behavior: "smooth" });
+      }
+    });
+  }
   if (ui.tab === "lernen" && ui.session && ui.session.handwriting && ui.session.queue.length > 0) {
     setupHandwritingCanvas();
   }
@@ -2872,7 +3091,67 @@ function renderMain() {
 
 }
 
+/* Die Durchsicht. Eine Liste statt einer Karte pro Bildschirm: Wer mit einem
+   Video mitgeht, will blaettern koennen, nicht 25-mal weitertippen. Auf einem
+   breiten Bildschirm stehen zwei Spalten nebeneinander, auf dem Handy eine -
+   das macht das Raster von selbst, ohne zweite Ansicht. */
+function renderDurchsicht(set) {
+  const alle = lernKarten(set);
+  const cards = currentCards();
+  const offen = alle.filter(istNeueKarte);
+  const fertig = alle.length - offen.length;
+  let html = "";
+
+  html += '<div class="panel">';
+  html += '<div class="lern-kopf">';
+  html += '<div><h2 style="margin-bottom:2px">' + SET_ART_ZEICHEN[set.art || "eigen"] + ' ' + esc(set.name) + '</h2>';
+  html += '<p class="hint" style="padding:0">' + fertig + ' von ' + alle.length + ' gelernt' +
+    (offen.length > 0 ? ' · noch ' + offen.length : ' · fertig ✓') + '</p></div>';
+  html += '<div>';
+  if (ui.lernLetzte) html += '<button class="ghost" data-action="lern-undo" title="Letztes Abhaken zurücknehmen">↩ Rückgängig</button>';
+  html += '<button class="secondary" data-action="lern-ende">Fertig</button>';
+  html += '</div></div>';
+  /* Der Balken ist die einzige Rueckmeldung in diesem Modus - abgehakt wird
+     ohne Ton, ohne Sprung, ohne Bildschirmwechsel. */
+  html += '<div class="lern-balken"><span style="width:' + (alle.length ? Math.round(fertig / alle.length * 100) : 0) + '%"></span></div>';
+  html += '<p class="hint" style="padding-top:10px">Geh mit dem Video mit. Ein Tipp auf <strong>Gelernt</strong> setzt die Karte auf Stufe 1 – ab morgen kommt sie im Lernen-Tab als Wiederholung.</p>';
+  html += '</div>';
+
+  html += '<div class="lern-raster">';
+  for (const c of alle) {
+    const neu = istNeueKarte(c);
+    /* Die Nummer ist die Position im Bereich, nicht in dieser Auswahl. So
+       laesst sich draussen sagen "Video 3 = Karten 41-63", und die Zahl
+       bleibt dieselbe, egal ueber welche Speicherkarte man hereinkommt. */
+    const nr = cards.indexOf(c) + 1;
+    const notizOffen = ui.lernOffen.has(c.id);
+    html += '<div class="lern-karte' + (neu ? "" : " ist-gelernt") + '" data-lernid="' + esc(c.id) + '">';
+    html += '<div class="lern-nr">' + nr + '</div>';
+    html += '<div class="lern-inhalt">';
+    html += '<div class="wort arabic" lang="ar" dir="rtl">' + esc(c.wort) + '</div>';
+    html += '<div class="uebersetzung">' + esc(c.uebersetzung) + '</div>';
+    if (c.extra) {
+      html += '<button class="lern-notiz-knopf" data-action="lern-notiz" data-id="' + esc(c.id) + '" aria-expanded="' + (notizOffen ? "true" : "false") + '">' +
+        (notizOffen ? "▾" : "▸") + ' Notiz</button>';
+      if (notizOffen) html += '<div class="extra-note">' + renderExtra(c.extra, []) + '</div>';
+    }
+    html += '</div>';
+    html += '<div class="lern-tat">';
+    if (neu) {
+      html += '<button class="lern-haken" data-action="lern-haken" data-id="' + esc(c.id) + '">Gelernt</button>';
+    } else {
+      html += '<span class="badge" title="Diese Karte läuft schon im Wiederholungsplan">✓ Stufe ' + c.stufe + '</span>';
+    }
+    html += '</div>';
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
 function renderLernen() {
+  const lset = lernSet();
+  if (lset) return renderDurchsicht(lset);
   if (ui.session) return renderSession();
   const cards = currentCards();
   const due = dueCards();
@@ -3705,6 +3984,14 @@ function setBlock(s, b, frei, gefuehrt) {
   }
   html += '<span class="set-name">' + esc(s.name) + '</span>';
   html += '<span class="badge">' + cards.length + ' Karte' + (cards.length === 1 ? "" : "n") + '</span>';
+  if (cards.length > 0) {
+    /* Auch bei einer gesperrten Lektion: Der Knopf fragt dann, ob
+       freigeschaltet werden soll. Das ist der natuerliche Weg weiter - ein
+       eigenes Freischalt-Ritual muesste man erst finden. */
+    html += '<button class="ghost" data-action="lern-set" data-id="' + esc(s.id) + '" title="' +
+      (zu ? 'Freischalten und in Ruhe durchgehen' : 'In Ruhe durchgehen – Wort, Übersetzung und Notiz offen, in deiner Reihenfolge') +
+      '">▶ Lernen</button>';
+  }
   if (zu) {
     html += '<span class="badge">gesperrt</span>';
   } else {
@@ -4138,11 +4425,16 @@ app.addEventListener("click", e => {
     case "rename-bereich": renameBereich(); break;
     case "delete-bereich": deleteBereich(); break;
     case "tab-lernen": ui.tab = "lernen"; ui.editId = null; resetFormDraft(); ui.searchQuery = ""; ui.kartenSeite = 0; ui.searchAll = false; ui.selectMode = false; ui.selectedIds = new Set(); ui.drillOpen = false; render(); break;
-    case "tab-fortschritt": ui.tab = "fortschritt"; ui.session = null; ui.editId = null; resetFormDraft(); ui.drillOpen = false; render(); break;
+    case "tab-fortschritt": ui.tab = "fortschritt"; ui.session = null; ui.lernSetId = null; ui.editId = null; resetFormDraft(); ui.drillOpen = false; render(); break;
     case "stats-scope": ui.statsScope = btn.dataset.scope === "bereich" ? "bereich" : "alle"; render(); break;
     case "edit-leech": editCardInBereich(btn.dataset.bid, btn.dataset.id); break;
     case "reset-leech": resetRueckfaelle(btn.dataset.bid, btn.dataset.id); break;
-    case "tab-verwalten": ui.tab = "verwalten"; ui.session = null; render(); break;
+    case "tab-verwalten": ui.tab = "verwalten"; ui.session = null; ui.lernSetId = null; render(); break;
+    case "lern-set": startLernen(btn.dataset.id); break;
+    case "lern-haken": lernAbhaken(btn.dataset.id); break;
+    case "lern-notiz": toggleLernNotiz(btn.dataset.id); break;
+    case "lern-undo": lernRueckgaengig(); break;
+    case "lern-ende": endeLernen(); break;
     case "start-session": startSession(); break;
     case "reveal": revealAnswer(); break;
     case "toggle-extra": toggleExtra(); break;
