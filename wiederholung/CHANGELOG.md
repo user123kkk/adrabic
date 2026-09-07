@@ -1,3 +1,23 @@
+## 2.10.1 – 7. September 2026
+
+### Behoben
+
+- **„Heute" meldete „fertig ✓", obwohl noch nichts gelernt war.** In den
+  Tagesbalken zählten nur Wiederholungen als offen. Wer einen frisch
+  eingespielten Kartensatz vor sich hatte, sah einen vollen Balken – dabei war
+  die erste Lektion noch komplett ungelernt. Neue Karten zählen jetzt mit.
+
+  Für die Streak gilt das ausdrücklich **nicht**: dort zählen weiterhin nur
+  Wiederholungen, damit das Freischalten einer Lektion niemandem die Flamme
+  kostet.
+
+- **Am ersten Tag gab es keine Flamme.** Sie sprang nur am Ende einer
+  Lernsession an – an einem Tag mit einem neuen Kartensatz gibt es aber gar
+  keine Wiederholungen. Wer 21 Karten durchgegangen war, stand trotzdem bei 0.
+  Das Durchgehen zählt jetzt auch für den Tag.
+
+---
+
 ## 2.10.0 – 7. September 2026 — „Mitgenommen werden"
 
 ### Neu
