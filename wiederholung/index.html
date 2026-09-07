@@ -300,6 +300,31 @@
      anfassen" ohne Erklaerung lesbar ist. */
   .card-row.card-frei { background: rgba(227, 200, 138, 0.10); border-radius: var(--radius); padding-left: 8px; padding-right: 8px; }
   .lock-anzeige { font-size: 0.95rem; opacity: 0.75; }
+  /* 2.8.0: Fortschritt */
+  .heute-bar { height: 12px; background: var(--bg); border-radius: 999px; overflow: hidden; }
+  .heute-bar span { display: block; height: 100%; background: var(--green); transition: width 0.3s ease; }
+  .gross-zahl { margin: 4px 0 2px; line-height: 1.3; }
+  .gross-zahl strong { font-size: 1.9rem; color: var(--accent); }
+  .gross-zahl span { color: var(--ink-soft); font-size: 0.9rem; }
+  /* Kalenderraster: spaltenweise gefuellt, sieben Zeilen = Wochentage. */
+  .kal { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, 1fr); gap: 3px; margin-top: 8px; overflow-x: auto; padding-bottom: 4px; }
+  .kal-tag { width: 11px; height: 11px; border-radius: 2px; background: var(--bg); }
+  .kal-tag.sx { background: transparent; }
+  .kal-tag.s0 { background: var(--bg); }
+  .kal-tag.s1 { background: rgba(122, 184, 147, 0.30); }
+  .kal-tag.s2 { background: rgba(122, 184, 147, 0.55); }
+  .kal-tag.s3 { background: rgba(122, 184, 147, 0.80); }
+  .kal-tag.s4 { background: var(--green); }
+  .kal-tag.heute { outline: 1px solid var(--accent); outline-offset: 1px; }
+  .lekt-leiste { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-top: 8px; }
+  .lekt-kachel { background: var(--bg); border-radius: var(--radius); padding: 8px 10px; }
+  .lekt-kachel.zu { opacity: 0.45; }
+  .lekt-kachel.dran { outline: 1px solid var(--accent); }
+  .lekt-name { font-size: 0.82rem; margin-bottom: 6px; }
+  .lekt-bar { height: 5px; background: var(--card); border-radius: 999px; overflow: hidden; }
+  .lekt-bar span { display: block; height: 100%; background: var(--accent); }
+  .lekt-kachel.sitzt .lekt-bar span { background: var(--green); }
+  .lekt-zahl { font-size: 0.74rem; color: var(--ink-soft); margin-top: 4px; }
   /* 2.4.0: Modus „Lernen". Eine Liste zum Mitlesen, keine Abfrage - deshalb
      keine grossen Bewertungsflaechen, sondern ruhige Zeilen mit einer
      einzigen Handlung rechts. */
@@ -498,7 +523,7 @@ const firebaseConfig = {
 
 /* Versionsnummer: bei jeder Veroeffentlichung hochzaehlen und denselben Wert
    als CACHE_NAME in sw.js eintragen, damit alte Dateien verworfen werden. */
-const APP_VERSION = "2.7.0";
+const APP_VERSION = "2.8.0";
 
 const CONFIGURED = firebaseConfig.apiKey !== "HIER_EINFUEGEN";
 const app = document.getElementById("app");
@@ -931,9 +956,66 @@ function bereicheMapToArray(mapObj) {
   }).sort((x, y) => x.order - y.order).map(({ order, ...rest }) => rest);
   return list.length ? list : [{ id: genId(), name: "Vokabeln", karten: [], sets: [] }];
 }
+/* ---------- 2.8.0: Tagesprotokoll ----------
+   Bis 2.7.0 speicherte die App nur den AKTUELLEN Zustand jeder Karte. Damit
+   liess sich kein Verlauf zeigen: kein "diese Woche", kein Vergleich mit
+   gestern, kein Kalender. Der Fortschritts-Tab konnte deshalb gar nicht
+   lebendig sein - er hatte nichts, woraus sich eine Bewegung ergibt.
+
+   Jetzt wird pro Tag mitgeschrieben, wie viel gelernt wurde: w = bewertete
+   Wiederholungen, n = zum ersten Mal gelernte Karten. Zwei Zahlen pro Tag,
+   120 Tage aufgehoben - das sind ein paar Kilobyte.
+
+   Das Protokoll ist Anzeige, nichts haengt daran. Deshalb wird es gebuendelt
+   geschrieben (siehe verlaufSpeichernBald) statt bei jeder Karte einzeln;
+   geht beim Schliessen der Seite einmal ein Eintrag verloren, ist das kein
+   Schaden. */
+const VERLAUF_TAGE = 120;
+let verlauf = {};
+let verlaufTimer = null;
+function normVerlauf(v) {
+  const out = {};
+  if (!v || typeof v !== "object") return out;
+  const grenze = dateInDays(-VERLAUF_TAGE);
+  for (const k of Object.keys(v)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(k) || k < grenze) continue;
+    const e = v[k] || {};
+    out[k] = { w: Number.isInteger(e.w) && e.w > 0 ? e.w : 0,
+               n: Number.isInteger(e.n) && e.n > 0 ? e.n : 0 };
+  }
+  return out;
+}
+function verlaufZaehle(art) {
+  const t = todayStr();
+  if (!verlauf[t]) verlauf[t] = { w: 0, n: 0 };
+  verlauf[t][art] = (verlauf[t][art] || 0) + 1;
+  verlaufSpeichernBald();
+}
+function verlaufSpeichernBald() {
+  if (verlaufTimer) return;
+  verlaufTimer = setTimeout(() => { verlaufTimer = null; persistVerlauf(); }, 2000);
+}
+function persistVerlauf() {
+  if (!userDocRef) return;
+  const grenze = dateInDays(-VERLAUF_TAGE);
+  for (const k of Object.keys(verlauf)) if (k < grenze) delete verlauf[k];
+  fb.updateDoc(userDocRef, { verlauf: verlauf }).catch(() => {});
+}
+/* Summe der letzten n Tage (heute eingeschlossen). */
+function verlaufSumme(tage) {
+  let w = 0, nn = 0;
+  for (let i = 0; i < tage; i++) {
+    const e = verlauf[dateInDays(-i)];
+    if (e) { w += e.w || 0; nn += e.n || 0; }
+  }
+  return { w: w, n: nn, gesamt: w + nn };
+}
+
 function normStreak(s) {
-  if (!s || typeof s !== "object") return { count: 0, lastCompletedDate: null, lastEvaluatedDate: null };
+  if (!s || typeof s !== "object") return { count: 0, lastCompletedDate: null, lastEvaluatedDate: null, jokerAm: null };
   return {
+    /* 2.8.0: Tag, an dem zuletzt ein Ausfalltag ueberbrueckt wurde. */
+    jokerAm: /^\d{4}-\d{2}-\d{2}$/.test(s.jokerAm) ? s.jokerAm : null,
     count: Number.isInteger(s.count) && s.count >= 0 ? s.count : 0,
     lastCompletedDate: /^\d{4}-\d{2}-\d{2}$/.test(s.lastCompletedDate) ? s.lastCompletedDate : null,
     lastEvaluatedDate: /^\d{4}-\d{2}-\d{2}$/.test(s.lastEvaluatedDate) ? s.lastEvaluatedDate : null
@@ -1229,6 +1311,7 @@ async function initFirebase() {
     umzugBereiche = null;
     streak = normStreak(null);
     settings = normSettings(null);
+    verlauf = {};
     cloudDocExists = false;
     ui.session = null;
     ui.editId = null;
@@ -1257,6 +1340,7 @@ async function initFirebase() {
         if (typeof data.name === "string" && data.name) displayName = data.name;
         settings = normSettings(data.settings);
         streak = normStreak(data.streak);
+        verlauf = normVerlauf(data.verlauf);
         if (data.schemaVersion === SCHEMA_VERSION) {
           ui.umzug = null;
           sammlungenStarten();
@@ -1555,7 +1639,17 @@ function evaluateStreakForNewDay() {
     return b.karten.some(c => !istNeueKarte(c) && c.nextReview < t && (frei === null || frei.has(c.id)));
   });
   if (hadOverdue && streak.lastCompletedDate !== t) {
-    streak.count = 0;
+    /* 2.8.0: Ein Ausfalltag reisst die Serie nicht sofort. Serien wirken,
+       weil man ungern verliert - genau deshalb hoeren viele nach dem ersten
+       gerissenen Tag ganz auf. Eine Kulanz alle sieben Tage faengt Krankheit
+       und Reisen ab, ohne die Serie wertlos zu machen. */
+    const jokerFrei = !streak.jokerAm || streak.jokerAm < dateInDays(-7);
+    if (jokerFrei && streak.count > 0) {
+      streak.jokerAm = dateInDays(-1);
+    } else {
+      streak.count = 0;
+      streak.jokerAm = null;
+    }
   }
   streak.lastEvaluatedDate = t;
   persistStreak();
@@ -1773,6 +1867,35 @@ const STAT_GRUPPEN = [
   { label: "im Aufbau", erklaerung: "Stufe 3–5",          farbe: "var(--accent-dark)", test: c => !istNeueKarte(c) && c.stufe >= 3 && c.stufe <= 5 },
   { label: "sitzt",     erklaerung: "Stufe 6+",           farbe: "var(--green)",      test: c => !istNeueKarte(c) && c.stufe >= 6 }
 ];
+/* Kalenderraster: sieben Zeilen (Wochentage), eine Spalte je Woche. Die
+   Faerbung richtet sich nach der Menge des Tages, in vier groben Stufen -
+   feiner waere nicht lesbar. */
+function renderKalender(tage) {
+  /* Das Raster hat sieben Zeilen (Mo..So) und volle Spalten. Deshalb wird
+     vom SONNTAG DIESER WOCHE aus zurueckgerechnet - sonst bricht die letzte
+     Spalte mitten ab und die Zeilen stehen nicht mehr fuer Wochentage. */
+  const wochen = Math.ceil(tage / 7);
+  const heuteIso = todayStr();
+  const heute = new Date(heuteIso + "T00:00:00");
+  const dow = heute.getDay() === 0 ? 7 : heute.getDay();      // Mo=1 .. So=7
+  const ende = new Date(heute); ende.setDate(ende.getDate() + (7 - dow));
+  const start = new Date(ende); start.setDate(start.getDate() - (wochen * 7 - 1));
+  let html = '<div class="kal">';
+  for (let i = 0; i < wochen * 7; i++) {
+    const d = new Date(start); d.setDate(d.getDate() + i);
+    const iso = fmtDate(d);
+    const e = verlauf[iso];
+    const menge = e ? (e.w || 0) + (e.n || 0) : 0;
+    const zukunft = iso > heuteIso;
+    /* Vier Stufen. Feiner waere bei 11 Pixeln nicht mehr unterscheidbar. */
+    const stufe = zukunft ? "x" : menge === 0 ? 0 : menge < 10 ? 1 : menge < 25 ? 2 : menge < 50 ? 3 : 4;
+    html += '<div class="kal-tag s' + stufe + (iso === heuteIso ? " heute" : "") +
+      '" title="' + esc(iso + (zukunft ? "" : ": " + menge + " Karten")) + '"></div>';
+  }
+  html += '</div>';
+  return html;
+}
+
 function stufenVerteilung(cards) {
   return STAT_GRUPPEN.map(g => ({ ...g, anzahl: cards.filter(g.test).length }));
 }
@@ -2650,6 +2773,7 @@ function lernAbhaken(id) {
   card.ersteBewertung = todayStr();
   card.stufe = 1;
   card.maxStufe = Math.max(card.maxStufe || 0, 1);
+  verlaufZaehle("n");
   card.nextReview = dateInDays(1);   // ab morgen im Lernen-Tab
   persistCardGrade(currentBereich().id, card.id, {
     stufe: card.stufe, nextReview: card.nextReview,
@@ -2907,6 +3031,10 @@ function gradeCard(kind) {
          nicht: da war die Erinnerung ja da. */
       if (!warNeu) card.rueckfaelle = (card.rueckfaelle || 0) + 1;
     }
+    /* 2.8.0: fuers Tagesprotokoll. warNeu steht vor der Bewertung fest -
+       danach traegt die Karte ihr Erstbewertungsdatum und waere nicht mehr
+       als neu erkennbar. */
+    verlaufZaehle(warNeu ? "n" : "w");
   }
   const id = s.queue.shift();
   // Nur „Nicht" hängt die Karte wieder hinten an. „Fast" ist morgen dran –
@@ -3559,23 +3687,47 @@ function renderFortschritt() {
     return html;
   }
 
-  /* --- Kennzahlen --- */
+  /* --- 1. Heute: das Einzige, was jeden Tag von vorn beginnt --- */
   const t = todayStr();
-  const faellig = cards.filter(c => !istNeueKarte(c) && c.nextReview <= t).length;
-  const heuteNeu = cards.filter(c => c.ersteBewertung === t).length;
-  html += '<div class="stat-kennzahlen">';
-  html += '<div class="stat-kennzahl"><div class="zahl">' + cards.length + '</div><div class="was">Karten insgesamt</div></div>';
-  html += '<div class="stat-kennzahl"><div class="zahl">' + faellig + '</div><div class="was">heute zu wiederholen</div></div>';
-  html += '<div class="stat-kennzahl"><div class="zahl">' + heuteNeu + '</div><div class="was">heute neu gelernt</div></div>';
-  html += '<div class="stat-kennzahl"><div class="zahl">' + streak.count + '</div><div class="was">Tage am Stück</div></div>';
+  const offenHeute = cards.filter(c => !istNeueKarte(c) && c.nextReview <= t).length;
+  const heute = verlauf[t] || { w: 0, n: 0 };
+  const getan = heute.w + heute.n;
+  const ziel = getan + offenHeute;
+  const anteil = ziel > 0 ? Math.round((getan / ziel) * 100) : 100;
+  html += '<div class="stat-block" style="border-top:none; padding-top:0; margin-top:0">';
+  html += '<h3>Heute</h3>';
+  html += '<div class="heute-bar" role="img" aria-label="' + getan + ' von ' + ziel + ' erledigt"><span style="width:' + anteil + '%"></span></div>';
+  html += '<p class="stat-sub" style="padding-top:8px">' +
+    (ziel === 0
+      ? 'Nichts zu tun – schau morgen wieder rein.'
+      : '<strong>' + getan + '</strong> erledigt' + (offenHeute > 0 ? ', noch ' + offenHeute + ' offen' : ' – fertig ✓')) +
+    (heute.n > 0 ? ' · davon ' + heute.n + ' zum ersten Mal' : '') + '</p>';
+  html += '<p class="stat-sub">🔥 ' + streak.count + ' Tag' + (streak.count === 1 ? '' : 'e') + ' am Stück' +
+    (streak.jokerAm ? ' · ein Ausfalltag überbrückt' : '') + '</p>';
   html += '</div>';
 
-  /* --- Stufenverteilung --- */
+  /* --- 2. Die letzten Wochen: die Bewegung, die dem Tab vorher fehlte ---
+     Ein Kalenderraster sagt in einer Sekunde, ob man dranbleibt - dafür
+     braucht es keine Beschriftung und keine Erklärung. */
+  html += '<div class="stat-block">';
+  html += '<h3>Die letzten 12 Wochen</h3>';
+  const w12 = verlaufSumme(84);
+  html += '<p class="stat-sub">' + w12.gesamt + ' Karten bearbeitet · ' + w12.n + ' zum ersten Mal</p>';
+  html += renderKalender(84);
+  html += '</div>';
+
+  /* --- 3. Der Stoff: eine Zahl, die nie zurückgeht --- */
+  const gesessen = cards.filter(c => (c.maxStufe || 0) >= LEKTION_STUFE).length;
   const gruppen = stufenVerteilung(cards);
   const gesamt = cards.length;
-  html += '<div class="stat-block" style="border-top:none; padding-top:0; margin-top:0">';
-  html += '<h3>Wie fest sitzt der Stoff?</h3>';
-  html += '<p class="stat-sub">' + gesamt + ' Karten' + (nurBereich ? ' in „' + esc(currentBereich().name) + '"' : ' über alle Bereiche') + '</p>';
+  html += '<div class="stat-block">';
+  html += '<h3>Dein Stoff</h3>';
+  /* maxStufe kann nicht fallen - anders als der Stapelbalken darunter, der
+     schwankt, sobald man etwas vergisst. Deshalb steht diese Zahl oben. */
+  html += '<p class="gross-zahl"><strong>' + gesessen + '</strong> <span>von ' + gesamt + ' Karten saßen schon mindestens einmal</span></p>';
+  const woche = verlaufSumme(7);
+  if (woche.n > 0) html += '<p class="stat-sub">Diese Woche ' + woche.n + ' neue dazu.</p>';
+  html += '<p class="stat-sub" style="padding-top:6px">Wie fest es gerade sitzt:</p>';
   html += '<div class="stat-bar" role="img" aria-label="' +
     esc(gruppen.map(g => g.anzahl + " " + g.label).join(", ")) + '">';
   gruppen.forEach(g => {
@@ -3592,6 +3744,38 @@ function renderFortschritt() {
   });
   html += '</div>';
   html += '</div>';
+
+  /* --- 4. Lektionen: nur, wenn es welche gibt ---
+     Der Ziel-Gradient-Effekt greift bei einem NAHEN Ziel. 21 Karten in einer
+     Lektion sind eines, 133 Karten im Bereich nicht. Wer keine Lektionen hat
+     (eigene Bereiche), sieht diesen Block gar nicht - ein leerer Block waere
+     schlechter als keiner. */
+  const bF = currentBereich();
+  const lekF = lektionenVon(bF);
+  if (nurBereich && lekF.length > 0) {
+    const offenIds = offeneLektionIds(bF);
+    const aktF = aktuelleLektion(bF);
+    html += '<div class="stat-block">';
+    html += '<h3>Lektionen</h3>';
+    const fertig = lekF.filter(x => lektionSitzt(bF, x)).length;
+    html += '<p class="stat-sub">' + fertig + ' von ' + lekF.length + ' sitzen</p>';
+    html += '<div class="lekt-leiste">';
+    for (const st of lekF) {
+      const karten = setCards(st);
+      const sitzt = lektionSitzt(bF, st);
+      const zu = !offenIds.has(st.id);
+      const dran = aktF && st.id === aktF.id;
+      const fest = karten.filter(c => (c.maxStufe || 0) >= LEKTION_STUFE || istVerbrannt(c)).length;
+      const p = karten.length ? Math.round((fest / karten.length) * 100) : 100;
+      html += '<div class="lekt-kachel' + (zu ? " zu" : sitzt ? " sitzt" : "") + (dran ? " dran" : "") + '">';
+      html += '<div class="lekt-name">' + (zu ? "🔒 " : sitzt ? "✓ " : "") + esc(st.name) + '</div>';
+      html += '<div class="lekt-bar"><span style="width:' + (zu ? 0 : p) + '%"></span></div>';
+      html += '<div class="lekt-zahl">' + (zu ? karten.length + ' Karten' : fest + ' / ' + karten.length) + '</div>';
+      html += '</div>';
+    }
+    html += '</div>';
+    html += '</div>';
+  }
 
   /* --- E6: verbrannte Karten --- */
   const leeches = verbrannteKarten();
@@ -3637,7 +3821,7 @@ function renderFortschritt() {
   const spitze = tage.slice(1).reduce((a, b) => b.anzahl > a.anzahl ? b : a, tage[1]);
   if (spitze && spitze.anzahl >= 60) {
     html += '<p class="hint" style="padding-bottom:0">⚠ Am ' + esc(tagKurz(spitze.tag)) + ' stehen ' + spitze.anzahl +
-      ' Wiederholungen an. Wenn du das Tageslimit für neue Karten bis dahin senkst, wird der Tag kleiner.</p>';
+      ' Wiederholungen an. An dem Tag wird es voll – plan ihn ein.</p>';
   }
   html += '</div>';
 
