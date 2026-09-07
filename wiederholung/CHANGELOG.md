@@ -1,3 +1,52 @@
+## 2.11.2 – 7. September 2026
+
+### Behoben
+
+- **Der allererste Bildschirm schickte neue Nutzer in die falsche Richtung.**
+  Wer sich gerade angemeldet hatte, las im leeren Bereich nur: „leg welche
+  unter Verwalten an". Wer stattdessen eine Kartensatz-Datei bekommen hatte –
+  also der Regelfall für alle, die einen Satz geschickt bekommen – las
+  ausgerechnet die Aufforderung, alles selbst zu tippen. Vom Import stand dort
+  kein Wort; der versteckte sich als kleiner Link oben rechts zwischen zwei
+  Backup-Knöpfen.
+
+  Jetzt steht der Import dort zuerst und als richtiger Knopf, das eigene
+  Anlegen darunter als Alternative.
+
+---
+
+## 2.11.1 – 7. September 2026
+
+### Behoben
+
+- **Eine freigeschaltete Lektion konnte nach dem Neuladen wieder zugehen.**
+  Der höchste je erreichte Stand einer Karte wurde beim Bewerten zwar im
+  Speicher nachgezogen, aber **nie in die Cloud geschrieben**. Beim nächsten
+  Laden errechnete die App ihn ersatzweise aus der *aktuellen* Stufe. Für eine
+  Karte, die einmal auf Stufe 2 stand und später zurückfiel, hieß das:
+  Höchststand wieder 1 – und die Lektion dahinter war wieder gesperrt.
+
+  Genau der Fall, den „einmal erreicht" verhindern sollte. Auf demselben Gerät
+  fiel es nicht auf, weil der Wert dort im Speicher stand; erst nach einem
+  Neuladen oder auf einem zweiten Gerät.
+
+- **Die erste Abfrage konnte Karten „verbrennen".** Seit 2.11.0 stellt
+  „Gesehen" eine Karte in die Abfrage, ohne ihr eine Stufe zu geben – damit
+  galt sie sofort als „nicht mehr neu". Wer sie in der ersten Abfrage nicht
+  wusste, sammelte Rückfälle für etwas, das er gerade zum ersten Mal gelesen
+  hatte; nach fünf Malen wäre die Karte als verbrannt markiert worden.
+
+  Ein Rückfall zählt jetzt erst, wenn die Karte **schon einmal gesessen hat** –
+  gemessen am Höchststand, nicht daran, ob sie schon angefasst wurde.
+
+### Geändert
+
+- **Frisch durchgesehene Karten heißen nicht mehr „Wiederholungen".** Im
+  Lernen-Tab steht jetzt „21 Karten in der ersten Abfrage" statt „21
+  Wiederholungen" – man hat sie ja noch nie gewusst.
+
+---
+
 ## 2.11.0 – 7. September 2026 — „Ansehen, prüfen, wiederholen"
 
 ### Geändert
