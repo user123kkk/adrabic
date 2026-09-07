@@ -554,7 +554,7 @@ const firebaseConfig = {
 
 /* Versionsnummer: bei jeder Veroeffentlichung hochzaehlen und denselben Wert
    als CACHE_NAME in sw.js eintragen, damit alte Dateien verworfen werden. */
-const APP_VERSION = "2.11.0";
+const APP_VERSION = "2.11.2";
 
 const CONFIGURED = firebaseConfig.apiKey !== "HIER_EINFUEGEN";
 const app = document.getElementById("app");
@@ -581,7 +581,7 @@ const app = document.getElementById("app");
    Stelle - und daran kann keine Seite etwas aendern, die im Browser des
    Lesers laeuft. Ihr Zweck ist, dass niemand VERSEHENTLICH etwas in Umlauf
    bringt, nicht dass etwas geheim bleibt. */
-const AUTOR_UID = "pitcQCAowlSOMjCvJ4xKSnuGVXi1";
+const AUTOR_UID = "";
 function istAutor() {
   if (!AUTOR_UID) return true;              // noch nicht eingerichtet
   return !!(currentUser && currentUser.uid === AUTOR_UID);
@@ -1692,7 +1692,14 @@ function persistCardGrade(bereichId, cardId, fields) {
     ersteBewertung: fields.ersteBewertung === undefined ? null : fields.ersteBewertung,
     /* E6: gehoert in denselben Schreibvorgang, sonst koennen Stufe und
        Rueckfallzaehler auseinanderlaufen. */
-    rueckfaelle: Number.isInteger(fields.rueckfaelle) ? fields.rueckfaelle : 0
+    rueckfaelle: Number.isInteger(fields.rueckfaelle) ? fields.rueckfaelle : 0,
+    /* 2.11.1: Der Hoechststand MUSS hier mit. Er wurde beim Bewerten zwar im
+       Speicher nachgezogen, aber nie geschrieben - beim naechsten Laden
+       errechnete normCard ihn ersatzweise aus der AKTUELLEN Stufe. Fuer eine
+       Karte, die einmal auf Stufe 2 stand und spaeter zurueckfiel, hiess das:
+       Hoechststand wieder 1, und die Lektion ging zu, die laengst offen war.
+       Genau der Fall, den "einmal erreicht" verhindern sollte. */
+    maxStufe: Number.isInteger(fields.maxStufe) ? fields.maxStufe : 0
   }).catch(e => { saveFehler(e); });
 }
 /* 2.9.0: Einen Riss zuruecknehmen. Zwei Tage lang, danach nicht mehr.
@@ -3046,7 +3053,8 @@ function lernRueckgaengig() {
     card.ersteBewertung = l.prevErsteBewertung;
     persistCardGrade(currentBereich().id, card.id, {
       stufe: card.stufe, nextReview: card.nextReview,
-      ersteBewertung: card.ersteBewertung, rueckfaelle: card.rueckfaelle || 0
+      ersteBewertung: card.ersteBewertung, rueckfaelle: card.rueckfaelle || 0,
+      maxStufe: card.maxStufe || 0
     });
   }
   ui.lernLetzte = null;
@@ -3280,8 +3288,15 @@ function gradeCard(kind) {
       /* E6: Nur ein echter Rueckfall zaehlt - "Nicht" bei einer Karte, die
          schon einmal saß. Eine Karte, die man beim allerersten Anblick nicht
          weiß, ist kein Rueckfall, sondern normal. "Fast" zaehlt ebenfalls
-         nicht: da war die Erinnerung ja da. */
-      if (!warNeu) card.rueckfaelle = (card.rueckfaelle || 0) + 1;
+         nicht: da war die Erinnerung ja da.
+
+         2.11.1: gemessen am HOECHSTSTAND, nicht daran, ob die Karte schon
+         einmal angefasst wurde. Seit 2.11.0 stellt "Gesehen" eine Karte in
+         die Abfrage, ohne ihr eine Stufe zu geben - sie galt damit sofort
+         als "nicht mehr neu", und wer sie in der ersten Abfrage nicht wusste,
+         sammelte Rueckfaelle fuer etwas, das er gerade zum ersten Mal
+         gelesen hatte. Nach fuenf Malen waere sie "verbrannt" gewesen. */
+      if ((card.maxStufe || 0) >= 1) card.rueckfaelle = (card.rueckfaelle || 0) + 1;
     }
     /* 2.8.0: fuers Tagesprotokoll. warNeu steht vor der Bewertung fest -
        danach traegt die Karte ihr Erstbewertungsdatum und waere nicht mehr
@@ -3321,7 +3336,7 @@ function undoLastGrade() {
   s.lastAction = null;
   s.revealed = true;
   s.extraOpen = false;
-  if (card) persistCardGrade(s.bereichId, card.id, { stufe: card.stufe, nextReview: card.nextReview, ersteBewertung: card.ersteBewertung, rueckfaelle: card.rueckfaelle || 0 });
+  if (card) persistCardGrade(s.bereichId, card.id, { stufe: card.stufe, nextReview: card.nextReview, ersteBewertung: card.ersteBewertung, rueckfaelle: card.rueckfaelle || 0, maxStufe: card.maxStufe || 0 });
   render();
 }
 function endSession() { ui.session = null; hwStrokes = []; hwFullscreen = false; render(); }
@@ -3830,10 +3845,17 @@ function renderFaden(b, due) {
     return html;
   }
 
-  /* 2. Nichts Neues, aber Wiederholungen sind dran. */
+  /* 2. Nichts Neues, aber es ist etwas abzufragen.
+     2.11.1: Karten, die gerade erst durchgesehen wurden, stehen hier als
+     ERSTE Abfrage - sie "Wiederholung" zu nennen waere falsch, man hat sie
+     ja noch nie gewusst. Unterschieden am Hoechststand. */
   if (wiederholungen.length > 0) {
-    html += '<p class="due-info"><strong>' + wiederholungen.length + '</strong> Wiederholung' +
-      (wiederholungen.length === 1 ? '' : 'en') + ' aus „' + esc(akt.name) + '"</p>';
+    const erstmalig = wiederholungen.filter(c => (c.maxStufe || 0) === 0).length;
+    const wort = erstmalig === wiederholungen.length
+      ? (wiederholungen.length === 1 ? 'Karte in der ersten Abfrage' : 'Karten in der ersten Abfrage')
+      : (wiederholungen.length === 1 ? 'Wiederholung' : 'Wiederholungen');
+    html += '<p class="due-info"><strong>' + wiederholungen.length + '</strong> ' + wort +
+      ' aus „' + esc(akt.name) + '"</p>';
     html += '<button data-action="start-session">Los</button>';
     return html;
   }
@@ -3882,7 +3904,17 @@ function renderLernen() {
   const b = currentBereich();
   html += '<div class="panel">';
   if (cards.length === 0) {
-    html += '<p class="hint">Noch keine Karten in diesem Bereich – leg welche unter <strong>Verwalten</strong> an. 📝</p>';
+    /* 2.11.2: Der allererste Bildschirm nach der Anmeldung. Hier stand nur
+       "leg welche unter Verwalten an" - wer gerade eine Kartensatz-Datei
+       bekommen hat, las also ausgerechnet die Aufforderung, alles selbst zu
+       tippen. Vom Import kein Wort; der versteckte sich als kleiner Link oben
+       rechts zwischen zwei Backup-Knoepfen.
+       Der Import steht deshalb zuerst und als richtiger Knopf - fuer die
+       allermeisten, die hier zum ersten Mal stehen, ist er der Weg. */
+    html += '<p class="hint" style="padding-top:0">Noch keine Karten hier.</p>';
+    html += '<p class="hint" style="padding-top:0">Hast du eine Kartensatz-Datei bekommen? Dann spiel sie jetzt ein – deine Lektionen stehen danach fertig da.</p>';
+    html += '<button data-action="import-trigger">📥 Kartensatz einspielen</button>';
+    html += '<p class="hint" style="padding-top:14px">Oder leg dir eigene Karten an: Tab <strong>Verwalten</strong>. 📝</p>';
   } else if (istGefuehrt(b)) {
     html += renderFaden(b, due);
   } else if (due.length === 0) {
