@@ -1,3 +1,54 @@
+## 2.8.0 – 7. September 2026 — „Fortschritt"
+
+### Neu
+
+- **Ein Tagesprotokoll.** Bis 2.7.0 speicherte die App nur den *aktuellen*
+  Zustand jeder Karte. Damit ließ sich kein Verlauf zeigen: kein „diese
+  Woche", kein Vergleich mit gestern, kein Kalender. Der Fortschritts-Tab
+  konnte gar nicht lebendig sein – er hatte nichts, woraus sich eine Bewegung
+  ergibt.
+
+  Jetzt werden pro Tag zwei Zahlen mitgeschrieben: wie viele Wiederholungen
+  bewertet und wie viele Karten zum ersten Mal gelernt wurden. 120 Tage
+  werden aufgehoben, das sind ein paar Kilobyte. Geschrieben wird gebündelt,
+  nicht bei jeder Karte – das Protokoll ist Anzeige, es hängt nichts daran.
+
+- **Der Fortschritts-Tab ist neu aufgebaut**, in vier Ebenen von schnell nach
+  langsam:
+
+  - **Heute** – ein Balken, der voll wird, und morgen wieder bei null steht.
+    Das Einzige im Tab, das täglich abschließbar ist.
+  - **Die letzten 12 Wochen** – ein Kalenderraster, sieben Zeilen für die
+    Wochentage. Man sieht in einer Sekunde, ob man dranbleibt.
+  - **Dein Stoff** – „84 von 133 Karten saßen schon mindestens einmal". Diese
+    Zahl kann nie zurückgehen, weil sie an der höchsten je erreichten Stufe
+    hängt und nicht an der aktuellen. Der bisherige Stapelbalken steht als
+    Detail darunter – der schwankt, sobald man etwas vergisst, und taugt
+    deshalb nicht als Hauptzahl.
+  - **Lektionen** – eine Kachel je Lektion mit eigenem Balken. Ein Ziel wirkt,
+    wenn es nah ist; 21 Karten sind eines, 133 nicht. Der Block erscheint nur,
+    wenn es Lektionen gibt.
+
+- **Ein Ausfalltag reißt die Serie nicht mehr sofort.** Serien wirken, weil man
+  ungern verliert – genau deshalb hören viele nach dem ersten gerissenen Tag
+  ganz auf. Höchstens einmal pro Woche wird ein Ausfall überbrückt; das fängt
+  Krankheit und Reisen ab, ohne die Serie wertlos zu machen. Der Tab sagt
+  dazu, wenn ein Tag überbrückt wurde.
+
+### Geändert
+
+- **„Karten insgesamt" ist raus.** Eine Zahl, die nichts über den Lernstand
+  sagt und nur größer wird, weil man fleißig anlegt.
+
+- Bewusst **nicht** eingebaut: Punkte, Ligen, Abzeichen. Äußere Belohnungen
+  können die innere Motivation verdrängen – bei diesem Stoff besonders
+  schade. Alle Zahlen im Tab beschreiben den Stoff, nicht den Fleiß.
+
+- Der Hinweis bei einem vollen Wiederholungstag verweist nicht mehr auf das
+  Tageslimit, das es seit 2.3.0 nicht mehr gibt.
+
+---
+
 ## 2.7.0 – 7. September 2026 — „Der Faden"
 
 ### Neu
