@@ -1,3 +1,48 @@
+## 2.10.0 – 7. September 2026 — „Mitgenommen werden"
+
+### Neu
+
+- **Sprung und Aufleuchten**, übernommen aus dem Adrabic-Trainer. Dort führt
+  ein Tipp auf ein Kategorie-Zeichen in der Checkliste sanft zum passenden
+  Modul, und das Modul leuchtet kurz auf – so sieht man, *was* sich geändert
+  hat.
+
+  Dasselbe gilt jetzt hier für jede Aktion, deren Wirkung nicht dort steht, wo
+  man getippt hat: 🔁 Üben und ▶ Durchgehen aus einer Speicherkarte heraus
+  starten oben eine Sitzung, während man unten in der Kartenliste steht. Ohne
+  den Sprung sah es aus, als sei nichts passiert. Gleiches Aufleuchten,
+  gleiche 1,4 Sekunden, gleicher Creme-Ton – und wie im Trainer wird
+  `prefers-reduced-motion` beachtet.
+
+### Geändert
+
+- **„▶ Lernen" heißt an der Speicherkarte jetzt „▶ Durchgehen".** Es stand
+  direkt neben „🔁 Üben", und beides klang nach demselben – dabei ist das eine
+  Ansehen und das andere Abfragen. „Durchgehen" ist außerdem das Wort, das im
+  Lernen-Tab schon auf dem Knopf steht.
+
+  Die Erklärzeile über den Lektionen sagt den Unterschied jetzt ausdrücklich:
+  Durchgehen heißt ansehen und abhaken, Üben heißt abfragen und ändert nichts
+  am Fortschritt.
+
+### Behoben
+
+- **Ein Update konnte den Lernstand aller Karten austauschen.** Beim
+  Zusammenführen wurden Karten nur über ihre Herkunfts-Nummer zugeordnet.
+  Traf eine Datei ohne solche Nummern – etwa ein gewöhnliches Backup – auf
+  einen geführten Kartensatz, passte keine einzige Karte: alle galten als neu,
+  alle vorhandenen als weggefallen. Aus 133 Karten wurden 133 andere, der
+  Lernstand war weg.
+
+  Jetzt dient das arabische Wort als Rückfallebene, wenn die Nummer fehlt, und
+  eine fehlende Nummer wird beim Zusammenführen nachgetragen.
+
+- **Notbremse beim Zusammenführen.** Fiele mehr als die Hälfte der Karten weg,
+  steht das jetzt als Warnung im Dialog. Das passt fast nie und heißt
+  meistens, dass die Datei nicht aus derselben Reihe stammt.
+
+---
+
 ## 2.9.0 – 7. September 2026 — „Beste Serie"
 
 ### Neu
