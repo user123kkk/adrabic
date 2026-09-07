@@ -299,7 +299,7 @@
      ist - dieselbe Farbe wie bei den Suchtreffern, damit "das darfst du
      anfassen" ohne Erklaerung lesbar ist. */
   .card-row.card-frei { background: rgba(227, 200, 138, 0.10); border-radius: var(--radius); padding-left: 8px; padding-right: 8px; }
-  .lock-btn { font-size: 1rem; padding: 4px 7px; }
+  .lock-anzeige { font-size: 0.95rem; opacity: 0.75; }
   /* 2.4.0: Modus „Lernen". Eine Liste zum Mitlesen, keine Abfrage - deshalb
      keine grossen Bewertungsflaechen, sondern ruhige Zeilen mit einer
      einzigen Handlung rechts. */
@@ -498,7 +498,7 @@ const firebaseConfig = {
 
 /* Versionsnummer: bei jeder Veroeffentlichung hochzaehlen und denselben Wert
    als CACHE_NAME in sw.js eintragen, damit alte Dateien verworfen werden. */
-const APP_VERSION = "2.6.0";
+const APP_VERSION = "2.7.0";
 
 const CONFIGURED = firebaseConfig.apiKey !== "HIER_EINFUEGEN";
 const app = document.getElementById("app");
@@ -525,7 +525,7 @@ const app = document.getElementById("app");
    Stelle - und daran kann keine Seite etwas aendern, die im Browser des
    Lesers laeuft. Ihr Zweck ist, dass niemand VERSEHENTLICH etwas in Umlauf
    bringt, nicht dass etwas geheim bleibt. */
-const AUTOR_UID = "pitcQCAowlSOMjCvJ4xKSnuGVXi1";
+const AUTOR_UID = "";
 function istAutor() {
   if (!AUTOR_UID) return true;              // noch nicht eingerichtet
   return !!(currentUser && currentUser.uid === AUTOR_UID);
@@ -641,7 +641,16 @@ function normCard(c) {
        Karte eine neue id (sonst ueberschreibt sie vorhandene Karten, siehe
        2.2.0) - an der quelleId erkennt ein spaeteres Update trotzdem wieder,
        welche Karte im Konto schon da ist. Eigene Karten haben keine. */
-    quelleId: typeof c.quelleId === "string" && c.quelleId ? c.quelleId : null
+    quelleId: typeof c.quelleId === "string" && c.quelleId ? c.quelleId : null,
+    /* 2.7.0: hoechste je erreichte Stufe. Sie faellt nie, auch wenn die
+       aktuelle Stufe faellt - genau darum haengt das Freischalten der
+       naechsten Lektion daran und nicht an stufe. Wer bei einer alten Karte
+       ehrlich "Nicht" drueckt, soll damit keine Lektion wieder zusperren.
+       Fuer Karten aus der Zeit davor gilt die aktuelle Stufe als Hoechststand. */
+    maxStufe: Math.max(
+      Number.isInteger(c.maxStufe) && c.maxStufe >= 0 ? Math.min(c.maxStufe, MAX_STUFE) : 0,
+      Number.isInteger(c.stufe) && c.stufe >= 0 ? Math.min(c.stufe, MAX_STUFE) : 0
+    )
   };
 }
 function istNeueKarte(c) { return !c.ersteBewertung; }
@@ -670,6 +679,59 @@ function istVerbrannt(c) { return (c.rueckfaelle || 0) >= LEECH_SCHWELLE; }
    In einem eigenen Bereich gibt es nichts davon: dort ist alles frei und
    alles bearbeitbar, genau wie vor 2.3.0. */
 function istGefuehrt(b) { return !!(b && b.gefuehrt); }
+
+/* ---------- 2.7.0: Das Schloss wird berechnet, nicht gespeichert ----------
+   Bis 2.6.0 stand an jeder Lektion ein gespeichertes "gesperrt", das man von
+   Hand auf- und zumachte. Damit gab es einen Zustand, der mit der
+   Wirklichkeit auseinanderlaufen konnte, und eine Entscheidung, die niemand
+   treffen will.
+
+   Jetzt gilt schlicht:
+       Lektion 1 ist offen.
+       Lektion N ist offen, sobald Lektion N-1 sitzt.
+
+   Und "sitzt" heisst: jede ihrer Karten war SCHON EINMAL auf Stufe 2
+   (maxStufe), nicht: steht gerade darauf. Das ist der entscheidende Punkt -
+   so kann eine einmal geoeffnete Lektion nie wieder zugehen. Wer bei einer
+   alten Karte ehrlich "Nicht" drueckt, verliert nichts.
+
+   Ausnahme: eine verbrannte Karte (fuenf Rueckfaelle) haelt nichts auf. Wer
+   ein Wort fuenfmal verhauen hat, soll deswegen nicht wochenlang feststecken -
+   das ist der Moment, in dem man eine App zumacht. */
+function karteZaehltFuerLektion(c) {
+  return (c.maxStufe || 0) < LEKTION_STUFE && !istVerbrannt(c);
+}
+function lektionOffeneKarten(b, set) {
+  const byId = new Map(b.karten.map(c => [c.id, c]));
+  return set.cardIds.map(id => byId.get(id)).filter(c => c && karteZaehltFuerLektion(c));
+}
+function lektionSitzt(b, set) { return lektionOffeneKarten(b, set).length === 0; }
+/* Die Nummern der offenen Lektionen. Sobald eine nicht sitzt, ist Schluss -
+   die Reihenfolge der Liste ist der Weg. */
+function offeneLektionIds(b) {
+  const lek = lektionenVon(b);
+  const offen = new Set();
+  for (let i = 0; i < lek.length; i++) {
+    if (i > 0 && !lektionSitzt(b, lek[i - 1])) break;
+    offen.add(lek[i].id);
+  }
+  return offen;
+}
+function setGesperrt(s, b) {
+  b = b || currentBereich();
+  if (!istGefuehrt(b) || s.art !== "lektion") return false;
+  return !offeneLektionIds(b).has(s.id);
+}
+/* Die Lektion, an der man gerade steht: die letzte offene. */
+function aktuelleLektion(b) {
+  const offen = offeneLektionIds(b);
+  const lek = lektionenVon(b).filter(s => offen.has(s.id));
+  return lek.length ? lek[lek.length - 1] : null;
+}
+function naechsteLektion(b) {
+  const offen = offeneLektionIds(b);
+  return lektionenVon(b).find(s => !offen.has(s.id)) || null;
+}
 /* Die Menge der freigeschalteten Karten-Nummern - oder null, wenn der Bereich
    gar nicht gefuehrt ist und die Frage sich nicht stellt. null statt "alle"
    spart bei 500 Karten das Aufbauen einer Menge, die ohnehin jeden Test
@@ -679,9 +741,10 @@ function freieIdsFor(b) {
      Ein "gesperrt" an einer Speicherkarte im eigenen Bereich bleibt damit
      folgenlos, auch wenn es aus einer aelteren Fassung noch dranhaengt. */
   if (!istGefuehrt(b)) return null;
+  const offen = offeneLektionIds(b);
   const frei = new Set();
   for (const s of (b.sets || [])) {
-    if (s.art !== "lektion" || s.gesperrt) continue;
+    if (s.art !== "lektion" || !offen.has(s.id)) continue;
     for (const id of s.cardIds) frei.add(id);
   }
   return frei;
@@ -752,6 +815,10 @@ async function hinweisGefuehrt(was) {
    Datenstaende vor 2.3.0 kennen das Feld nicht; sie gelten deshalb als
    "eigen" und verhalten sich damit exakt wie bisher. */
 const SET_ARTEN = ["kategorie", "lektion", "eigen"];
+/* Ab dieser je erreichten Stufe gilt eine Karte als sitzend. Stufe 2 heisst
+   bei den Intervallen (1,8 hoch Stufe-1): einmal gelernt, am naechsten Tag
+   wiedererkannt. Eine Lektion braucht also mindestens zwei Tage. */
+const LEKTION_STUFE = 2;
 const SET_ART_ZEICHEN = { kategorie: "\u{1F4DA}", lektion: "\u{1F4D6}", eigen: "\u2B50" };
 const SET_ART_TITEL = { kategorie: "Kategorien", lektion: "Lektionen", eigen: "Eigene" };
 const SET_ART_ERKLAERUNG = {
@@ -767,6 +834,9 @@ function normSet(s) {
     art: art,
     /* Das Schloss haengt ausschliesslich an Lektionen. Stuende es auch an
        einer Kategorie, waere die Freigabe-Regel nicht mehr eindeutig. */
+    /* Seit 2.7.0 wird das Schloss berechnet (siehe offeneLektionIds). Das
+       Feld bleibt erhalten, damit aeltere Dateien und aeltere Fassungen der
+       App weiter funktionieren - gelesen wird es nicht mehr. */
     gesperrt: art === "lektion" && s.gesperrt === true,
     quelleId: typeof s.quelleId === "string" && s.quelleId ? s.quelleId : null,
     cardIds: (Array.isArray(s.cardIds) ? s.cardIds : []).filter(x => typeof x === "string" && x)
@@ -812,6 +882,7 @@ function kartenFelder(c, order) {
     ersteBewertung: c.ersteBewertung === undefined ? null : c.ersteBewertung,
     rueckfaelle: c.rueckfaelle || 0,
     quelleId: c.quelleId || null,
+    maxStufe: c.maxStufe || 0,
     order: order
   };
 }
@@ -849,7 +920,7 @@ function bereicheMapToArray(mapObj) {
     const kartenMap = b.karten && typeof b.karten === "object" ? b.karten : {};
     const karten = Object.keys(kartenMap).map(cid => {
       const c = kartenMap[cid] || {};
-      return { card: normCard({ id: cid, wort: c.wort, uebersetzung: c.uebersetzung, extra: c.extra, stufe: c.stufe, nextReview: c.nextReview, ersteBewertung: c.ersteBewertung, rueckfaelle: c.rueckfaelle, quelleId: c.quelleId }), order: Number.isFinite(c.order) ? c.order : 0 };
+      return { card: normCard({ id: cid, wort: c.wort, uebersetzung: c.uebersetzung, extra: c.extra, stufe: c.stufe, nextReview: c.nextReview, ersteBewertung: c.ersteBewertung, rueckfaelle: c.rueckfaelle, quelleId: c.quelleId, maxStufe: c.maxStufe }), order: Number.isFinite(c.order) ? c.order : 0 };
     }).sort((x, y) => x.order - y.order).map(x => x.card);
     const setsMap = b.sets && typeof b.sets === "object" ? b.sets : {};
     const sets = Object.keys(setsMap).map(sid => {
@@ -1660,14 +1731,6 @@ function dueCardsFor(bereich) {
   return dran.filter(c => !istNeueKarte(c)).concat(dran.filter(istNeueKarte));
 }
 function dueCards() { return dueCardsFor(currentBereich()); }
-/* Wie viele Karten warten in diesem Bereich noch hinter einem Schloss?
-   (nur zur Anzeige auf dem Lernen-Tab) */
-function gesperrteKarten(bereich) {
-  const b = bereich || currentBereich();
-  const frei = freieIdsFor(b);
-  if (frei === null) return 0;
-  return b.karten.filter(c => !frei.has(c.id)).length;
-}
 /* E7 (1.8.0) */
 function setArabGroesse(id) {
   if (!ARAB_STUFEN.some(x => x.id === id)) return;
@@ -2407,27 +2470,6 @@ function setArtAendern(id, art) {
   });
   render();
 }
-/* Schloss auf und wieder zu. Beides geht jederzeit: Wer merkt, dass eine
-   Lektion noch zu frueh kommt, macht sie wieder zu. Die Stufen der schon
-   gelernten Karten bleiben dabei stehen - sie kommen nur nicht mehr dran und
-   sind beim Wiederaufschliessen sofort faellig, weil ihr Datum inzwischen in
-   der Vergangenheit liegt. */
-async function toggleSetLock(id) {
-  const set = findSet(id);
-  if (!set || set.art !== "lektion" || !istGefuehrt(currentBereich())) return;
-  if (set.gesperrt) {
-    const anzahl = setCards(set).length;
-    const ok = await dlgConfirm('„' + set.name + '" wird freigeschaltet. ' + anzahl +
-      ' Karte(n) kommen damit ins Lernen.', { title: "Lektion freischalten?", okLabel: "Freischalten" });
-    if (!ok) return;
-  }
-  set.gesperrt = !set.gesperrt;
-  if (set.gesperrt && ui.openSetId === set.id) ui.openSetId = null;
-  if (set.gesperrt && ui.lernSetId === set.id) { ui.lernSetId = null; ui.lernLetzte = null; }
-  if (set.gesperrt && ui.drillSource === set.id) ui.drillSource = "stufen";
-  patchDoc({ [pfadSet(currentBereich().id, set.id) + ".gesperrt"]: set.gesperrt });
-  render();
-}
 async function renameSet(id) {
   const set = findSet(id);
   if (!set) return;
@@ -2471,7 +2513,7 @@ function removeCardFromSet(setId, cardId) {
 }
 function toggleSetOpen(id) {
   const set = findSet(id);
-  if (set && set.gesperrt && istGefuehrt(currentBereich())) return;   // zu ist zu: auch kein Reinschauen
+  if (set && setGesperrt(set)) return;   // zu ist zu: auch kein Reinschauen
   ui.openSetId = ui.openSetId === id ? null : id;
   render();
 }
@@ -2505,7 +2547,7 @@ async function startDrill(min, max, handwriting) {
 async function startDrillFromSet(setId, handwriting) {
   const set = findSet(setId);
   if (!set) return;
-  if (istGefuehrt(currentBereich()) && set.gesperrt) {
+  if (setGesperrt(set)) {
     await dlgAlert('„' + set.name + '" ist noch gesperrt. Schalte sie erst frei – dann kannst du sie auch üben.', "Noch gesperrt");
     return;
   }
@@ -2525,7 +2567,7 @@ function startDrillWithCards(cards, label, handwriting) {
     queue: shuffled(ids),
     total: ids.length,
     revealed: false,
-    extraOpen: false,
+    extraOpen: true,
     lastAction: null,
     isDrill: true,
     handwriting: !!handwriting,
@@ -2569,15 +2611,9 @@ function lernKarten(set) {
 async function startLernen(setId) {
   const set = findSet(setId);
   if (!set || !istGefuehrt(currentBereich())) return;
-  /* Der natuerliche Weg, eine Lektion aufzuschliessen: draufdruecken. Ein
-     eigenes Freischalt-Ritual muesste man erst finden. */
-  if (set.gesperrt) {
-    const ok = await dlgConfirm('„' + set.name + '" ist noch gesperrt. Freischalten und durchgehen? ' +
-      setCards(set).length + ' Karte(n) kommen damit ins Lernen.',
-      { title: "Lektion freischalten?", okLabel: "Freischalten" });
-    if (!ok) return;
-    set.gesperrt = false;
-    patchDoc({ [pfadSet(currentBereich().id, set.id) + ".gesperrt"]: false });
+  if (setGesperrt(set)) {
+    await dlgAlert('„' + set.name + '" wird frei, sobald die Lektion davor sitzt.', "Noch nicht dran");
+    return;
   }
   if (lernKarten(set).length === 0) {
     await dlgAlert('„' + set.name + '" enthält keine Karten (mehr).', "Nichts durchzugehen");
@@ -2613,10 +2649,12 @@ function lernAbhaken(id) {
   ui.lernLetzte = { cardId: card.id, prevStufe: card.stufe, prevNextReview: card.nextReview, prevErsteBewertung: card.ersteBewertung };
   card.ersteBewertung = todayStr();
   card.stufe = 1;
+  card.maxStufe = Math.max(card.maxStufe || 0, 1);
   card.nextReview = dateInDays(1);   // ab morgen im Lernen-Tab
   persistCardGrade(currentBereich().id, card.id, {
     stufe: card.stufe, nextReview: card.nextReview,
-    ersteBewertung: card.ersteBewertung, rueckfaelle: card.rueckfaelle || 0
+    ersteBewertung: card.ersteBewertung, rueckfaelle: card.rueckfaelle || 0,
+    maxStufe: card.maxStufe
   });
   ui.lernFokusNach = card.id;
   render();
@@ -2779,7 +2817,7 @@ async function deleteCard(id) {
 function startSession() {
   const due = dueCards();
   if (due.length === 0) return;
-  ui.session = { queue: shuffled(due.map(c => c.id)), total: due.length, revealed: false, extraOpen: false, lastAction: null, isDrill: false, bereichId: currentBereich().id };
+  ui.session = { queue: shuffled(due.map(c => c.id)), total: due.length, revealed: false, extraOpen: true, lastAction: null, isDrill: false, bereichId: currentBereich().id };
   render();
 }
 /* E5 (1.8.0): Beim Aufdecken das Vollbild verlassen.
@@ -2856,6 +2894,7 @@ function gradeCard(kind) {
     if (kind === "known") {
       card.stufe = Math.min(card.stufe + 1, MAX_STUFE);
       card.nextReview = nextReviewForStufe(card.stufe);
+      card.maxStufe = Math.max(card.maxStufe || 0, card.stufe);
     } else if (kind === "almost") {
       card.stufe = Math.max(0, card.stufe - 1);
       card.nextReview = dateInDays(1);
@@ -2875,10 +2914,10 @@ function gradeCard(kind) {
   if (kind === "unknown" && card) s.queue.push(id);
   if (s.isDrill && s.queue.length === 0) s.queue = shuffled(s.drillIds);
   s.revealed = false;
-  s.extraOpen = false;
+  s.extraOpen = true;      // 2.7.0: Notiz ist beim Aufdecken offen
   hwStrokes = [];
   if (!s.isDrill) {
-    if (card) persistCardGrade(s.bereichId, card.id, { stufe: card.stufe, nextReview: card.nextReview, ersteBewertung: card.ersteBewertung, rueckfaelle: card.rueckfaelle || 0 });
+    if (card) persistCardGrade(s.bereichId, card.id, { stufe: card.stufe, nextReview: card.nextReview, ersteBewertung: card.ersteBewertung, rueckfaelle: card.rueckfaelle || 0, maxStufe: card.maxStufe || 0 });
     if (s.queue.length === 0) checkStreakOnSessionComplete();
   }
   render();
@@ -3331,7 +3370,14 @@ function renderDurchsicht(set) {
   /* Der Balken ist die einzige Rueckmeldung in diesem Modus - abgehakt wird
      ohne Ton, ohne Sprung, ohne Bildschirmwechsel. */
   html += '<div class="lern-balken"><span style="width:' + (alle.length ? Math.round(fertig / alle.length * 100) : 0) + '%"></span></div>';
-  html += '<p class="hint" style="padding-top:10px">Geh mit dem Video mit. Ein Tipp auf <strong>Gelernt</strong> setzt die Karte auf Stufe 1 – ab morgen kommt sie im Lernen-Tab als Wiederholung.</p>';
+  /* 2.7.0: Ist alles abgehakt, ist der Bildschirm sonst nur eine Liste
+     abgeblendeter Karten - man weiss nicht, ob man fertig ist. */
+  if (offen.length === 0) {
+    html += '<p class="hint" style="padding-top:10px">✓ Durchgearbeitet. Ab morgen kommen die ' + alle.length +
+      ' Karten im Lernen-Tab als Wiederholung.</p>';
+  } else {
+    html += '<p class="hint" style="padding-top:10px">Geh mit dem Video mit. Ein Tipp auf <strong>Gelernt</strong> setzt die Karte auf Stufe 1 – ab morgen kommt sie im Lernen-Tab als Wiederholung.</p>';
+  }
   html += '</div>';
 
   html += '<div class="lern-raster">';
@@ -3366,6 +3412,80 @@ function renderDurchsicht(set) {
   return html;
 }
 
+/* ---------- 2.7.0: der Faden ----------
+   In einem gefuehrten Kartensatz steht hier immer GENAU EIN Schritt: ein Satz,
+   ein Knopf. Vorher standen mehrere Meldungen nebeneinander, und die
+   wichtigste war eine Wegbeschreibung ("schalte die naechste Lektion unter
+   Verwalten bei den Speicherkarten mit dem Schloss frei"). Wer weiterlernen
+   will, soll nicht in einen anderen Tab geschickt werden, um dort ein Symbol
+   zu suchen - der naechste Schritt gehoert dorthin, wo man steht. */
+function renderFaden(b, due) {
+  const akt = aktuelleLektion(b);
+  const naechste = naechsteLektion(b);
+  let html = "";
+  if (!akt) {
+    return '<p class="hint">Dieser Kartensatz hat noch keine Lektionen.</p>';
+  }
+  const inLektion = lernKarten(akt);
+  const ungelernt = inLektion.filter(istNeueKarte);
+  const wiederholungen = due.filter(c => !istNeueKarte(c));
+
+  /* 1. Neuer Stoff in der offenen Lektion - das ist immer der erste Schritt. */
+  if (ungelernt.length > 0) {
+    const angefangen = inLektion.length - ungelernt.length;
+    html += '<p class="due-info">📖 <strong>' + esc(akt.name) + '</strong></p>';
+    html += '<p class="hint" style="padding:0 0 12px">' +
+      (angefangen > 0
+        ? 'Noch ' + ungelernt.length + ' von ' + inLektion.length + ' Karten.'
+        : inLektion.length + ' Karten, noch keine davon gelernt.') + '</p>';
+    html += '<button data-action="lern-set" data-id="' + esc(akt.id) + '">' +
+      (angefangen > 0 ? "Weiter durchgehen" : "Durchgehen") + '</button>';
+    if (wiederholungen.length > 0) {
+      html += '<p class="hint" style="margin-top:14px">Danach warten ' + wiederholungen.length +
+        ' Wiederholung' + (wiederholungen.length === 1 ? '' : 'en') + '.</p>';
+      html += '<button class="secondary" data-action="start-session">Erst wiederholen (' + wiederholungen.length + ')</button>';
+    }
+    return html;
+  }
+
+  /* 2. Nichts Neues, aber Wiederholungen sind dran. */
+  if (wiederholungen.length > 0) {
+    html += '<p class="due-info"><strong>' + wiederholungen.length + '</strong> Wiederholung' +
+      (wiederholungen.length === 1 ? '' : 'en') + ' aus „' + esc(akt.name) + '"</p>';
+    html += '<button data-action="start-session">Los</button>';
+    return html;
+  }
+
+  /* 3. Heute fertig. Was jetzt zaehlt, ist der Weg zur naechsten Lektion. */
+  const fehlen = lektionOffeneKarten(b, akt);
+  if (fehlen.length === 0 && naechste) {
+    /* Kann nur eintreten, wenn die naechste Lektion selbst leer ist. */
+    html += '<p class="due-info">✓ „' + esc(akt.name) + '" sitzt.</p>';
+    html += '<p class="hint" style="padding:0">„' + esc(naechste.name) + '" ist frei.</p>';
+    return html;
+  }
+  html += '<p class="due-info">✓ Für heute erledigt.</p>';
+  if (naechste) {
+    const naechsterTermin = fehlen.map(c => c.nextReview).sort()[0];
+    html += '<p class="hint" style="padding:6px 0 0">🔒 <strong>' + esc(naechste.name) + '</strong> wird frei, ' +
+      'sobald jede Karte aus „' + esc(akt.name) + '" einmal auf Stufe ' + LEKTION_STUFE + ' war.</p>';
+    html += '<p class="hint" style="padding:0">Noch ' + fehlen.length + ' Karte' + (fehlen.length === 1 ? '' : 'n') +
+      (naechsterTermin ? ' – die nächste ist am ' + fmtDatum(naechsterTermin) + ' dran.' : '.') + '</p>';
+  } else {
+    html += '<p class="hint" style="padding:6px 0 0">Alle Lektionen sind durch. 🌙</p>';
+  }
+  return html;
+}
+
+function fmtDatum(iso) {
+  const t = todayStr();
+  if (iso <= t) return "heute";
+  const d = new Date(t + "T00:00:00"); d.setDate(d.getDate() + 1);
+  if (fmtDate(d) === iso) return "morgen";
+  const p = iso.split("-");
+  return p[2] + "." + p[1] + ".";
+}
+
 function renderLernen() {
   const lset = lernSet();
   if (lset) return renderDurchsicht(lset);
@@ -3377,23 +3497,18 @@ function renderLernen() {
     html += '<p class="hint" style="margin-bottom:10px">🔥 <strong>' + streak.count + '</strong> Tag' + (streak.count === 1 ? "" : "e") + ' am Stück</p>';
   }
   const neuImStapel = due.filter(istNeueKarte).length;
-  const zu = gesperrteKarten();
+  const b = currentBereich();
   html += '<div class="panel">';
   if (cards.length === 0) {
     html += '<p class="hint">Noch keine Karten in diesem Bereich – leg welche unter <strong>Verwalten</strong> an. 📝</p>';
+  } else if (istGefuehrt(b)) {
+    html += renderFaden(b, due);
   } else if (due.length === 0) {
-    html += '<p class="hint">🎉 Für heute nichts mehr fällig in „' + esc(currentBereich().name) + '". Schau morgen wieder rein!</p>';
+    html += '<p class="hint">🎉 Für heute nichts mehr fällig in „' + esc(b.name) + '". Schau morgen wieder rein!</p>';
   } else {
     html += '<p class="due-info">Heute fällig: <strong>' + due.length + '</strong> von ' + cards.length + ' Karten' +
       (neuImStapel > 0 ? ' <span class="badge">' + neuImStapel + ' neu</span>' : '') + '</p>';
     html += '<button data-action="start-session">Lernsession starten (' + due.length + ')</button>';
-  }
-  /* 2.3.0: Was hinter einem Schloss wartet, muss sichtbar sein - sonst wirkt
-     es wie ein Fehler, wenn ein Satz mit 500 Karten nur 25 anzeigt. */
-  if (zu > 0) {
-    html += '<p class="hint" style="margin-top:12px">🔒 <strong>' + zu + '</strong> Karte' + (zu === 1 ? '' : 'n') +
-      ' liegen in Lektionen, die noch gesperrt sind. Die nächste Lektion schaltest du unter <strong>Verwalten</strong> ' +
-      'bei den Speicherkarten mit dem 🔓 frei – dann kommen ihre Karten hier dazu.</p>';
   }
   /* E7: Bewusst drei feste Stufen statt eines Zahlenfeldes - es gibt nichts
      einzustellen, nur auszuprobieren, was man lesen kann. */
@@ -3586,6 +3701,9 @@ function renderSession() {
         'sonst frisst sie weiter deine Lernzeit. Sobald du Wort oder Übersetzung änderst, beginnt die Zählung von vorn.</div>';
     }
     if (card.extra) {
+      /* 2.7.0: Die Notiz steht offen da. Vorher klappte sie nach JEDER Karte
+         wieder zu - bei 25 Karten also 25 Extra-Tipps fuer etwas, das man
+         eigentlich immer sehen will. Wer sie knapp mag, klappt sie zu. */
       html += '<div style="margin-top:12px"><button class="ghost" data-action="toggle-extra">' +
         (s.extraOpen ? "▾ Beispiel / Bild verbergen" : "▸ Beispiel / Bild anzeigen") + '</button></div>';
       if (s.extraOpen) {
@@ -3880,15 +3998,14 @@ function renderVerwalten() {
   let html = "";
   /* 2.3.0: In einem gefuehrten Satz gibt es kein Formular. Ein ausgegrautes
      Formular waere schlechter als keins - es sieht aus, als waere etwas
-     kaputt. Stattdessen steht hier, warum das so ist und wohin man geht,
-     wenn man doch eigene Karten will. */
+     kaputt. Stattdessen steht hier in zwei Zeilen, was Sache ist.
+     2.7.0: Kein Hinweis mehr aufs Freischalten - das passiert von selbst. */
   if (gefuehrt) {
     const lekt = lektionenVon(bAkt);
-    const offen = lekt.filter(s => !s.gesperrt).length;
-    html += '<div class="satz-banner">🔒 <strong>' + esc(bAkt.name) + '</strong> ist ein geführter Kartensatz. ' +
-      'Die Karten stehen fest, damit der Stoff bei allen in derselben Reihenfolge steht und Nachschub sauber nachziehen kann. ' +
-      offen + ' von ' + lekt.length + ' Lektionen freigeschaltet – die nächste schaltest du unten bei den Speicherkarten mit dem 🔓 frei. ' +
-      'Eigene Karten kommen in einen eigenen Bereich (oben „+ Bereich").</div>';
+    const offen = lekt.filter(x => !setGesperrt(x, bAkt)).length;
+    html += '<div class="satz-banner"><strong>' + esc(bAkt.name) + '</strong> · ' +
+      offen + ' von ' + lekt.length + ' Lektionen frei' +
+      '<br>Die Karten stehen fest. Eigene legst du in einem eigenen Bereich an (oben „+ Bereich").</div>';
     return html + renderVerwaltenListe(cards, gefuehrt);
   }
   html += '<div class="panel">';
@@ -3926,7 +4043,7 @@ function renderVerwaltenListe(cards, gefuehrt) {
 
   if (ui.drillOpen) {
     const stufen = availableStufen();
-    const sets = currentSets().filter(s => !(istGefuehrt(currentBereich()) && s.gesperrt));
+    const sets = currentSets().filter(s => !setGesperrt(s));
     const srcSet = ui.drillSource === "stufen" ? null : findSet(ui.drillSource);
     html += '<div class="drill-picker">';
     html += '<p class="hint" style="padding-top:0">Was üben? (Fortschritt bleibt dabei unverändert)</p>';
@@ -4162,7 +4279,7 @@ function renderSetsPanel() {
   const frei = freieIdsFor(b);
   const gefuehrt = istGefuehrt(b);
   const gruppen = zeigtGruppen(b);
-  const zuAnzahl = gefuehrt ? sets.filter(s => s.gesperrt).length : 0;
+  const zuAnzahl = gefuehrt ? sets.filter(s => setGesperrt(s, b)).length : 0;
   let html = '<div class="drill-picker" style="margin-bottom:14px">';
   /* 2.2.0: Kopfzeile zum Auf- und Zuklappen. Zu ist der Normalzustand. */
   html += '<button class="sets-kopf" data-action="toggle-sets" aria-expanded="' + (ui.setsOffen ? "true" : "false") + '">';
@@ -4203,30 +4320,26 @@ function renderSetsPanel() {
 function setBlock(s, b, frei, gefuehrt) {
   /* Ein Schloss wirkt nur in einem gefuehrten Satz. In einem eigenen Bereich
      wird es deshalb weder gezeigt noch beachtet. */
-  const zu = gefuehrt && !!s.gesperrt;
+  const zu = setGesperrt(s, b);
   const cards = setCards(s);
   const open = ui.openSetId === s.id && !zu;
   const eigenerBesitz = setBearbeitbar(s, b);
   let html = '<div class="set-block' + (zu ? " set-locked" : "") + '" data-setid="' + esc(s.id) + '">';
   html += '<div class="set-row">';
   if (eigenerBesitz) html += '<span class="drag-handle" title="Ziehen zum Sortieren" aria-hidden="true">⠿</span>';
+  /* 2.7.0: Nur noch Anzeige. Freigeschaltet wird durch Lernen, nicht durch
+     Tippen - es gibt hier nichts zu entscheiden. */
   if (gefuehrt && s.art === "lektion") {
-    html += '<button class="ghost lock-btn" data-action="toggle-set-lock" data-id="' + esc(s.id) + '" title="' +
-      (zu ? 'Freischalten – die Karten kommen ins Lernen' : 'Wieder sperren – die Karten kommen nicht mehr dran') +
-      '" aria-label="' + (zu ? "Lektion freischalten" : "Lektion sperren") + '">' + (zu ? "🔒" : "🔓") + '</button>';
+    html += '<span class="lock-anzeige" title="' +
+      (zu ? 'Wird frei, sobald die Lektion davor sitzt' : 'Freigeschaltet') + '">' + (zu ? "🔒" : "🔓") + '</span>';
   }
   html += '<span class="set-name">' + esc(s.name) + '</span>';
   html += '<span class="badge">' + cards.length + ' Karte' + (cards.length === 1 ? "" : "n") + '</span>';
   /* ▶ Lernen ist der Weg durch einen weitergegebenen Satz. In einem eigenen
      Bereich legt man die Karten ja selbst an - da gibt es nichts durchzugehen,
      was man nicht gerade selbst getippt haette. */
-  if (gefuehrt && cards.length > 0) {
-    /* Auch bei einer gesperrten Lektion: Der Knopf fragt dann, ob
-       freigeschaltet werden soll. Das ist der natuerliche Weg weiter - ein
-       eigenes Freischalt-Ritual muesste man erst finden. */
-    html += '<button class="ghost" data-action="lern-set" data-id="' + esc(s.id) + '" title="' +
-      (zu ? 'Freischalten und in Ruhe durchgehen' : 'In Ruhe durchgehen – Wort, Übersetzung und Notiz offen, in deiner Reihenfolge') +
-      '">▶ Lernen</button>';
+  if (gefuehrt && cards.length > 0 && !zu) {
+    html += '<button class="ghost" data-action="lern-set" data-id="' + esc(s.id) + '" title="In Ruhe durchgehen – Wort, Übersetzung und Notiz offen, in deiner Reihenfolge">▶ Lernen</button>';
   }
   if (zu) {
     html += '<span class="badge">gesperrt</span>';
@@ -4770,7 +4883,6 @@ app.addEventListener("click", e => {
     case "export-backup": exportBackup(false); break;
     case "export-backup-current": exportBackup(true); break;
     case "export-weitergabe": exportWeitergabe(); break;
-    case "toggle-set-lock": toggleSetLock(btn.dataset.id); break;
     case "import-trigger": {
       const el = document.getElementById("import-file-input");
       if (el) el.click();
