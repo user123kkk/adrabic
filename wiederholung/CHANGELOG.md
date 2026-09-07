@@ -1,3 +1,64 @@
+## 2.7.0 – 7. September 2026 — „Der Faden"
+
+### Neu
+
+- **Lektionen schalten sich von selbst frei.** Eine Lektion ist offen, sobald
+  jede Karte der Lektion davor **schon einmal** Stufe 2 erreicht hat.
+
+  Das Wort „einmal" ist der ganze Trick. Die Bedingung hängt nicht an der
+  aktuellen Stufe, sondern an der höchsten je erreichten – deshalb kann sie
+  nie wieder falsch werden. Wer bei einer alten Karte ehrlich „Nicht" drückt
+  und sie zurückfallen lässt, sperrt damit keine Lektion wieder zu. Ohne diese
+  Unterscheidung wäre jede ehrliche Antwort bestraft worden.
+
+  Dafür trägt jede Karte jetzt ihre höchste je erreichte Stufe mit. Bei
+  vorhandenen Karten gilt die aktuelle Stufe als Höchststand.
+
+- **Eine verbrannte Karte hält nichts auf.** Wer ein Wort fünfmal verhauen hat,
+  soll deswegen nicht wochenlang feststecken – das ist der Moment, in dem man
+  eine App zumacht. Karten mit fünf Rückfällen zählen für die Bedingung nicht
+  mit.
+
+- **Der Faden im Lernen-Tab.** In einem geführten Kartensatz steht dort jetzt
+  immer genau ein Schritt: ein Satz, ein Knopf.
+
+  - Neuer Stoff da → *Lektion 1 · 21 Karten, noch keine davon gelernt* →
+    **Durchgehen**
+  - Mittendrin → *Noch 8 von 21 Karten* → **Weiter durchgehen**
+  - Nur Wiederholungen → *21 Wiederholungen aus „Lektion 1"* → **Los**
+  - Fertig für heute → *✓ Für heute erledigt* und darunter, was die nächste
+    Lektion noch braucht, samt Datum der nächsten fälligen Karte
+
+### Geändert
+
+- **Das Schloss wird berechnet statt gespeichert, und lässt sich nicht mehr
+  von Hand bedienen.** Vorher gab es einen gespeicherten Zustand, der mit der
+  Wirklichkeit auseinanderlaufen konnte, und eine Entscheidung, die niemand
+  treffen will. Jetzt gilt schlicht: Lektion 1 ist offen, Lektion N ist offen,
+  sobald Lektion N−1 sitzt. Das Symbol in der Zeile ist nur noch Anzeige.
+
+  Das gespeicherte Feld bleibt in den Daten, damit ältere Dateien und ältere
+  Fassungen der App weiter funktionieren – gelesen wird es nicht mehr.
+
+- **Die Notiz ist nach dem Aufdecken offen.** Vorher klappte sie nach *jeder*
+  Karte wieder zu – bei 21 Karten also 21 Extra-Tipps für etwas, das man
+  eigentlich immer sehen will. Rückmeldung aus der Praxis war, dass Leute
+  deswegen anfangen, den Notiztext in die Übersetzung zu schreiben. Das macht
+  zwei Dinge kaputt: Die Übersetzung ist das, was abgefragt wird, und im
+  Handschrift-Modus wird sie zur Vorderseite – dann steht der ganze
+  Beispielsatz als Frage da.
+
+- **Die Wegbeschreibung im Lernen-Tab ist weg.** Statt „schalte die nächste
+  Lektion unter Verwalten bei den Speicherkarten mit dem 🔓 frei" passiert das
+  Weiterkommen jetzt dort, wo man steht. Auch das Banner im Verwalten-Tab ist
+  von fünf Zeilen auf zwei geschrumpft.
+
+- **Der Modus „Lernen" hat einen Abschluss.** Ist alles abgehakt, stand vorher
+  nur eine Liste abgeblendeter Karten da und man wusste nicht, ob man fertig
+  ist. Jetzt steht es dort.
+
+---
+
 ## 2.6.0 – 6. September 2026 — „Eigene Reihenfolge"
 
 ### Geändert
