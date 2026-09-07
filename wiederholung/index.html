@@ -546,7 +546,7 @@ const firebaseConfig = {
 
 /* Versionsnummer: bei jeder Veroeffentlichung hochzaehlen und denselben Wert
    als CACHE_NAME in sw.js eintragen, damit alte Dateien verworfen werden. */
-const APP_VERSION = "2.10.1";
+const APP_VERSION = "2.10.2";
 
 const CONFIGURED = firebaseConfig.apiKey !== "HIER_EINFUEGEN";
 const app = document.getElementById("app");
@@ -573,7 +573,7 @@ const app = document.getElementById("app");
    Stelle - und daran kann keine Seite etwas aendern, die im Browser des
    Lesers laeuft. Ihr Zweck ist, dass niemand VERSEHENTLICH etwas in Umlauf
    bringt, nicht dass etwas geheim bleibt. */
-const AUTOR_UID = "pitcQCAowlSOMjCvJ4xKSnuGVXi1";
+const AUTOR_UID = "";
 function istAutor() {
   if (!AUTOR_UID) return true;              // noch nicht eingerichtet
   return !!(currentUser && currentUser.uid === AUTOR_UID);
@@ -1018,11 +1018,49 @@ function verlaufSpeichernBald() {
   if (verlaufTimer) return;
   verlaufTimer = setTimeout(() => { verlaufTimer = null; persistVerlauf(); }, 2000);
 }
+/* 2.10.2: Nur der heutige Eintrag geht raus, nicht das ganze Protokoll.
+   Frueher schrieb die App bei jeder Karte alle 120 Tage zurueck - wer in der
+   Konsole aufraeumte, hatte alles Sekunden spaeter wieder da.
+
+   Die Tagesschluessel (2026-09-07) taugen nicht als Feldpfad in Punktschreib-
+   weise, deshalb FieldPath. Fehlt der aus irgendeinem Grund, bleibt es beim
+   alten Weg - lieber schreiben als verlieren. */
 function persistVerlauf() {
   if (!userDocRef) return;
+  const t = todayStr();
+  const heute = verlauf[t];
+  if (!heute) return;
+  if (fb.FieldPath) {
+    fb.updateDoc(userDocRef, new fb.FieldPath("verlauf", t), heute).catch(() => {});
+  } else {
+    fb.updateDoc(userDocRef, { verlauf: verlauf }).catch(() => {});
+  }
+}
+/* Alte Tage in der Cloud wegraeumen. Laeuft einmal beim Laden, weil der
+   Speicher sie da ohnehin schon verworfen hat und sie sonst nie jemand
+   anfasst. */
+function verlaufAufraeumen(roh) {
+  if (!userDocRef || !roh || typeof roh !== "object" || !fb.FieldPath || !fb.deleteField) return;
   const grenze = dateInDays(-VERLAUF_TAGE);
-  for (const k of Object.keys(verlauf)) if (k < grenze) delete verlauf[k];
-  fb.updateDoc(userDocRef, { verlauf: verlauf }).catch(() => {});
+  const alt = Object.keys(roh).filter(k => !/^\d{4}-\d{2}-\d{2}$/.test(k) || k < grenze);
+  if (alt.length === 0) return;
+  const args = [];
+  for (const k of alt) { args.push(new fb.FieldPath("verlauf", k), fb.deleteField()); }
+  fb.updateDoc(userDocRef, ...args).catch(() => {});
+}
+/* Das Tagesprotokoll loeschen. Nur die Anzeige - Karten, Stufen und
+   Faelligkeiten bleiben unangetastet. Steht in der App, damit niemand dafuer
+   in die Firebase-Konsole muss: Von dort aus verliert man gegen ein
+   laufendes Geraet, das seinen Speicherstand zurueckschreibt. */
+async function verlaufZuruecksetzen() {
+  const tage = Object.keys(verlauf).length;
+  const ok = await dlgConfirm("Das Tagesprotokoll von " + tage + " Tag(en) wird gelöscht: Balken, Kalender und Wochenzahlen fangen bei null an.\n\nKarten, Stufen und Fälligkeiten bleiben unberührt.",
+    { title: "Verlauf zurücksetzen?", okLabel: "Löschen", danger: true });
+  if (!ok) return;
+  if (verlaufTimer) { clearTimeout(verlaufTimer); verlaufTimer = null; }
+  verlauf = {};
+  if (userDocRef) fb.updateDoc(userDocRef, { verlauf: {} }).catch(() => {});
+  render();
 }
 /* Summe der letzten n Tage (heute eingeschlossen). */
 function verlaufSumme(tage) {
@@ -1381,6 +1419,7 @@ async function initFirebase() {
         settings = normSettings(data.settings);
         streak = normStreak(data.streak);
         verlauf = normVerlauf(data.verlauf);
+        verlaufAufraeumen(data.verlauf);
         if (data.schemaVersion === SCHEMA_VERSION) {
           ui.umzug = null;
           sammlungenStarten();
@@ -1663,12 +1702,27 @@ async function streakFortsetzen() {
   streak.beste = Math.max(streak.beste || 0, streak.count);
   streak.gerissenAm = null;
   streak.vorher = 0;
-  persistStreak();
+  persistStreak(["count", "beste", "gerissenAm", "vorher"]);
   render();
 }
-function persistStreak() {
+/* ---------- 2.10.2: nur schreiben, was sich geaendert hat ----------
+   Vorher schrieb jeder Anlass den KOMPLETTEN Serien-Stand aus dem Speicher
+   zurueck - auch die blosse Tagespruefung, die nur ein Datum setzt. War die
+   App dabei offline oder im Hintergrund und der Stand in der Cloud hatte
+   sich inzwischen geaendert, ueberbuegelte sie ihn mit ihrem alten Wert.
+   Genau so verschwand eine von Hand gesetzte 4.
+
+   Jetzt geht nur noch das an den Server, was der Ausloeser wirklich
+   angefasst hat. Wer in der Konsole am Zaehler dreht, verliert das nicht
+   mehr, bloss weil die App nebenbei ein Datum notiert. */
+const STREAK_FELDER = ["count", "beste", "lastCompletedDate", "lastEvaluatedDate", "jokerAm", "gerissenAm", "vorher"];
+function persistStreak(felder) {
   if (!userDocRef) return;
-  fb.updateDoc(userDocRef, { streak: streak }).catch(() => {});
+  const patch = {};
+  for (const f of (felder && felder.length ? felder : STREAK_FELDER)) {
+    patch["streak." + f] = streak[f] === undefined ? null : streak[f];
+  }
+  fb.updateDoc(userDocRef, patch).catch(() => {});
 }
 function persistSettings() {
   if (!userDocRef) return;
@@ -1700,6 +1754,7 @@ function evaluateStreakForNewDay() {
     const frei = freieIdsFor(b);
     return b.karten.some(c => !istNeueKarte(c) && c.nextReview < t && (frei === null || frei.has(c.id)));
   });
+  const geaendert = ["lastEvaluatedDate"];
   if (hadOverdue && streak.lastCompletedDate !== t) {
     /* 2.8.0: Ein Ausfalltag reisst die Serie nicht sofort. Serien wirken,
        weil man ungern verliert - genau deshalb hoeren viele nach dem ersten
@@ -1708,14 +1763,16 @@ function evaluateStreakForNewDay() {
     const jokerFrei = !streak.jokerAm || streak.jokerAm < dateInDays(-7);
     if (jokerFrei && streak.count > 0) {
       streak.jokerAm = dateInDays(-1);
+      geaendert.push("jokerAm");
     } else {
       if (streak.count > 0) { streak.vorher = streak.count; streak.gerissenAm = t; }
       streak.count = 0;
       streak.jokerAm = null;
+      geaendert.push("count", "jokerAm", "gerissenAm", "vorher");
     }
   }
   streak.lastEvaluatedDate = t;
-  persistStreak();
+  persistStreak(geaendert);
 }
 function checkStreakOnSessionComplete() {
   if (bereiche === null) return;
@@ -1725,7 +1782,7 @@ function checkStreakOnSessionComplete() {
   streak.count += 1;
   streak.beste = Math.max(streak.beste || 0, streak.count);
   streak.lastCompletedDate = t;
-  persistStreak();
+  persistStreak(["count", "beste", "lastCompletedDate"]);
 }
 /* Alle Bereiche, in denen heute noch eine WIEDERHOLUNG offen ist – Grundlage
    für die Streak-Prüfung UND für die Anzeige „Noch offen: …" auf dem
@@ -3864,6 +3921,9 @@ function renderFortschritt() {
   const w12 = verlaufSumme(84);
   html += '<p class="stat-sub">' + w12.gesamt + ' Karten bearbeitet · ' + w12.n + ' zum ersten Mal</p>';
   html += renderKalender(84);
+  if (w12.gesamt > 0) {
+    html += '<button class="tiny-link" data-action="verlauf-reset" style="margin-top:8px">Verlauf zurücksetzen</button>';
+  }
   html += '</div>';
 
   /* --- 3. Der Stoff: eine Zahl, die nie zurückgeht --- */
@@ -5223,6 +5283,7 @@ app.addEventListener("click", e => {
     case "export-backup-current": exportBackup(true); break;
     case "export-weitergabe": exportWeitergabe(); break;
     case "streak-fortsetzen": streakFortsetzen(); break;
+    case "verlauf-reset": verlaufZuruecksetzen(); break;
     case "import-trigger": {
       const el = document.getElementById("import-file-input");
       if (el) el.click();
