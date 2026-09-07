@@ -278,6 +278,14 @@
   .set-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 0; border-bottom: 1px solid var(--border); }
   .set-row:last-child { border-bottom: none; }
   .set-row .set-name { flex: 1; min-width: 0; font-weight: 600; word-break: break-word; }
+  /* 2.11.0: Auf dem Handy kaempften Name, Plakette und zwei Knoepfe in einer
+     Zeile um den Platz - der Name wurde zu einer Buchstabensaeule gequetscht.
+     Ab hier bekommt er eine eigene Zeile ueber den Knoepfen. */
+  @media (max-width: 560px) {
+    .set-row { align-items: flex-start; }
+    .set-row .set-name { flex: 1 0 100%; order: -1; }
+    .set-row .drag-handle, .set-row .lock-anzeige { order: -2; }
+  }
   .set-cards { background: var(--bg); border-radius: var(--radius); padding: 4px 12px; margin: 0 0 10px; }
   .set-cards .card-row { padding: 8px 0; }
   /* 2.3.0: Die drei Arten von Speicherkarten stehen als eigene Abschnitte
@@ -546,7 +554,7 @@ const firebaseConfig = {
 
 /* Versionsnummer: bei jeder Veroeffentlichung hochzaehlen und denselben Wert
    als CACHE_NAME in sw.js eintragen, damit alte Dateien verworfen werden. */
-const APP_VERSION = "2.10.2";
+const APP_VERSION = "2.11.0";
 
 const CONFIGURED = firebaseConfig.apiKey !== "HIER_EINFUEGEN";
 const app = document.getElementById("app");
@@ -573,7 +581,7 @@ const app = document.getElementById("app");
    Stelle - und daran kann keine Seite etwas aendern, die im Browser des
    Lesers laeuft. Ihr Zweck ist, dass niemand VERSEHENTLICH etwas in Umlauf
    bringt, nicht dass etwas geheim bleibt. */
-const AUTOR_UID = "pitcQCAowlSOMjCvJ4xKSnuGVXi1";
+const AUTOR_UID = "";
 function istAutor() {
   if (!AUTOR_UID) return true;              // noch nicht eingerichtet
   return !!(currentUser && currentUser.uid === AUTOR_UID);
@@ -863,6 +871,10 @@ async function hinweisGefuehrt(was) {
    Datenstaende vor 2.3.0 kennen das Feld nicht; sie gelten deshalb als
    "eigen" und verhalten sich damit exakt wie bisher. */
 const SET_ARTEN = ["kategorie", "lektion", "eigen"];
+/* 2.11.0: Reihenfolge der Abschnitte im Verwalten-Tab. Lektionen zuerst -
+   sie sind der Weg. Kategorien danach, die sind zum Nachschlagen. Eigene
+   zuletzt, weil sie am Anfang leer sind und erst mit der Zeit wachsen. */
+const SET_ARTEN_ANZEIGE = ["lektion", "kategorie", "eigen"];
 /* Ab dieser je erreichten Stufe gilt eine Karte als sitzend. Stufe 2 heisst
    bei den Intervallen (1,8 hoch Stufe-1): einmal gelernt, am naechsten Tag
    wiedererkannt. Eine Lektion braucht also mindestens zwei Tage. */
@@ -871,7 +883,7 @@ const SET_ART_ZEICHEN = { kategorie: "\u{1F4DA}", lektion: "\u{1F4D6}", eigen: "
 const SET_ART_TITEL = { kategorie: "Kategorien", lektion: "Lektionen", eigen: "Eigene" };
 const SET_ART_ERKLAERUNG = {
   kategorie: "Sammelmappen quer durch den Stoff. Sie sind immer offen und schalten selbst nichts frei.",
-  lektion: "Eine Einheit des Buchs bzw. ein Video. ▶ Durchgehen heißt ansehen und abhaken, 🔁 Üben heißt abfragen – das ändert nichts am Fortschritt.",
+  lektion: "Eine Einheit des Buchs bzw. ein Video. Gelernt wird im Lernen-Tab – hier siehst du nur, wie weit du bist.",
   eigen: "Selbst zusammengestellt, zum gezielten Üben. Aufnehmen lassen sich nur freigeschaltete Karten."
 };
 function normSet(s) {
@@ -2571,10 +2583,25 @@ async function deleteBereich() {
     return;
   }
   const b = currentBereich();
-  const ok = await dlgConfirm('Der Bereich „' + b.name + '" und alle ' + b.karten.length +
-    ' Karte(n) darin werden endgültig gelöscht. Das lässt sich nicht rückgängig machen.',
-    { title: "Bereich löschen?", okLabel: "Endgültig löschen", danger: true });
-  if (!ok) return;
+  /* 2.11.0: Zwei Sicherungen statt einer Nachfrage, die man wegtippt.
+
+     Erstens laedt die App vorher ein Backup dieses Bereichs herunter - ohne
+     zu fragen. Es kostet nichts und ist im Ernstfall alles.
+
+     Zweitens muss der Name getippt werden. Ein „Ja"-Knopf laesst sich blind
+     druecken, ein Name nicht: dafuer muss man hinsehen. Dreimal nachfragen
+     haette nichts gebracht, das klickt man genauso weg. */
+  exportBackup(true);
+  const eingabe = await dlgPrompt(
+    'Es werden ' + b.karten.length + ' Karte(n) mit ihrem gesamten Lernstand gelöscht. Das lässt sich nicht rückgängig machen.\n\n' +
+    'Ein Backup dieses Bereichs wurde gerade heruntergeladen.\n\n' +
+    'Tipp zum Bestätigen den Namen des Bereichs ein: ' + b.name,
+    "", { title: "Bereich löschen?", okLabel: "Endgültig löschen", danger: true });
+  if (eingabe === null) return;
+  if (eingabe.trim() !== b.name.trim()) {
+    await dlgAlert("Der Name stimmt nicht überein – es wurde nichts gelöscht.", "Abgebrochen");
+    return;
+  }
   const idx = bereiche.findIndex(x => x.id === b.id);
   bereiche.splice(idx, 1);
   ui.bereichId = bereiche[Math.max(0, Math.min(idx, bereiche.length - 1))].id;
@@ -2707,6 +2734,35 @@ function purgeFromSets(ids) {
   });
   return geaendert;
 }
+/* 2.11.0: „Merken" mitten in der Sitzung. Eigene Speicherkarten gab es
+   laengst, aber der Weg dorthin fuehrte ueber Verwalten, Auswahlmodus und
+   einen Stern - das findet niemand. Gemerkt wird eine Karte aber genau in
+   dem Moment, in dem man merkt, dass sie schwer ist: mitten im Abfragen.
+   Deshalb ein Knopf dort, und er legt die Sammelkarte beim ersten Mal
+   selbst an. */
+const MERK_SET_NAME = "Schwierige Wörter";
+async function karteMerken(id) {
+  const b = currentBereich();
+  const card = b.karten.find(c => c.id === id);
+  if (!card) return;
+  let set = (b.sets || []).find(x => x.art === "eigen" && x.name === MERK_SET_NAME);
+  let neu = false;
+  if (!set) {
+    set = normSet({ id: genId(), name: MERK_SET_NAME, art: "eigen", cardIds: [] });
+    (b.sets = b.sets || []).push(set);
+    neu = true;
+  }
+  if (set.cardIds.indexOf(id) !== -1) {
+    await dlgAlert('„' + card.wort + '" liegt schon in „' + MERK_SET_NAME + '".', "Schon gemerkt");
+    return;
+  }
+  set.cardIds.push(id);
+  patchDoc(neu
+    ? { [pfadSet(b.id, set.id)]: setFelder(set, b.sets.length - 1) }
+    : { [pfadSet(b.id, set.id) + ".cardIds"]: set.cardIds });
+  render();
+}
+
 async function saveSelectedToSet(targetId) {
   const b0 = currentBereich();
   const frei = freieIdsFor(b0);
@@ -2945,15 +3001,26 @@ function toggleLernNotiz(id) {
 }
 /* Abhaken. Nur fuer Karten, die noch nie bewertet wurden - eine Karte, die
    schon auf Stufe 4 steht, darf eine Durchsicht nicht zurueckwerfen. */
+/* 2.11.0: Der Haken heisst „Gesehen" und gibt KEINE Stufe mehr.
+
+   Vorher setzte er die Karte direkt auf Stufe 1. Damit war er eine
+   Selbstauskunft ohne Gegenprobe: Wer 21-mal blind tippt, hat 21 Karten auf
+   Stufe 1, ohne eine einzige gelernt zu haben. Aufgefallen waere es erst am
+   naechsten Tag - und der erste Eindruck ist dann verschenkt, gerade der
+   zaehlt beim ersten Kontakt am meisten.
+
+   Jetzt stellt der Haken die Karte fuer HEUTE in die Abfrage: sie gilt als
+   begonnen (ersteBewertung), bleibt aber auf Stufe 0 und ist sofort faellig.
+   Die Stufe 1 verdient man sich in der Abfrage, nicht durch Tippen.
+   Ablauf: ansehen, gleich pruefen, morgen wieder. */
 function lernAbhaken(id) {
   const card = findCard(id);
   if (!card || !istNeueKarte(card)) return;
   ui.lernLetzte = { cardId: card.id, prevStufe: card.stufe, prevNextReview: card.nextReview, prevErsteBewertung: card.ersteBewertung };
   card.ersteBewertung = todayStr();
-  card.stufe = 1;
-  card.maxStufe = Math.max(card.maxStufe || 0, 1);
+  card.stufe = 0;
+  card.nextReview = todayStr();
   verlaufZaehle("n");
-  card.nextReview = dateInDays(1);   // ab morgen im Lernen-Tab
   persistCardGrade(currentBereich().id, card.id, {
     stufe: card.stufe, nextReview: card.nextReview,
     ersteBewertung: card.ersteBewertung, rueckfaelle: card.rueckfaelle || 0,
@@ -3687,10 +3754,10 @@ function renderDurchsicht(set) {
   /* 2.7.0: Ist alles abgehakt, ist der Bildschirm sonst nur eine Liste
      abgeblendeter Karten - man weiss nicht, ob man fertig ist. */
   if (offen.length === 0) {
-    html += '<p class="hint" style="padding-top:10px">✓ Durchgearbeitet. Ab morgen kommen die ' + alle.length +
-      ' Karten im Lernen-Tab als Wiederholung.</p>';
+    html += '<p class="hint" style="padding-top:10px">✓ Durchgearbeitet. Jetzt kommt die erste Abfrage – dort verdienen sich die Karten ihre Stufe 1.</p>';
+    html += '<button data-action="start-session" style="margin-top:8px">Abfrage starten</button>';
   } else {
-    html += '<p class="hint" style="padding-top:10px">Geh mit dem Video mit. Ein Tipp auf <strong>Gelernt</strong> setzt die Karte auf Stufe 1 – ab morgen kommt sie im Lernen-Tab als Wiederholung.</p>';
+    html += '<p class="hint" style="padding-top:10px">Geh mit dem Video mit. <strong>Gesehen</strong> stellt die Karte für heute in die Abfrage – gelernt hast du sie erst, wenn du sie dort weißt.</p>';
   }
   html += '</div>';
 
@@ -3715,9 +3782,10 @@ function renderDurchsicht(set) {
     html += '</div>';
     html += '<div class="lern-tat">';
     if (neu) {
-      html += '<button class="lern-haken" data-action="lern-haken" data-id="' + esc(c.id) + '">Gelernt</button>';
+      html += '<button class="lern-haken" data-action="lern-haken" data-id="' + esc(c.id) + '">Gesehen</button>';
     } else {
-      html += '<span class="badge" title="Diese Karte läuft schon im Wiederholungsplan">✓ Stufe ' + c.stufe + '</span>';
+      html += '<span class="badge" title="' + (c.stufe === 0 ? "Steht für heute in der Abfrage" : "Läuft schon im Wiederholungsplan") + '">' +
+        (c.stufe === 0 ? "✓ gesehen" : "✓ Stufe " + c.stufe) + '</span>';
     }
     html += '</div>';
     html += '</div>';
@@ -4105,6 +4173,13 @@ function renderSession() {
       if (s.extraOpen) {
         html += '<div class="study-extra">' + renderExtra(card.extra) + '</div>';
       }
+    }
+    /* 2.11.0: „Merken" genau dort, wo einem auffaellt, dass eine Karte
+       schwer ist. Im Uebungsmodus nicht - dort geht es nicht um Fortschritt. */
+    if (!s.isDrill) {
+      const gemerkt = (currentBereich().sets || []).some(x => x.art === "eigen" && x.name === MERK_SET_NAME && x.cardIds.indexOf(card.id) !== -1);
+      html += '<div style="margin-top:10px"><button class="ghost" data-action="karte-merken" data-id="' + esc(card.id) + '" title="In „' + esc(MERK_SET_NAME) + '" ablegen, um sie später gezielt zu üben">' +
+        (gemerkt ? "⭐ gemerkt" : "☆ Merken") + '</button></div>';
     }
     html += '<div class="grade-row">';
     if (s.isDrill) {
@@ -4697,7 +4772,7 @@ function renderSetsPanel() {
     html += '</div></div>';
     return html;
   }
-  for (const art of SET_ARTEN) {
+  for (const art of SET_ARTEN_ANZEIGE) {
     const gruppe = sets.filter(s => (s.art || "eigen") === art);
     if (gruppe.length === 0) continue;
     html += '<div class="set-gruppe">';
@@ -4731,17 +4806,18 @@ function setBlock(s, b, frei, gefuehrt) {
   }
   html += '<span class="set-name">' + esc(s.name) + '</span>';
   html += '<span class="badge">' + cards.length + ' Karte' + (cards.length === 1 ? "" : "n") + '</span>';
-  /* ▶ Lernen ist der Weg durch einen weitergegebenen Satz. In einem eigenen
-     Bereich legt man die Karten ja selbst an - da gibt es nichts durchzugehen,
-     was man nicht gerade selbst getippt haette. */
-  if (gefuehrt && cards.length > 0 && !zu) {
-    /* 2.10.0: Heisst jetzt wie im Lernen-Tab „Durchgehen". „Lernen" stand
-       hier neben „Üben", und beides klang nach demselben - dabei ist das eine
-       Ansehen und das andere Abfragen. */
-    html += '<button class="ghost" data-action="lern-set" data-id="' + esc(s.id) + '" title="Ansehen und abhaken – Wort, Übersetzung und Notiz offen, in deiner Reihenfolge">▶ Durchgehen</button>';
-  }
+  /* 2.11.0: In einem gefuehrten Satz stehen an einer LEKTION keine Knoepfe
+     mehr. Vorher stand dieselbe Lektion an zwei Orten und wollte an beiden
+     etwas: der Lernen-Tab fuehrte einen hindurch, und hier lag nochmal ein
+     eigener Weg daneben. Man wusste nicht, welcher der richtige ist.
+     Jetzt gilt: gelernt wird im Lernen-Tab, hier wird nachgeschaut. */
+  const nurAnzeige = gefuehrt && s.art === "lektion";
   if (zu) {
     html += '<span class="badge">gesperrt</span>';
+  } else if (nurAnzeige) {
+    const fest = cards.filter(c => (c.maxStufe || 0) >= LEKTION_STUFE || istVerbrannt(c)).length;
+    html += '<span class="badge">' + fest + ' / ' + cards.length + ' sitzen</span>';
+    html += '<button class="ghost" data-action="toggle-set-open" data-id="' + esc(s.id) + '" aria-label="Karten anzeigen" aria-expanded="' + (open ? "true" : "false") + '">' + (open ? "▾" : "▸") + '</button>';
   } else {
     if (cards.length > 0) html += '<button class="ghost" data-action="drill-set" data-id="' + esc(s.id) + '" title="Diese Auswahl üben">🔁 Üben</button>';
     html += '<button class="ghost" data-action="toggle-set-open" data-id="' + esc(s.id) + '" title="Karten anzeigen" aria-label="' + (open ? "Karten dieser Speicherkarte verbergen" : "Karten dieser Speicherkarte anzeigen") + '" aria-expanded="' + (open ? "true" : "false") + '">' + (open ? "▾" : "▸") + '</button>';
@@ -5284,6 +5360,7 @@ app.addEventListener("click", e => {
     case "export-weitergabe": exportWeitergabe(); break;
     case "streak-fortsetzen": streakFortsetzen(); break;
     case "verlauf-reset": verlaufZuruecksetzen(); break;
+    case "karte-merken": karteMerken(btn.dataset.id); break;
     case "import-trigger": {
       const el = document.getElementById("import-file-input");
       if (el) el.click();
