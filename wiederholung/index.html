@@ -554,7 +554,7 @@ const firebaseConfig = {
 
 /* Versionsnummer: bei jeder Veroeffentlichung hochzaehlen und denselben Wert
    als CACHE_NAME in sw.js eintragen, damit alte Dateien verworfen werden. */
-const APP_VERSION = "2.11.2";
+const APP_VERSION = "2.11.3";
 
 const CONFIGURED = firebaseConfig.apiKey !== "HIER_EINFUEGEN";
 const app = document.getElementById("app");
@@ -581,7 +581,7 @@ const app = document.getElementById("app");
    Stelle - und daran kann keine Seite etwas aendern, die im Browser des
    Lesers laeuft. Ihr Zweck ist, dass niemand VERSEHENTLICH etwas in Umlauf
    bringt, nicht dass etwas geheim bleibt. */
-const AUTOR_UID = "pitcQCAowlSOMjCvJ4xKSnuGVXi1";
+const AUTOR_UID = "";
 function istAutor() {
   if (!AUTOR_UID) return true;              // noch nicht eingerichtet
   return !!(currentUser && currentUser.uid === AUTOR_UID);
@@ -1466,11 +1466,22 @@ async function initFirebase() {
 }
 
 let saveWarned = false;
+/* 2.11.3: Ein fehlgeschlagener Schreibvorgang meldete sich EINMAL und war
+   danach fuer den Rest der Sitzung stumm. Wer die erste Meldung wegtippte,
+   lernte weiter im guten Glauben, alles werde gespeichert - waehrend nichts
+   mehr ankam. Deshalb bleibt jetzt eine Zeile oben stehen, solange es klemmt.
+
+   Offline ist ausdruecklich KEIN Fehlerfall: Firestore nimmt Schreibvorgaenge
+   entgegen und schickt sie los, sobald die Verbindung wieder steht. Hier
+   landen nur echte Ablehnungen (fehlende Rechte, kaputte Daten). */
+let schreibFehler = null;
 function saveFehler(e) {
-  if (saveWarned) return;
+  schreibFehler = (e && e.code) ? e.code : "unbekannter Fehler";
+  if (saveWarned) { render(); return; }
   saveWarned = true;
-  dlgAlert("Speichern in der Cloud fehlgeschlagen (" + (e && e.code ? e.code : "Fehler") + "). Änderungen werden erneut versucht, sobald die Verbindung steht.", "Cloud nicht erreichbar");
+  dlgAlert("Speichern in der Cloud fehlgeschlagen (" + schreibFehler + "). Änderungen werden erneut versucht, sobald die Verbindung steht.", "Cloud nicht erreichbar");
 }
+function schreibErfolg() { saveWarned = false; if (schreibFehler) { schreibFehler = null; render(); } }
 
 /* ---------- A4 (1.9.0): gezielt schreiben statt alles ueberschreiben ----------
 
@@ -1629,7 +1640,7 @@ async function patchDoc(patch) {
        geloeschten Bereichs muessen einzeln weg, sonst bleiben sie fuer immer
        liegen und zaehlen bei jedem Start als Leseeinheit mit. */
     for (const bid of bereichLoeschungen) await kartenEinesBereichsLoeschen(bid);
-    saveWarned = false;
+    schreibErfolg();
   } catch (e) {
     /* Es gibt nichts zu aendern, weil das Dokument (noch) nicht existiert -
        etwa direkt nach dem Anlegen des Kontos. Dann einmal komplett anlegen. */
@@ -1673,7 +1684,7 @@ async function persistAll() {
       ops.slice(i, i + 400).forEach(o => stapel.set(o.ref, o.daten));
       await stapel.commit();
     }
-    saveWarned = false;
+    schreibErfolg();
   } catch (e) { saveFehler(e); }
 }
 
@@ -1700,7 +1711,7 @@ function persistCardGrade(bereichId, cardId, fields) {
        Hoechststand wieder 1, und die Lektion ging zu, die laengst offen war.
        Genau der Fall, den "einmal erreicht" verhindern sollte. */
     maxStufe: Number.isInteger(fields.maxStufe) ? fields.maxStufe : 0
-  }).catch(e => { saveFehler(e); });
+  }).then(schreibErfolg).catch(e => { saveFehler(e); });
 }
 /* 2.9.0: Einen Riss zuruecknehmen. Zwei Tage lang, danach nicht mehr.
    Gedacht fuer den Fall, dass die Serie an etwas gerissen ist, das mit dem
@@ -1741,11 +1752,38 @@ function persistStreak(felder) {
   for (const f of (felder && felder.length ? felder : STREAK_FELDER)) {
     patch["streak." + f] = streak[f] === undefined ? null : streak[f];
   }
-  fb.updateDoc(userDocRef, patch).catch(() => {});
+  schreibeInsNutzerdokument(patch);
 }
 function persistSettings() {
   if (!userDocRef) return;
-  fb.updateDoc(userDocRef, { settings: settings }).catch(() => {});
+  schreibeInsNutzerdokument({ settings: settings });
+}
+/* 2.11.3: Serie, Einstellungen und Tagesprotokoll gingen bisher mit einem
+   stillen .catch(() => {}) raus. Zwei Faelle verschluckte das:
+
+     - Das Nutzerdokument existiert noch nicht (frisch angelegtes Konto, das
+       Anlegen laeuft noch). updateDoc scheitert dann mit "not-found", und die
+       erste Serie war weg, ohne dass es jemand merkte.
+     - Eine echte Ablehnung (fehlende Rechte) blieb voellig unsichtbar.
+
+   Jetzt wird im ersten Fall das Dokument angelegt und danach neu geschrieben,
+   im zweiten erscheint die Meldung wie bei den Karten auch. */
+async function schreibeInsNutzerdokument(patch) {
+  if (!userDocRef) return;
+  try {
+    await fb.updateDoc(userDocRef, patch);
+    schreibErfolg();
+  } catch (e) {
+    if (e && e.code === "not-found") {
+      try {
+        await fb.setDoc(userDocRef, { name: displayName, schemaVersion: SCHEMA_VERSION }, { merge: true });
+        await fb.updateDoc(userDocRef, patch);
+        schreibErfolg();
+        return;
+      } catch (e2) { saveFehler(e2); return; }
+    }
+    saveFehler(e);
+  }
 }
 
 /* ---------- Streak: zählt nur echte, vollständig erledigte Lerntage (kein Üben) ---------- */
@@ -2601,7 +2639,8 @@ async function deleteBereich() {
   exportBackup(true);
   const eingabe = await dlgPrompt(
     'Es werden ' + b.karten.length + ' Karte(n) mit ihrem gesamten Lernstand gelöscht. Das lässt sich nicht rückgängig machen.\n\n' +
-    'Ein Backup dieses Bereichs wurde gerade heruntergeladen.\n\n' +
+    'Ein Backup dieses Bereichs wurde gerade zum Herunterladen angeboten – ' +
+    'sieh in deinen Downloads nach, dass die Datei wirklich da ist.\n\n' +
     'Tipp zum Bestätigen den Namen des Bereichs ein: ' + b.name,
     "", { title: "Bereich löschen?", okLabel: "Endgültig löschen", danger: true });
   if (eingabe === null) return;
@@ -3271,6 +3310,11 @@ function gradeCard(kind) {
       prevNextReview: card.nextReview,
       prevErsteBewertung: card.ersteBewertung,
       prevRueckfaelle: card.rueckfaelle || 0,
+      /* 2.11.3: Ohne das blieb ein Fehltipp auf "Sicher" fuer immer stehen -
+         der Hoechststand kennt kein Zurueck, und bei der letzten Karte einer
+         Lektion haette ein einziger Fehlgriff die naechste Lektion dauerhaft
+         aufgeschlossen. */
+      prevMaxStufe: card.maxStufe || 0,
       prevQueue: s.queue.slice()
     };
     // B3: ab jetzt gilt die Karte als eingeführt und zählt gegen das Tageslimit
@@ -3331,6 +3375,7 @@ function undoLastGrade() {
     card.ersteBewertung = s.lastAction.prevErsteBewertung;
     // E6: sonst bliebe ein irrtuemlicher Rueckfall dauerhaft gezaehlt
     card.rueckfaelle = s.lastAction.prevRueckfaelle;
+    card.maxStufe = s.lastAction.prevMaxStufe;
   }
   s.queue = s.lastAction.prevQueue;
   s.lastAction = null;
@@ -3569,6 +3614,11 @@ function renderMain() {
   html += '<div class="topbar">';
   html += '<div class="who">Angemeldet: <strong>' + esc(displayName) + '</strong>' +
     (syncError ? ' <span class="sync-dot">⚠ ' + esc(syncError) + '</span>' : '') + '</div>';
+  if (schreibFehler) {
+    html += '<p class="hint" style="margin:-4px 0 12px; color:var(--red)">⚠ <strong>Nicht gespeichert:</strong> ' +
+      'Änderungen kommen gerade nicht in der Cloud an (' + esc(schreibFehler) + '). ' +
+      'Lade ein Backup herunter, bevor du weiterlernst.</p>';
+  }
   html += '<div>';
   html += '<button class="ghost" data-action="logout">Abmelden</button>';
   /* 2.3.0: Vier Knoepfe statt drei, und alle heissen jetzt nach dem, was sie
