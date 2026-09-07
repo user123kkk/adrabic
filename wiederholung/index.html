@@ -300,6 +300,11 @@
      anfassen" ohne Erklaerung lesbar ist. */
   .card-row.card-frei { background: rgba(227, 200, 138, 0.10); border-radius: var(--radius); padding-left: 8px; padding-right: 8px; }
   .lock-anzeige { font-size: 0.95rem; opacity: 0.75; }
+  /* Dasselbe Aufleuchten wie im Adrabic-Trainer: heller Creme-Schleier, der
+     in 1,4 Sekunden verschwindet. */
+  @keyframes aufleuchten { 0% { background: rgba(244, 240, 227, 0.30); } 100% { background: transparent; } }
+  .aufleuchten { animation: aufleuchten 1.4s ease-out; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
   /* 2.9.0: Handschrift. Dieselbe Palette wie im Adrabic-Trainer, dazu der
      Creme-Akzent und die arabischen Ziffern als stille Zierde. */
   .serie-karte {
@@ -541,7 +546,7 @@ const firebaseConfig = {
 
 /* Versionsnummer: bei jeder Veroeffentlichung hochzaehlen und denselben Wert
    als CACHE_NAME in sw.js eintragen, damit alte Dateien verworfen werden. */
-const APP_VERSION = "2.9.0";
+const APP_VERSION = "2.10.0";
 
 const CONFIGURED = firebaseConfig.apiKey !== "HIER_EINFUEGEN";
 const app = document.getElementById("app");
@@ -568,7 +573,7 @@ const app = document.getElementById("app");
    Stelle - und daran kann keine Seite etwas aendern, die im Browser des
    Lesers laeuft. Ihr Zweck ist, dass niemand VERSEHENTLICH etwas in Umlauf
    bringt, nicht dass etwas geheim bleibt. */
-const AUTOR_UID = "pitcQCAowlSOMjCvJ4xKSnuGVXi1";
+const AUTOR_UID = "";
 function istAutor() {
   if (!AUTOR_UID) return true;              // noch nicht eingerichtet
   return !!(currentUser && currentUser.uid === AUTOR_UID);
@@ -866,7 +871,7 @@ const SET_ART_ZEICHEN = { kategorie: "\u{1F4DA}", lektion: "\u{1F4D6}", eigen: "
 const SET_ART_TITEL = { kategorie: "Kategorien", lektion: "Lektionen", eigen: "Eigene" };
 const SET_ART_ERKLAERUNG = {
   kategorie: "Sammelmappen quer durch den Stoff. Sie sind immer offen und schalten selbst nichts frei.",
-  lektion: "Eine Einheit des Buchs bzw. ein Video. Nur Lektionen lassen sich sperren – und nur sie geben Karten frei.",
+  lektion: "Eine Einheit des Buchs bzw. ein Video. ▶ Durchgehen heißt ansehen und abhaken, 🔁 Üben heißt abfragen – das ändert nichts am Fortschritt.",
   eigen: "Selbst zusammengestellt, zum gezielten Üben. Aufnehmen lassen sich nur freigeschaltete Karten."
 };
 function normSet(s) {
@@ -1149,6 +1154,10 @@ let ui = {
      Steht hier statt in einer eigenen Variablen weiter unten, damit die
      Reihenfolge im Skript keine Rolle spielt. */
   lernFokusNach: null,
+  /* 2.10.0: Ziel eines Sprungs. Wer eine Aktion ausloest, die woanders auf
+     der Seite etwas veraendert, soll dorthin mitgenommen werden - genau das
+     Muster, das der Adrabic-Trainer bei der Checkliste benutzt. */
+  springZu: null,
   drillOpen: false,           // Auswahl für Übungsmodus sichtbar?
   drillSource: "stufen",      // "stufen" oder die ID einer Speicherkarte
   openSetId: null,            // Speicherkarte, deren Kartenliste aufgeklappt ist
@@ -1930,6 +1939,31 @@ function arabZahl(n) {
   return String(Math.max(0, Math.round(n))).split("").map(z => ARAB_ZIFFERN[+z] || z).join("");
 }
 
+/* ---------- 2.10.0: Sprung und Aufleuchten ----------
+   Aus dem Adrabic-Trainer uebernommen: Wer in der Checkliste auf ein
+   Kategorie-Zeichen tippt, wird sanft zum passenden Modul gescrollt, und das
+   Modul leuchtet kurz auf - so sieht man, WAS sich geaendert hat.
+
+   Hier gilt dasselbe fuer jede Aktion, deren Wirkung nicht dort steht, wo
+   man getippt hat: Ueben und Durchgehen aus einer Speicherkarte heraus
+   starten oben eine Sitzung, waehrend man unten in der Kartenliste steht.
+   Ohne den Sprung sieht es aus, als sei nichts passiert. */
+function springeZu(id) { ui.springZu = id; }
+function sprungAusfuehren() {
+  const id = ui.springZu;
+  if (!id) return;
+  ui.springZu = null;
+  requestAnimationFrame(() => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const sanft = !(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+    el.scrollIntoView({ behavior: sanft ? "smooth" : "auto", block: "start" });
+    el.classList.remove("aufleuchten");
+    void el.offsetWidth;            // Neustart der Animation erzwingen
+    el.classList.add("aufleuchten");
+  });
+}
+
 /* Kalenderraster: sieben Zeilen (Wochentage), eine Spalte je Woche. Die
    Faerbung richtet sich nach der Menge des Tages, in vier groben Stufen -
    feiner waere nicht lesbar. */
@@ -2206,20 +2240,19 @@ async function exportWeitergabe() {
    Meisterbereich umbauen. So entsteht stattdessen eine gefuehrte Kopie zum
    Ausprobieren, genau wie bei einem Bruder. */
 function satzUnterschied(ziel, datei) {
-  const zielNachQuelle = new Map();
-  for (const c of ziel.karten) if (c.quelleId) zielNachQuelle.set(c.quelleId, c);
+  const zielNachQuelle = kartenNachHerkunft(ziel);
   const gesehen = new Set();
   const neu = [], aktualisiert = [];
   for (const c of datei.karten) {
-    const q = c.quelleId || c.id;
-    const vorhanden = zielNachQuelle.get(q);
+    const q = herkunftsSchluessel(c);
+    const vorhanden = zielNachQuelle.get(q) || zielNachQuelle.get("w:" + c.wort);
     if (!vorhanden) { neu.push(c); continue; }
-    gesehen.add(q);
+    gesehen.add(vorhanden.id);
     if (vorhanden.wort !== c.wort || vorhanden.uebersetzung !== c.uebersetzung || vorhanden.extra !== c.extra) {
       aktualisiert.push(c);
     }
   }
-  const entfernt = ziel.karten.filter(c => !c.quelleId || !gesehen.has(c.quelleId));
+  const entfernt = ziel.karten.filter(c => !gesehen.has(c.id));
   /* Speicherkarten ohne Herkunfts-Nummer hat sich der Lernende selbst
      angelegt - die gehoeren ihm und bleiben, egal was in der Datei steht. */
   const dateiSetQuellen = new Set(datei.sets.map(s => s.quelleId || s.id));
@@ -2227,6 +2260,22 @@ function satzUnterschied(ziel, datei) {
   const entfernteSets = ziel.sets.filter(s => s.quelleId && !dateiSetQuellen.has(s.quelleId));
   return { neu, aktualisiert, entfernt, neueSets, entfernteSets };
 }
+
+/* Karten des Ziels nach Herkunfts-Nummer.
+
+   2.10.0: Fehlt die Herkunfts-Nummer, wird ersatzweise das arabische Wort
+   genommen. Grund: Eine Datei, die aus einem normalen Backup stammt, hat
+   keine Herkunfts-Nummern - traf sie auf einen gefuehrten Satz, passte KEINE
+   einzige Karte, und das Zusammenfuehren tauschte alle 133 gegen 133 neue
+   aus. Fuer den Lernenden hiess das: Lernstand weg. Mit dem Wort als
+   Rueckfallebene bleibt die Zuordnung erhalten. */
+function kartenNachHerkunft(b) {
+  const m = new Map();
+  for (const c of b.karten) if (c.quelleId) m.set(c.quelleId, c);
+  for (const c of b.karten) if (!m.has("w:" + c.wort)) m.set("w:" + c.wort, c);
+  return m;
+}
+function herkunftsSchluessel(c) { return c.quelleId || "w:" + c.wort; }
 
 async function satzZusammenfuehren(ziel, datei) {
   const d = satzUnterschied(ziel, datei);
@@ -2243,21 +2292,29 @@ async function satzZusammenfuehren(ziel, datei) {
   if ((datei.satzVersion || 1) <= (ziel.satzVersion || 0)) {
     text = "Diese Ausgabe hast du schon (Nr. " + (ziel.satzVersion || 0) + ").\n\n" + text;
   }
+  /* 2.10.0: Notbremse. Faellt mehr als die Haelfte weg, stimmt mit der Datei
+     etwas nicht - etwa ein normales Backup, das auf einen gefuehrten Satz
+     trifft. Lieber einmal zu viel gefragt als ein Lernstand weniger. */
+  if (d.entfernt.length > ziel.karten.length / 2 && ziel.karten.length > 0) {
+    text = "⚠ Achtung: " + d.entfernt.length + " von " + ziel.karten.length +
+      " Karten würden wegfallen – samt ihrem Lernstand.\n\nDas passt fast nie. " +
+      "Meist stammt die Datei nicht aus derselben Reihe.\n\n" + text;
+  }
   const ok = await dlgConfirm(text, { title: "Kartensatz aktualisieren?", okLabel: "Übernehmen" });
   if (!ok) return null;
 
   /* 1. Karten: vorhandene behalten (mit Fortschritt), fehlende anlegen,
         weggefallene loeschen. Die Reihenfolge kommt aus der Datei. */
-  const nachQuelle = new Map();
-  for (const c of ziel.karten) if (c.quelleId) nachQuelle.set(c.quelleId, c);
+  const nachQuelle = kartenNachHerkunft(ziel);
   const vergeben = new Set(ziel.karten.map(c => c.id));
   const frisch = () => { let x = genId(); while (vergeben.has(x)) x = genId(); vergeben.add(x); return x; };
   const dateiZuLokal = new Map();   // Karten-Nummer in der Datei -> Karte im Konto
   const neueListe = [];
   for (const c of datei.karten) {
-    const q = c.quelleId || c.id;
-    let lokal = nachQuelle.get(q);
+    const q = herkunftsSchluessel(c);
+    let lokal = nachQuelle.get(q) || nachQuelle.get("w:" + c.wort);
     if (lokal) {
+      if (!lokal.quelleId && c.quelleId) lokal.quelleId = c.quelleId;   // Nummer nachtragen
       lokal.wort = c.wort;
       lokal.uebersetzung = c.uebersetzung;
       lokal.extra = c.extra;
@@ -2746,6 +2803,7 @@ async function startDrillFromSet(setId, handwriting) {
   startDrillWithCards(cards, "Speicherkarte: " + set.name, handwriting);
 }
 function startDrillWithCards(cards, label, handwriting) {
+  springeZu("sitzung");
   const ids = cards.map(c => c.id);
   hwStrokes = [];
   hwFullscreen = false;
@@ -2795,6 +2853,7 @@ function lernKarten(set) {
   return setCards(set).filter(c => frei === null || frei.has(c.id));
 }
 async function startLernen(setId) {
+  springeZu("durchsicht");
   const set = findSet(setId);
   if (!set || !istGefuehrt(currentBereich())) return;
   if (setGesperrt(set)) {
@@ -3002,6 +3061,7 @@ async function deleteCard(id) {
 
 /* ---------- Lern-Session ---------- */
 function startSession() {
+  springeZu("sitzung");
   const due = dueCards();
   if (due.length === 0) return;
   ui.session = { queue: shuffled(due.map(c => c.id)), total: due.length, revealed: false, extraOpen: true, lastAction: null, isDrill: false, bereichId: currentBereich().id };
@@ -3454,6 +3514,7 @@ function renderMain() {
      Gescrollt wird ausserdem nur, wenn die Zielkarte gerade nicht zu sehen
      ist - sonst ruckelt die Seite bei jedem Tipp, obwohl alles schon im
      Bild steht. */
+  sprungAusfuehren();
   if (ui.lernFokusNach) {
     const woher = ui.lernFokusNach;
     ui.lernFokusNach = null;
@@ -3549,7 +3610,7 @@ function renderDurchsicht(set) {
   const fertig = alle.length - offen.length;
   let html = "";
 
-  html += '<div class="panel">';
+  html += '<div class="panel" id="durchsicht">';
   html += '<div class="lern-kopf">';
   html += '<div><h2 style="margin-bottom:2px">' + SET_ART_ZEICHEN[set.art || "eigen"] + ' ' + esc(set.name) + '</h2>';
   html += '<p class="hint" style="padding:0">' + fertig + ' von ' + alle.length + ' gelernt' +
@@ -3934,7 +3995,7 @@ function renderSession() {
   const promptArabic = !s.handwriting;
   const answerText = s.handwriting ? card.wort : card.uebersetzung;
   const answerArabic = s.handwriting;
-  let html = '<div class="panel study-card">';
+  let html = '<div class="panel study-card" id="sitzung">';
   if (s.isDrill) {
     html += '<div class="drill-banner">🔁 Übungsmodus (' + esc(s.drillLabel) + ')' +
       (s.handwriting ? ' · ✍️ Handschrift Deutsch → Arabisch' : '') +
@@ -4603,7 +4664,10 @@ function setBlock(s, b, frei, gefuehrt) {
      Bereich legt man die Karten ja selbst an - da gibt es nichts durchzugehen,
      was man nicht gerade selbst getippt haette. */
   if (gefuehrt && cards.length > 0 && !zu) {
-    html += '<button class="ghost" data-action="lern-set" data-id="' + esc(s.id) + '" title="In Ruhe durchgehen – Wort, Übersetzung und Notiz offen, in deiner Reihenfolge">▶ Lernen</button>';
+    /* 2.10.0: Heisst jetzt wie im Lernen-Tab „Durchgehen". „Lernen" stand
+       hier neben „Üben", und beides klang nach demselben - dabei ist das eine
+       Ansehen und das andere Abfragen. */
+    html += '<button class="ghost" data-action="lern-set" data-id="' + esc(s.id) + '" title="Ansehen und abhaken – Wort, Übersetzung und Notiz offen, in deiner Reihenfolge">▶ Durchgehen</button>';
   }
   if (zu) {
     html += '<span class="badge">gesperrt</span>';
