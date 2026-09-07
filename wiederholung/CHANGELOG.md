@@ -1,3 +1,37 @@
+## 2.11.3 – 7. September 2026 — Härtung gegen Datenverlust
+
+### Behoben
+
+- **Fehlgeschlagene Speichervorgänge waren nach der ersten Meldung stumm.** Wer
+  den einen Hinweis wegtippte, lernte weiter im guten Glauben, alles werde
+  gespeichert – während nichts mehr ankam. Jetzt bleibt oben eine Zeile
+  stehen, solange es klemmt, mit der Aufforderung, ein Backup zu ziehen.
+
+  Offline ist ausdrücklich **kein** Fehlerfall: Firestore nimmt Änderungen
+  entgegen und schickt sie los, sobald die Verbindung wieder steht. Die
+  Warnung erscheint nur bei echten Ablehnungen.
+
+- **Serie und Einstellungen konnten still verschwinden.** Sie gingen mit einem
+  stummen `.catch()` raus. Existierte das Nutzerdokument noch nicht – frisch
+  angelegtes Konto, das Anlegen läuft noch –, scheiterte der Schreibvorgang
+  mit „not-found", und die erste Serie war weg, ohne dass es jemand merkte.
+  Jetzt wird das Dokument in dem Fall angelegt und danach neu geschrieben.
+
+- **„Rückgängig" hob den Höchststand einer Karte nicht auf.** Ein Fehltipp auf
+  „Sicher" blieb damit für immer stehen – und bei der letzten Karte einer
+  Lektion hätte ein einziger Fehlgriff die nächste Lektion dauerhaft
+  aufgeschlossen.
+
+### Geändert
+
+- **Beim Löschen eines Bereichs wird nichts mehr behauptet, was sich nicht
+  prüfen lässt.** Statt „Ein Backup wurde heruntergeladen" steht dort jetzt,
+  dass es zum Herunterladen angeboten wurde und man in den Downloads
+  nachsehen soll. Auf manchen Geräten kann ein automatischer Download
+  stillschweigend blockiert werden – dann wäre die Zusage eine Lüge gewesen.
+
+---
+
 ## 2.11.2 – 7. September 2026
 
 ### Behoben
