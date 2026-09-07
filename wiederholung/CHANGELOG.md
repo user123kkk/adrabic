@@ -1,3 +1,63 @@
+## 2.11.0 – 7. September 2026 — „Ansehen, prüfen, wiederholen"
+
+### Geändert
+
+- **Der Haken beim Durchgehen heißt „Gesehen" und gibt keine Stufe mehr.**
+
+  Vorher setzte er die Karte direkt auf Stufe 1. Damit war er eine
+  Selbstauskunft ohne Gegenprobe: Wer 21-mal blind tippt, hätte 21 Karten auf
+  Stufe 1 gehabt, ohne eine einzige gelernt zu haben. Aufgefallen wäre es erst
+  am nächsten Tag – und dann ist der erste Eindruck verschenkt, gerade der
+  zählt beim ersten Kontakt am meisten.
+
+  Jetzt stellt der Haken die Karte für **heute** in die Abfrage: Sie gilt als
+  begonnen, bleibt aber auf Stufe 0 und ist sofort fällig. Die Stufe 1
+  verdient man sich in der Abfrage, nicht durch Tippen. Am Ende der
+  Durchsicht steht deshalb ein Knopf, der direkt dorthin führt.
+
+  Ablauf: **ansehen → gleich prüfen → morgen wieder.** Statt: tippen → morgen.
+
+- **An einer Lektion stehen keine Knöpfe mehr.** Vorher stand dieselbe Lektion
+  an zwei Orten und wollte an beiden etwas: Der Lernen-Tab führte einen
+  hindurch, und im Verwalten-Tab lag ein zweiter Weg daneben. Man wusste
+  nicht, welcher der richtige ist. Jetzt gilt: **gelernt wird im Lernen-Tab,
+  im Verwalten-Tab wird nachgeschaut.** Die Lektion zeigt dort nur noch, wie
+  viele ihrer Karten sitzen.
+
+- **Lektionen stehen jetzt über den Kategorien.** Sie sind der Weg;
+  Kategorien sind zum Nachschlagen, eigene Speicherkarten wachsen erst mit
+  der Zeit. Reihenfolge der Abschnitte: Lektionen, Kategorien, Eigene.
+
+### Behoben
+
+- **Auf dem Handy wurde der Name einer Speicherkarte zu einer
+  Buchstabensäule.** Name, Plakette und zwei Knöpfe kämpften in einer Zeile um
+  den Platz. Ab schmalen Bildschirmen bekommt der Name jetzt eine eigene Zeile
+  über den Knöpfen. Auf breiten Bildschirmen bleibt alles wie es war.
+
+### Neu
+
+- **„☆ Merken" mitten in der Abfrage.** Eigene Speicherkarten gab es längst,
+  aber der Weg dorthin führte über Verwalten, Auswahlmodus und einen Stern –
+  das findet niemand. Gemerkt wird eine Karte aber genau in dem Moment, in dem
+  auffällt, dass sie schwer ist: mitten im Abfragen. Der Knopf legt die
+  Sammelkarte „Schwierige Wörter" beim ersten Mal selbst an.
+
+  Damit haben auch die Empfänger eines geführten Kartensatzes wieder das,
+  wofür die Speicherkarten ursprünglich erfunden wurden.
+
+- **Bereich löschen ist abgesichert.** Zwei Sicherungen statt einer Nachfrage,
+  die man wegtippt:
+
+  1. Die App lädt vorher **ohne zu fragen ein Backup dieses Bereichs**
+     herunter. Es kostet nichts und ist im Ernstfall alles.
+  2. Zum Bestätigen muss der **Name des Bereichs getippt** werden. Ein
+     „Ja"-Knopf lässt sich blind drücken, ein Name nicht – dafür muss man
+     hinsehen. Dreimal nachfragen hätte nichts gebracht, das klickt man
+     genauso weg.
+
+---
+
 ## 2.10.2 – 7. September 2026
 
 ### Behoben
