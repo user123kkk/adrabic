@@ -1,3 +1,38 @@
+## 2.9.0 – 7. September 2026 — „Beste Serie"
+
+### Neu
+
+- **Die beste Serie geht nie verloren.** Neben der laufenden Serie steht jetzt
+  der eigene Rekord. Ein gerissener Zähler fühlt sich sonst an, als wäre alles
+  weg – und genau dann hört man auf. Derselbe Begriff wie im
+  Adrabic-Trainer.
+
+- **Ein Riss wird gesagt, nicht verschwiegen.** Vorher sprang die Zahl still
+  auf 0 und man rätselte. Jetzt steht da, auf welchem Stand die Serie war und
+  wann sie gerissen ist.
+
+- **„Serie fortsetzen".** Zwei Tage lang lässt sich ein Riss zurücknehmen.
+  Gedacht für den Fall, dass die Serie an etwas gerissen ist, das mit dem
+  Lernen nichts zu tun hatte: ein zweiter Bereich, der nach einem Import noch
+  herumstand, oder ein zweites Gerät. Ohne diesen Knopf bleibt nur der Weg
+  über die Firebase-Konsole.
+
+### Geändert
+
+- **Der Fortschritts-Tab trägt jetzt die Handschrift von Adrabic.** Dieselbe
+  Palette wie der Adrabic-Trainer war schon da – neu sind:
+
+  - Die Serie steht oben in einer eigenen Karte mit Creme-Verlauf und der
+    großen Zahl im Markenton, statt als Zeile unter einem Balken.
+  - **Arabisch-indische Ziffern** als stille Zierde neben den großen Zahlen
+    (٤ neben 4, ١٣٣ neben 133), gesetzt in derselben Quran-Schrift wie die
+    Karten. Ein Zeichen statt eines beliebigen Symbols – und man lernt die
+    Ziffern nebenbei mit.
+  - Der Kalender und der Tagesbalken laufen in der Markenfarbe statt in Grün.
+    Der Kalender ist das größte Element im Tab, deshalb trägt er den Akzent.
+
+---
+
 ## 2.8.0 – 7. September 2026 — „Fortschritt"
 
 ### Neu
