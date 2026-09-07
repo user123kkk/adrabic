@@ -1,3 +1,36 @@
+## 2.10.2 – 7. September 2026
+
+### Behoben
+
+- **Die App überschrieb fremde Änderungen mit ihrem eigenen, alten Stand.**
+  Bisher schrieb jeder Anlass den *kompletten* Serien-Stand aus dem Speicher
+  zurück – auch die bloße Tagesprüfung, die nur ein Datum setzt. War die App
+  dabei offline oder im Hintergrund und der Wert in der Cloud hatte sich
+  inzwischen geändert, überbügelte sie ihn. Genau so verschwand ein von Hand
+  gesetzter Zähler wieder.
+
+  Jetzt geht nur noch an den Server, was der Auslöser wirklich angefasst hat.
+  Die Tagesprüfung schreibt ihr Datum, sonst nichts.
+
+- **Dasselbe beim Tagesprotokoll.** Es schrieb bei jeder Karte alle 120 Tage
+  zurück; wer aufräumte, hatte Sekunden später alles wieder da. Jetzt geht nur
+  der heutige Eintrag raus.
+
+  Alte Tage werden beim Laden einmal aus der Cloud entfernt, statt bei jedem
+  Schreibvorgang mitgeschleppt zu werden.
+
+### Neu
+
+- **„Verlauf zurücksetzen"** unter dem Kalender. Löscht das Tagesprotokoll –
+  Balken, Kalender und Wochenzahlen fangen bei null an. Karten, Stufen und
+  Fälligkeiten bleiben unberührt.
+
+  Der Knopf steht in der App, damit niemand dafür in die Firebase-Konsole muss:
+  Von dort aus verliert man gegen ein laufendes Gerät, das seinen Speicherstand
+  zurückschreibt.
+
+---
+
 ## 2.10.1 – 7. September 2026
 
 ### Behoben
