@@ -1,3 +1,70 @@
+## 2.11.5 – 7. September 2026
+
+### Behoben
+
+- **„Abfrage starten" tat nichts.** Der Knopf am Ende des Durchgehens startete
+  die Sitzung tatsächlich – sie war nur nirgends zu sehen, weil die Durchsicht
+  angezeigt wird, solange sie geöffnet ist. Sie wird jetzt beendet, wenn eine
+  Sitzung beginnt.
+
+- **Ein gewöhnliches Backup konnte in einen geführten Kartensatz
+  hineinverschmelzen.** Es trägt zwar dieselbe Kennung, ist aber der
+  Arbeitsstand des Autors samt seiner eigenen Speicherkarten – und die haben
+  im Satz eines anderen nichts verloren. Zusammengeführt wird jetzt nur noch,
+  was ausdrücklich als Kartensatz erzeugt wurde; aus allem anderen entsteht
+  wie gewohnt ein eigener Bereich.
+
+- **„Übernehmen" für einen Vorgang ohne Wirkung.** Wer dieselbe Ausgabe ein
+  zweites Mal einspielte, bekam eine Rückfrage mit dem Inhalt „Am Inhalt
+  ändert sich nichts". Jetzt steht dort ein Hinweis und sonst nichts.
+
+### Geändert
+
+- **Der Fortschritt zählt Antworten, nicht Karten.** Dort stand „44 Karten
+  bearbeitet", obwohl der Stapel nur 21 Karten hat – das las sich wie ein
+  Fehler. Gezählt werden aber Antworten: Eine Karte kann an einem Tag mehrfach
+  drankommen, denn „Nicht" hängt sie wieder hinten an. Und wer 21 Karten
+  durchsieht und anschließend abfragt, hat zwangsläufig 42 Antworten gegeben.
+
+  Jetzt steht dort „44 Antworten · 23 Karten zum ersten Mal gesehen".
+
+---
+
+## 2.11.4 – 7. September 2026
+
+### Behoben
+
+- **„Zugriff verweigert" nach dem Bestätigen der E-Mail.** Die
+  Sicherheitsregeln verlangen eine bestätigte Adresse. Firestore prüft das
+  aber nicht am Konto, sondern an dem Ausweis (ID-Token), den der Browser
+  mitschickt – und darin steht `email_verified` so, wie es beim *Anmelden*
+  war.
+
+  Wer sich anmeldet und erst danach den Link in der Mail anklickt, hat
+  deshalb ein Zeitfenster, in dem die App ihn hereinlässt (sie sieht die
+  Bestätigung sofort), die Datenbank ihn aber abweist – bis zu einer Stunde
+  lang. Für den Betroffenen sieht das aus wie ein kaputtes Konto.
+
+  Die App holt jetzt in dem Fall selbstständig einen frischen Ausweis und lädt
+  neu. Das passiert genau einmal pro Sitzung: Liegt es doch an den Regeln,
+  entsteht keine Endlosschleife, sondern die Meldung bleibt stehen.
+
+- **Die Fehlermeldung sagt jetzt, was zu tun ist.** Vorher stand dort nur
+  „bitte Sicherheitsregeln in Firebase prüfen" – ein Satz, mit dem niemand
+  etwas anfangen kann, der die Konsole nie gesehen hat. Jetzt steht dort, dass
+  man sich einmal ab- und wieder anmelden soll, und die Regeln erst danach in
+  Frage kommen.
+
+### Neu
+
+- **„Ich habe bestätigt – weiter"** auf dem Bestätigungs-Bildschirm. Wer den
+  Link angeklickt hatte, saß dort sonst fest, bis er die Seite von sich aus
+  neu lud. Der Knopf holt den Kontostand vom Server, dazu einen frischen
+  Ausweis – ohne den zweiten Schritt käme er zwar in die App, würde dort aber
+  von der Datenbank abgewiesen.
+
+---
+
 ## 2.11.3 – 7. September 2026 — Härtung gegen Datenverlust
 
 ### Behoben
