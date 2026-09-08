@@ -1,3 +1,40 @@
+## 2.13.0 – 8. September 2026 — „Anfang statt Null"
+
+### Geändert
+
+Der Fortschritts-Tab sah bei einem frisch eingespielten Kartensatz aus wie ein
+Fehler: fünf Nullen untereinander, ein grauer Balken, zwölf leere Wochen und
+sieben leere Balken. Alles rechnerisch richtig – und trotzdem der falsche
+erste Eindruck. Ein Anfang soll nicht aussehen wie ein Ausfall.
+
+- **Keine große Null mehr als erste Zahl.** Wer noch keine Serie hat, sieht
+  statt „0 Tage am Stück" die nächste Handlung: *Heute wird Tag 1 – Wiederholungen
+  erledigen, dann zählt der Tag.* Ist der Tag schon erledigt, steht dort ein
+  Haken und *morgen beginnt die Serie*.
+
+- **„beste Serie" erscheint erst, wenn es eine gibt.** Eine zweite Null
+  daneben machte es nur schlimmer.
+
+- **„Heute" hat einen Knopf.** Solange etwas offen ist, führt *Weiter lernen*
+  direkt dorthin. Ein Tab, der nur zusieht, fühlt sich tot an – die
+  Feststellung, dass 21 Karten offen sind, gehört mit dem Weg dorthin
+  zusammen.
+
+- **Das Kalenderraster wächst mit.** Gezeigt wird ab der ersten Woche mit
+  einem Eintrag, mindestens vier und höchstens zwölf Wochen. Zwölf leere
+  Wochen am ersten Tag sahen aus wie ein Fehler; vier Wochen mit einem hellen
+  Kästchen sehen aus wie ein Anfang. Ist noch gar nichts aufgezeichnet, steht
+  das auch dort.
+
+- **Kein Balken aus einer einzigen Farbe.** Solange alle Karten im selben
+  Zustand sind, verteilt der Balken nichts – er sah nur aus, als wäre er
+  kaputt. Stattdessen steht dort ein Satz: *Alle 21 Karten sind gerade neu.*
+
+- **Die 7-Tage-Vorschau bleibt weg, wenn in der ganzen Woche nichts ansteht.**
+  Sieben leere Balken sagen nichts.
+
+---
+
 ## 2.12.1 – 7. September 2026 — Aufräumen
 
 Keine neuen Funktionen. Diese Fassung räumt auf, was sich über die letzten
