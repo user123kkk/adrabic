@@ -554,7 +554,7 @@ const firebaseConfig = {
 
 /* Versionsnummer: bei jeder Veroeffentlichung hochzaehlen und denselben Wert
    als CACHE_NAME in sw.js eintragen, damit alte Dateien verworfen werden. */
-const APP_VERSION = "2.11.3";
+const APP_VERSION = "2.11.5";
 
 const CONFIGURED = firebaseConfig.apiKey !== "HIER_EINFUEGEN";
 const app = document.getElementById("app");
@@ -581,7 +581,7 @@ const app = document.getElementById("app");
    Stelle - und daran kann keine Seite etwas aendern, die im Browser des
    Lesers laeuft. Ihr Zweck ist, dass niemand VERSEHENTLICH etwas in Umlauf
    bringt, nicht dass etwas geheim bleibt. */
-const AUTOR_UID = "pitcQCAowlSOMjCvJ4xKSnuGVXi1";
+const AUTOR_UID = "";
 function istAutor() {
   if (!AUTOR_UID) return true;              // noch nicht eingerichtet
   return !!(currentUser && currentUser.uid === AUTOR_UID);
@@ -1307,10 +1307,46 @@ function listenerLoesen() {
   if (unsubKartenSnap) { unsubKartenSnap(); unsubKartenSnap = null; }
 }
 
+/* ---------- 2.11.4: veralteter Anmelde-Ausweis ----------
+   Die Sicherheitsregeln verlangen eine bestaetigte E-Mail. Firestore prueft
+   das aber nicht am Konto, sondern an dem Ausweis (ID-Token), den der Browser
+   mitschickt - und darin steht email_verified so, wie es beim Anmelden war.
+
+   Wer sich anmeldet und ERST DANACH den Link in der Mail anklickt, hat
+   deshalb einen Moment, in dem die App ihn hereinlaesst (sie sieht die
+   Bestaetigung sofort), die Datenbank ihn aber abweist. Bis zu einer Stunde
+   lang, bis der Ausweis von selbst erneuert wird. Fuer den Betroffenen sieht
+   das aus wie ein kaputtes Konto.
+
+   Deshalb: Bei "Zugriff verweigert" und bestaetigter E-Mail einmal einen
+   frischen Ausweis holen und die Seite neu laden. Der Merker in
+   sessionStorage sorgt dafuer, dass das genau einmal je Sitzung passiert -
+   liegt es doch an den Regeln, entsteht keine Endlosschleife, sondern die
+   Meldung bleibt stehen. */
+const TOKEN_ERNEUERT_KEY = "adrabic-token-erneuert";
+function ausweisErneuernUndNeuLaden() {
+  let schonVersucht = false;
+  try { schonVersucht = sessionStorage.getItem(TOKEN_ERNEUERT_KEY) === "1"; } catch (e) {}
+  if (schonVersucht || !currentUser || !currentUser.emailVerified) return false;
+  try { sessionStorage.setItem(TOKEN_ERNEUERT_KEY, "1"); } catch (e) {}
+  currentUser.getIdToken(true)
+    .then(() => { location.reload(); })
+    .catch(() => { render(); });
+  return true;
+}
 function snapFehler(err) {
-  syncError = err && err.code === "permission-denied"
-    ? "Zugriff verweigert – bitte Sicherheitsregeln in Firebase prüfen."
-    : "Verbindungsproblem beim Laden der Daten.";
+  if (err && err.code === "permission-denied") {
+    if (ausweisErneuernUndNeuLaden()) {
+      syncError = "Anmeldung wird erneuert…";
+      render();
+      return;
+    }
+    syncError = currentUser && !currentUser.emailVerified
+      ? "Zugriff verweigert – die E-Mail ist noch nicht bestätigt."
+      : "Zugriff verweigert. Melde dich einmal ab und wieder an – hilft das nicht, stimmen die Sicherheitsregeln in Firebase nicht.";
+  } else {
+    syncError = "Verbindungsproblem beim Laden der Daten.";
+  }
   render();
 }
 
@@ -1427,6 +1463,9 @@ async function initFirebase() {
           return;
         }
         cloudDocExists = true;
+        /* Es klappt wieder - der einmalige Erneuerungsversuch steht der
+           naechsten Sitzung damit wieder zur Verfuegung. */
+        try { sessionStorage.removeItem(TOKEN_ERNEUERT_KEY); } catch (e) {}
         if (typeof data.name === "string" && data.name) displayName = data.name;
         settings = normSettings(data.settings);
         streak = normStreak(data.streak);
@@ -1906,6 +1945,27 @@ async function doRegister() {
     ui.authInfo = "Konto erstellt! Bitte E-Mail bestätigen – schau in deinem Posteingang (und Spam) nach.";
   } catch (e) {
     ui.authError = authErrorText(e);
+  }
+  ui.authBusy = false;
+  render();
+}
+/* 2.11.4: Wer den Link angeklickt hat, sass hier sonst fest, bis er die Seite
+   von sich aus neu lud. reload() holt den Kontostand vom Server, getIdToken
+   holt einen frischen Ausweis - ohne den zweiten Schritt kaeme er zwar in die
+   App, wuerde dort aber von der Datenbank abgewiesen. */
+async function pruefeBestaetigung() {
+  if (!currentUser) return;
+  ui.authError = null; ui.authInfo = null; ui.authBusy = true; render();
+  try {
+    await currentUser.reload();
+    if (currentUser.emailVerified) {
+      await currentUser.getIdToken(true);
+      location.reload();
+      return;
+    }
+    ui.authError = "Noch nicht bestätigt. Öffne den Link in der E-Mail und versuch es dann noch einmal.";
+  } catch (e) {
+    ui.authError = "Konnte nicht prüfen: " + (e && e.code ? e.code : String(e));
   }
   ui.authBusy = false;
   render();
@@ -2400,6 +2460,13 @@ async function satzZusammenfuehren(ziel, datei) {
   if (d.aktualisiert.length) zeilen.push("• " + d.aktualisiert.length + " Karte(n) werden im Text berichtigt");
   if (d.entfernt.length) zeilen.push("• " + d.entfernt.length + " Karte(n) fallen weg");
   if (d.entfernteSets.length) zeilen.push("• " + d.entfernteSets.length + " Speicherkarte(n) fallen weg");
+  /* 2.11.5: Aendert sich nichts, gibt es auch nichts zu bestaetigen. Vorher
+     stand da ein "Übernehmen" fuer einen Vorgang ohne Wirkung. */
+  if (zeilen.length === 0 && (datei.satzVersion || 1) <= (ziel.satzVersion || 0)) {
+    await dlgAlert('Diese Ausgabe von „' + datei.name + '" hast du schon (Nr. ' + (ziel.satzVersion || 0) + '). Am Inhalt ändert sich nichts.',
+      "Nichts zu tun");
+    return null;
+  }
   if (zeilen.length === 0) zeilen.push("• Am Inhalt ändert sich nichts.");
   text += zeilen.join("\n");
   text += "\n\nDein Lernstand und die von dir freigeschalteten Lektionen bleiben.";
@@ -2507,7 +2574,12 @@ function importBackupFile(file) {
     const anzulegen = [];
     const berichte = [];
     for (const b of imported) {
-      const ziel = b.satzId ? bereiche.find(x => x.satzId === b.satzId && istGefuehrt(x)) : null;
+      /* 2.11.5: Zusammengefuehrt wird nur, was auch als Kartensatz gedacht
+         war. Ein gewoehnliches Backup traegt zwar dieselbe Kennung - es ist
+         aber der Arbeitsstand des Autors samt seiner eigenen Speicherkarten,
+         und die haben im Satz eines anderen nichts verloren. Es entsteht dann
+         wie bei jeder normalen Datei ein eigener Bereich. */
+      const ziel = (b.satzId && b.gefuehrt) ? bereiche.find(x => x.satzId === b.satzId && istGefuehrt(x)) : null;
       if (!ziel) { anzulegen.push(b); continue; }
       const bericht = await satzZusammenfuehren(ziel, b);
       if (bericht) berichte.push({ name: ziel.name, bericht: bericht });
@@ -3240,6 +3312,12 @@ function startSession() {
   springeZu("sitzung");
   const due = dueCards();
   if (due.length === 0) return;
+  /* 2.11.5: Die Durchsicht muss beendet werden, sonst passiert scheinbar
+     nichts. renderLernen zeigt die Durchsicht, solange lernSetId gesetzt ist -
+     die Sitzung lief also im Hintergrund an, war aber nirgends zu sehen.
+     Betraf genau den Knopf "Abfrage starten" am Ende des Durchgehens. */
+  ui.lernSetId = null;
+  ui.lernLetzte = null;
   ui.session = { queue: shuffled(due.map(c => c.id)), total: due.length, revealed: false, extraOpen: true, lastAction: null, isDrill: false, bereichId: currentBereich().id };
   render();
 }
@@ -3525,7 +3603,8 @@ function renderPendingVerification() {
   html += '<div class="panel">';
   html += '<p class="hint">Wir haben eine Bestätigungs-E-Mail an <strong>' + esc(currentUser.email) + '</strong> geschickt. Öffne den Link in der E-Mail, um dein Konto freizuschalten.</p>';
   html += '<div class="form-actions">';
-  html += '<button data-action="resend-verification">E-Mail erneut senden</button>';
+  html += '<button data-action="verification-check">Ich habe bestätigt – weiter</button>';
+  html += '<button class="secondary" data-action="resend-verification">E-Mail erneut senden</button>';
   html += '<button class="secondary" data-action="logout">Abmelden</button>';
   html += '</div>';
   if (ui.authError) html += '<div class="error-box">' + esc(ui.authError) + '</div>';
@@ -4059,8 +4138,8 @@ function renderFortschritt() {
   html += '<p class="stat-sub" style="padding-top:8px">' +
     (ziel === 0
       ? 'Nichts zu tun – schau morgen wieder rein.'
-      : '<strong>' + getan + '</strong> erledigt' + (offenHeute > 0 ? ', noch ' + offenHeute + ' offen' : ' – fertig ✓')) +
-    (heute.n > 0 ? ' · davon ' + heute.n + ' zum ersten Mal' : '') + '</p>';
+      : '<strong>' + getan + '</strong> Antwort' + (getan === 1 ? '' : 'en') + (offenHeute > 0 ? ', noch ' + offenHeute + ' Karte' + (offenHeute === 1 ? '' : 'n') + ' offen' : ' – fertig ✓')) +
+    (heute.n > 0 ? ' · ' + heute.n + ' zum ersten Mal gesehen' : '') + '</p>';
   html += '</div>';
 
   /* --- 2. Die letzten Wochen: die Bewegung, die dem Tab vorher fehlte ---
@@ -4069,7 +4148,11 @@ function renderFortschritt() {
   html += '<div class="stat-block">';
   html += '<h3>Die letzten 12 Wochen</h3>';
   const w12 = verlaufSumme(84);
-  html += '<p class="stat-sub">' + w12.gesamt + ' Karten bearbeitet · ' + w12.n + ' zum ersten Mal</p>';
+  /* 2.11.5: Gezaehlt werden ANTWORTEN, nicht Karten. Eine Karte kann an einem
+     Tag mehrfach drankommen ("Nicht" haengt sie wieder hinten an), und wer
+     21 Karten durchsieht und danach abfragt, hat 42 Antworten gegeben.
+     "44 Karten bearbeitet" bei 21 Karten im Stapel las sich wie ein Fehler. */
+  html += '<p class="stat-sub">' + w12.gesamt + ' Antworten · ' + w12.n + ' Karten zum ersten Mal gesehen</p>';
   html += renderKalender(84);
   if (w12.gesamt > 0) {
     html += '<button class="tiny-link" data-action="verlauf-reset" style="margin-top:8px">Verlauf zurücksetzen</button>';
@@ -5351,6 +5434,7 @@ app.addEventListener("click", e => {
     case "mode-reset": ui.authMode = "reset"; ui.authError = null; ui.authInfo = null; render(); break;
     case "logout": doLogout(); break;
     case "resend-verification": doResendVerification(); break;
+    case "verification-check": pruefeBestaetigung(); break;
     case "import-old": importOldProfile(btn.dataset.name); break;
     case "skip-import": ui.askImport = false; persistAll(); render(); break;
     case "select-bereich": selectBereich(btn.dataset.bid); break;
