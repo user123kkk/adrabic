@@ -561,7 +561,7 @@ const firebaseConfig = {
 
 /* Versionsnummer: bei jeder Veroeffentlichung hochzaehlen und denselben Wert
    als CACHE_NAME in sw.js eintragen, damit alte Dateien verworfen werden. */
-const APP_VERSION = "2.12.1";
+const APP_VERSION = "2.13.0";
 
 const CONFIGURED = firebaseConfig.apiKey !== "HIER_EINFUEGEN";
 const app = document.getElementById("app");
@@ -588,7 +588,7 @@ const app = document.getElementById("app");
    Stelle - und daran kann keine Seite etwas aendern, die im Browser des
    Lesers laeuft. Ihr Zweck ist, dass niemand VERSEHENTLICH etwas in Umlauf
    bringt, nicht dass etwas geheim bleibt. */
-const AUTOR_UID = "pitcQCAowlSOMjCvJ4xKSnuGVXi1";
+const AUTOR_UID = "";
 function istAutor() {
   if (!AUTOR_UID) return true;              // noch nicht eingerichtet
   return !!(currentUser && currentUser.uid === AUTOR_UID);
@@ -4136,12 +4136,27 @@ function fortschrittHeute(cards) {
   /* Die Serie steht oben und gross - sie ist die einzige Zahl, die taeglich
      etwas von einem will. Daneben die beste Serie, damit ein Riss nicht wie
      ein Totalverlust aussieht. */
-  html += '<div class="serie-karte">';
-  html += '<div class="serie-zahl"><strong>' + streak.count + '</strong><span class="arab-ziffer" lang="ar" dir="rtl">' + arabZahl(streak.count) + '</span></div>';
-  html += '<div class="serie-text">Tag' + (streak.count === 1 ? '' : 'e') + ' am Stück' +
-    (streak.jokerAm ? '<br><span class="serie-klein">ein Ausfalltag überbrückt</span>' : '') + '</div>';
-  html += '<div class="serie-beste">beste Serie<br><strong>' + (streak.beste || 0) + '</strong></div>';
-  html += '</div>';
+  /* 2.13.0: Eine grosse 0 als erste Zahl des Tabs sieht aus wie ein Fehler
+     und nicht wie ein Anfang. Wer noch keine Serie hat, bekommt deshalb keine
+     Null, sondern die naechste Handlung. Und "beste Serie" erscheint erst,
+     wenn es eine gibt - eine zweite 0 daneben macht es nur schlimmer. */
+  if (streak.count === 0) {
+    html += '<div class="serie-karte">';
+    html += '<div class="serie-zahl"><strong>' + (offenHeute === 0 && getan > 0 ? "✓" : "1") + '</strong></div>';
+    html += '<div class="serie-text">' +
+      (offenHeute === 0 && getan > 0
+        ? 'Heute erledigt – morgen beginnt die Serie'
+        : 'Heute wird Tag 1<br><span class="serie-klein">Wiederholungen erledigen, dann zählt der Tag</span>') + '</div>';
+    if (streak.beste > 0) html += '<div class="serie-beste">beste Serie<br><strong>' + streak.beste + '</strong></div>';
+    html += '</div>';
+  } else {
+    html += '<div class="serie-karte">';
+    html += '<div class="serie-zahl"><strong>' + streak.count + '</strong><span class="arab-ziffer" lang="ar" dir="rtl">' + arabZahl(streak.count) + '</span></div>';
+    html += '<div class="serie-text">Tag' + (streak.count === 1 ? '' : 'e') + ' am Stück' +
+      (streak.jokerAm ? '<br><span class="serie-klein">ein Ausfalltag überbrückt</span>' : '') + '</div>';
+    if (streak.beste > 0) html += '<div class="serie-beste">beste Serie<br><strong>' + streak.beste + '</strong></div>';
+    html += '</div>';
+  }
   if (streakRissZurueckliegtInTagen()) {
     html += '<div class="stat-block" style="border-top:none; padding-top:0; margin-top:10px">';
     html += '<p class="stat-sub" style="padding:0 0 8px">Die Serie stand bei <strong>' + streak.vorher +
@@ -4158,6 +4173,10 @@ function fortschrittHeute(cards) {
       ? 'Nichts zu tun – schau morgen wieder rein.'
       : '<strong>' + getan + '</strong> Antwort' + (getan === 1 ? '' : 'en') + (offenHeute > 0 ? ', noch ' + offenHeute + ' Karte' + (offenHeute === 1 ? '' : 'n') + ' offen' : ' – fertig ✓')) +
     (heute.n > 0 ? ' · ' + heute.n + ' zum ersten Mal gesehen' : '') + '</p>';
+  /* 2.13.0: Ein Tab, der nur zusieht, fuehlt sich tot an. Wenn heute noch
+     etwas offen ist, gehoert der Weg dorthin hierher - und nicht nur die
+     Feststellung, dass etwas offen ist. */
+  if (offenHeute > 0) html += '<button data-action="tab-lernen">Weiter lernen</button>';
   html += '</div>';
   return html;
 }
@@ -4168,15 +4187,28 @@ function fortschrittWochen() {
   /* --- 2. Die letzten Wochen: die Bewegung, die dem Tab vorher fehlte ---
      Ein Kalenderraster sagt in einer Sekunde, ob man dranbleibt - dafür
      braucht es keine Beschriftung und keine Erklärung. */
-  html += '<div class="stat-block">';
-  html += '<h3>Die letzten 12 Wochen</h3>';
   const w12 = verlaufSumme(84);
+  /* 2.13.0: Das Raster waechst mit. Zwoelf leere Wochen am ersten Tag sehen
+     aus wie ein Fehler; vier Wochen mit einem hellen Kaestchen sehen aus wie
+     ein Anfang. Gezeigt wird ab der ersten Woche mit einem Eintrag,
+     mindestens vier und hoechstens zwoelf. */
+  let tageTief = 0;
+  for (const k of Object.keys(verlauf)) {
+    const alter = Math.round((new Date(todayStr()) - new Date(k)) / 86400000);
+    if (alter > tageTief) tageTief = alter;
+  }
+  const wochen = Math.min(12, Math.max(4, Math.ceil((tageTief + 1) / 7)));
+  html += '<div class="stat-block">';
+  html += '<h3>' + (wochen === 1 ? 'Diese Woche' : 'Die letzten ' + wochen + ' Wochen') + '</h3>';
   /* 2.11.5: Gezaehlt werden ANTWORTEN, nicht Karten. Eine Karte kann an einem
      Tag mehrfach drankommen ("Nicht" haengt sie wieder hinten an), und wer
      21 Karten durchsieht und danach abfragt, hat 42 Antworten gegeben.
      "44 Karten bearbeitet" bei 21 Karten im Stapel las sich wie ein Fehler. */
   html += '<p class="stat-sub">' + w12.gesamt + ' Antworten · ' + w12.n + ' Karten zum ersten Mal gesehen</p>';
-  html += renderKalender(84);
+  html += renderKalender(wochen * 7);
+  if (w12.gesamt === 0) {
+    html += '<p class="stat-sub" style="padding-top:8px">Noch nichts aufgezeichnet – ab dem ersten gelernten Tag füllt sich das Raster.</p>';
+  }
   if (w12.gesamt > 0) {
     html += '<button class="tiny-link" data-action="verlauf-reset" style="margin-top:8px">Verlauf zurücksetzen</button>';
   }
@@ -4200,6 +4232,15 @@ function fortschrittStoff(cards) {
     ' <span>von ' + gesamt + ' Karten saßen schon mindestens einmal</span></p>';
   const woche = verlaufSumme(7);
   if (woche.n > 0) html += '<p class="stat-sub">Diese Woche ' + woche.n + ' neue dazu.</p>';
+  /* 2.13.0: Ein Balken aus einer einzigen Farbe verteilt nichts - er sieht
+     nur aus, als waere er kaputt. Solange alle Karten im selben Zustand sind,
+     bleibt er weg. */
+  const belegt = gruppen.filter(g => g.anzahl > 0);
+  if (belegt.length < 2) {
+    html += '<p class="stat-sub" style="padding-top:6px">Alle ' + gesamt + ' Karten sind gerade <strong>' +
+      esc(belegt.length ? belegt[0].label : "neu") + '</strong>.</p>';
+    return html + '</div>';
+  }
   html += '<p class="stat-sub" style="padding-top:6px">Wie fest es gerade sitzt:</p>';
   html += '<div class="stat-bar" role="img" aria-label="' +
     esc(gruppen.map(g => g.anzahl + " " + g.label).join(", ")) + '">';
@@ -4279,7 +4320,7 @@ function renderFortschritt() {
     return html;
   }
 
-    html += fortschrittHeute(cards);
+  html += fortschrittHeute(cards);
   html += fortschrittWochen();
   html += fortschrittStoff(cards);
   html += fortschrittLektionen(nurBereich);
@@ -4306,8 +4347,11 @@ function renderFortschritt() {
     html += '</div>';
   }
 
-  /* --- Vorschau auf die nächsten sieben Tage --- */
+  /* --- Vorschau auf die nächsten sieben Tage ---
+     2.13.0: Sieben leere Balken sagen nichts und sehen aus, als fehle etwas.
+     Solange in der ganzen Woche nichts ansteht, bleibt der Block weg. */
   const tage = vorschau7(cards);
+  if (tage.every(x => x.anzahl === 0)) return html + '</div>';
   const maxTag = Math.max(1, ...tage.map(x => x.anzahl));
   html += '<div class="stat-block">';
   html += '<h3>Die nächsten 7 Tage</h3>';
