@@ -1,3 +1,71 @@
+## 2.12.1 – 7. September 2026 — Aufräumen
+
+Keine neuen Funktionen. Diese Fassung räumt auf, was sich über die letzten
+Veröffentlichungen angesammelt hat.
+
+### Geändert
+
+- **Der Fortschritts-Tab war eine Funktion von 188 Zeilen**, in die vier
+  Veröffentlichungen nacheinander etwas hineingeschrieben hatten. Er besteht
+  jetzt aus vier Bausteinen – Heute, Wochen, Stoff, Lektionen –, die jeder für
+  sich lesbar und änderbar sind. Am Bildschirm ändert sich dadurch nichts.
+
+- **Das Feld „gesperrt" ist aus allen Schreibwegen verschwunden.** Seit 2.7.0
+  wird das Schloss berechnet statt gespeichert; das Feld wurde seither an
+  fünf Stellen geschrieben und an keiner einzigen gelesen. Genau die Art
+  Altlast, die später jemanden auf eine falsche Fährte führt.
+
+  Auch die Weitergabe-Datei trägt es nicht mehr: Welche Lektion offen ist,
+  rechnet der Empfänger selbst aus – ein mitgeschicktes Schloss hätte nur so
+  ausgesehen, als würde es etwas entscheiden.
+
+- **Zwei tote Funktionen entfernt** (`karteFrei`, `zeigtSchloss`) – Überbleibsel
+  aus 2.3.0 und 2.5.0, die durch spätere Fassungen ersetzt worden waren.
+
+---
+
+## 2.12.0 – 7. September 2026 — „Ein Wortschatz"
+
+### Geändert
+
+- **Es gibt jetzt genau eine Stelle, an der die Zustände einer Karte
+  definiert sind.** Vorher dachte sich jede Ansicht ihre eigenen Wörter aus:
+  Dieselbe Karte hieß im Fortschritt „neu", in der Durchsicht „gesehen" und im
+  Lernen-Tab „in der ersten Abfrage". Wer eine Karte gerade durchgesehen
+  hatte, fand sie im Fortschritt trotzdem unter „neu" – obwohl er sie eben
+  erst gelesen hatte.
+
+  Fünf Zustände, jede Karte in genau einem:
+
+  | | |
+  |---|---|
+  | **neu** | nie angesehen |
+  | **gesehen** | durchgesehen, aber noch nie gewusst |
+  | **wackelig** | einmal gewusst, fällt noch leicht wieder raus (Stufe 1–2) |
+  | **solide** | hält sich (Stufe 3–5) |
+  | **fest** | sitzt (Stufe 6+) |
+
+  Die Grenze zwischen „neu" und „gesehen" ist das Erstbewertungsdatum, alle
+  weiteren sind die Stufe. Weil eine Karte nie unter Stufe 1 zurückfällt,
+  sobald sie einmal gewusst wurde, bedeutet Stufe 0 immer entweder neu oder
+  gesehen – die Einteilung ist damit überschneidungsfrei und lückenlos.
+
+- **Alle Ansichten lesen daraus.** Der Balken im Fortschritt, die Plaketten in
+  der Kartenliste und in den Speicherkarten, die Durchsicht, der Faden im
+  Lernen-Tab. Statt „Stufe 3" steht an einer Karte jetzt „solide 3", statt
+  „✓ gesehen" schlicht „gesehen" – überall derselbe Wortlaut.
+
+- **Die Farben bedeuten überall dasselbe.** Eine Plakette trägt die Farbe
+  ihres Zustands, dieselbe wie im Balken des Fortschritts. Der neue Zustand
+  „gesehen" bekommt den gedämpften Markenton, weil er zwischen „noch nichts"
+  und „wackelig" liegt.
+
+- Die frühere Gruppe „im Aufbau" heißt jetzt **solide**, und die Grenzen sind
+  angepasst: „wackelig" beginnt bei Stufe 1 statt bei 0, weil Stufe 0 seit
+  2.11.0 „gesehen" bedeutet.
+
+---
+
 ## 2.11.5 – 7. September 2026
 
 ### Behoben
