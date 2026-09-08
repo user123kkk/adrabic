@@ -308,6 +308,13 @@
      anfassen" ohne Erklaerung lesbar ist. */
   .card-row.card-frei { background: rgba(227, 200, 138, 0.10); border-radius: var(--radius); padding-left: 8px; padding-right: 8px; }
   .lock-anzeige { font-size: 0.95rem; opacity: 0.75; }
+  /* 2.12.0: Die Plakette traegt die Farbe ihres Zustands - dieselbe wie im
+     Balken des Fortschritts. So bedeutet ein Farbton ueberall dasselbe. */
+  .badge.zustand-neu      { color: var(--ink-soft); }
+  .badge.zustand-gesehen  { color: var(--accent-dark); }
+  .badge.zustand-wackelig { color: var(--red); }
+  .badge.zustand-solide   { color: var(--accent); }
+  .badge.zustand-fest     { color: var(--green); }
   /* Dasselbe Aufleuchten wie im Adrabic-Trainer: heller Creme-Schleier, der
      in 1,4 Sekunden verschwindet. */
   @keyframes aufleuchten { 0% { background: rgba(244, 240, 227, 0.30); } 100% { background: transparent; } }
@@ -554,7 +561,7 @@ const firebaseConfig = {
 
 /* Versionsnummer: bei jeder Veroeffentlichung hochzaehlen und denselben Wert
    als CACHE_NAME in sw.js eintragen, damit alte Dateien verworfen werden. */
-const APP_VERSION = "2.11.5";
+const APP_VERSION = "2.12.1";
 
 const CONFIGURED = firebaseConfig.apiKey !== "HIER_EINFUEGEN";
 const app = document.getElementById("app");
@@ -581,7 +588,7 @@ const app = document.getElementById("app");
    Stelle - und daran kann keine Seite etwas aendern, die im Browser des
    Lesers laeuft. Ihr Zweck ist, dass niemand VERSEHENTLICH etwas in Umlauf
    bringt, nicht dass etwas geheim bleibt. */
-const AUTOR_UID = "pitcQCAowlSOMjCvJ4xKSnuGVXi1";
+const AUTOR_UID = "";
 function istAutor() {
   if (!AUTOR_UID) return true;              // noch nicht eingerichtet
   return !!(currentUser && currentUser.uid === AUTOR_UID);
@@ -805,10 +812,6 @@ function freieIdsFor(b) {
   }
   return frei;
 }
-function karteFrei(c, bereich) {
-  const frei = freieIdsFor(bereich || currentBereich());
-  return frei === null || frei.has(c.id);
-}
 function lektionenVon(b) { return (b.sets || []).filter(s => s.art === "lektion"); }
 /* ---------- Wer bekommt das Lektions-System überhaupt zu sehen? ----------
    Schloss, Gruppen und der Modus „Lernen" gehoeren zu einem WEITERGEGEBENEN
@@ -824,7 +827,6 @@ function lektionenVon(b) { return (b.sets || []).filter(s => s.art === "lektion"
        die Lektionen fuer die Weitergabe muessen ja irgendwo entstehen. Und
        gruppiert wird erst, wenn wirklich eine Art vergeben wurde - vorher
        sieht das Feld genauso aus wie immer. */
-function zeigtSchloss(b) { return istGefuehrt(b || currentBereich()); }
 function zeigtArtWahl(b) {
   b = b || currentBereich();
   /* Auch beim Autor nicht dauerhaft: Ein Auswahlfeld in jeder Zeile macht das
@@ -894,10 +896,6 @@ function normSet(s) {
     art: art,
     /* Das Schloss haengt ausschliesslich an Lektionen. Stuende es auch an
        einer Kategorie, waere die Freigabe-Regel nicht mehr eindeutig. */
-    /* Seit 2.7.0 wird das Schloss berechnet (siehe offeneLektionIds). Das
-       Feld bleibt erhalten, damit aeltere Dateien und aeltere Fassungen der
-       App weiter funktionieren - gelesen wird es nicht mehr. */
-    gesperrt: art === "lektion" && s.gesperrt === true,
     quelleId: typeof s.quelleId === "string" && s.quelleId ? s.quelleId : null,
     cardIds: (Array.isArray(s.cardIds) ? s.cardIds : []).filter(x => typeof x === "string" && x)
   };
@@ -953,7 +951,6 @@ function setFelder(st, order) {
   return {
     name: st.name, order: order,
     art: st.art || "eigen",
-    gesperrt: !!st.gesperrt,
     quelleId: st.quelleId || null,
     cardIds: st.cardIds
   };
@@ -985,7 +982,7 @@ function bereicheMapToArray(mapObj) {
     const setsMap = b.sets && typeof b.sets === "object" ? b.sets : {};
     const sets = Object.keys(setsMap).map(sid => {
       const s = setsMap[sid] || {};
-      return { set: normSet({ id: sid, name: s.name, art: s.art, gesperrt: s.gesperrt, quelleId: s.quelleId, cardIds: s.cardIds }), order: Number.isFinite(s.order) ? s.order : 0 };
+      return { set: normSet({ id: sid, name: s.name, art: s.art, quelleId: s.quelleId, cardIds: s.cardIds }), order: Number.isFinite(s.order) ? s.order : 0 };
     }).sort((x, y) => x.order - y.order).map(x => x.set);
     return { id: id, name: typeof b.name === "string" && b.name ? b.name.slice(0, 40) : "Vokabeln", gefuehrt: b.gefuehrt === true, satzId: typeof b.satzId === "string" && b.satzId ? b.satzId : null, satzVersion: Number.isInteger(b.satzVersion) ? b.satzVersion : 0, karten: karten, sets: sets, order: Number.isFinite(b.order) ? b.order : 0 };
   }).sort((x, y) => x.order - y.order).map(({ order, ...rest }) => rest);
@@ -1370,7 +1367,7 @@ function bereicheAusSammlungen(bDocs, kDocs) {
     const setsMap = b.sets && typeof b.sets === "object" ? b.sets : {};
     const sets = Object.keys(setsMap).map(sid => {
       const st = setsMap[sid] || {};
-      return { set: normSet({ id: sid, name: st.name, art: st.art, gesperrt: st.gesperrt, quelleId: st.quelleId, cardIds: st.cardIds }), ord: Number.isFinite(st.order) ? st.order : 0 };
+      return { set: normSet({ id: sid, name: st.name, art: st.art, quelleId: st.quelleId, cardIds: st.cardIds }), ord: Number.isFinite(st.order) ? st.order : 0 };
     }).sort((x, y) => x.ord - y.ord).map(x => x.set);
     return {
       id: b.id,
@@ -2099,12 +2096,49 @@ function statsCards() {
    in gut zwei Wochen wieder. "Neu" laeuft ueber ersteBewertung und nicht ueber
    die Stufe - sonst stuende eine vergessene Karte auf Stufe 0 in derselben
    Gruppe wie eine nie gesehene. */
-const STAT_GRUPPEN = [
-  { label: "neu",       erklaerung: "noch nie bewertet", farbe: "var(--ink-soft)",   test: c => istNeueKarte(c) },
-  { label: "wackelig",  erklaerung: "Stufe 0–2",          farbe: "var(--red)",        test: c => !istNeueKarte(c) && c.stufe <= 2 },
-  { label: "im Aufbau", erklaerung: "Stufe 3–5",          farbe: "var(--accent-dark)", test: c => !istNeueKarte(c) && c.stufe >= 3 && c.stufe <= 5 },
-  { label: "sitzt",     erklaerung: "Stufe 6+",           farbe: "var(--green)",      test: c => !istNeueKarte(c) && c.stufe >= 6 }
+/* ---------- 2.12.0: Ein Wortschatz für alle Ansichten ----------
+   Jede Ansicht hatte sich bisher ihre eigenen Woerter ausgedacht. Dieselbe
+   Karte hiess im Fortschritt "neu", in der Durchsicht "gesehen" und im
+   Lernen-Tab "in der ersten Abfrage" - und wer eine Karte durchgesehen
+   hatte, fand sie im Fortschritt weiterhin unter "neu", obwohl er sie gerade
+   gelesen hatte.
+
+   Ab hier gibt es GENAU EINE Stelle, an der die Zustaende definiert sind.
+   Jede Ansicht liest daraus: der Balken im Fortschritt, die Plaketten in den
+   Listen, die Durchsicht, der Faden.
+
+   Fuenf Zustaende, und jede Karte ist in genau einem:
+
+     neu       nie angesehen
+     gesehen   durchgesehen, aber noch nie gewusst
+     wackelig  einmal gewusst, faellt noch leicht wieder raus
+     solide    haelt sich
+     fest      sitzt
+
+   Die Grenze zwischen "neu" und "gesehen" ist das Erstbewertungsdatum, alle
+   weiteren sind die Stufe. Eine Karte faellt nie unter Stufe 1 zurueck,
+   sobald sie einmal gewusst wurde - deshalb bedeutet Stufe 0 immer entweder
+   neu oder gesehen und die Einteilung ist ueberschneidungsfrei. */
+const KARTEN_ZUSTAENDE = [
+  { id: "neu",      label: "neu",      erklaerung: "noch nie angesehen",             farbe: "var(--ink-soft)",    test: c => istNeueKarte(c) },
+  { id: "gesehen",  label: "gesehen",  erklaerung: "durchgesehen, noch nie gewusst", farbe: "var(--accent-dark)", test: c => !istNeueKarte(c) && (c.maxStufe || 0) === 0 },
+  { id: "wackelig", label: "wackelig", erklaerung: "Stufe 1–2",                      farbe: "var(--red)",         test: c => (c.maxStufe || 0) > 0 && c.stufe <= 2 },
+  { id: "solide",   label: "solide",   erklaerung: "Stufe 3–5",                      farbe: "var(--accent)",      test: c => (c.maxStufe || 0) > 0 && c.stufe >= 3 && c.stufe <= 5 },
+  { id: "fest",     label: "fest",     erklaerung: "Stufe 6+",                       farbe: "var(--green)",       test: c => (c.maxStufe || 0) > 0 && c.stufe >= 6 }
 ];
+const STAT_GRUPPEN = KARTEN_ZUSTAENDE;
+/* Der Zustand einer einzelnen Karte. Der erste passende gewinnt; die Tests
+   oben sind so gebaut, dass immer genau einer passt. */
+function kartenZustand(c) {
+  return KARTEN_ZUSTAENDE.find(z => z.test(c)) || KARTEN_ZUSTAENDE[0];
+}
+/* Die Plakette, die in jeder Liste an einer Karte steht. Ein Ort, ein
+   Wortlaut - vorher stand mal "Stufe 3", mal "✓ gesehen", mal nichts. */
+function zustandBadge(c) {
+  const z = kartenZustand(c);
+  const stufe = (z.id === "neu" || z.id === "gesehen") ? "" : " " + c.stufe;
+  return '<span class="badge zustand-' + z.id + '" title="' + esc(z.erklaerung) + '">' + z.label + stufe + '</span>';
+}
 /* Arabisch-indische Ziffern. Sie stehen klein neben den grossen Zahlen im
    Fortschritt - das ist die Handschrift dieser App: arabische Schrift als
    Zierde, die nebenbei mitlernt, statt eines beliebigen Symbols. */
@@ -2360,12 +2394,15 @@ async function exportWeitergabe() {
      eine persoenliche Merkliste - sie in den Satz zu legen hiesse, jedem
      Empfaenger meine Schwaechen als Lernstoff mitzugeben. Weitergegeben werden
      nur Kategorien und Lektionen. */
+  /* 2.12.1: Ohne "gesperrt". Welche Lektion offen ist, rechnet der Empfaenger
+     seit 2.7.0 selbst aus (Lektion 1 immer, danach je nachdem, was sitzt) -
+     ein mitgeschicktes Schloss haette nur so ausgesehen, als wuerde es
+     etwas entscheiden. */
   const sets = (b.sets || []).filter(s => s.art === "kategorie" || s.art === "lektion").map(s => ({
     id: s.id,
     quelleId: s.quelleId || s.id,
     name: s.name,
     art: s.art,
-    gesperrt: s.art === "lektion" && s.id !== lektionen[0].id,
     cardIds: s.cardIds.slice()
   }));
   dateiSpeichern({
@@ -2526,10 +2563,9 @@ async function satzZusammenfuehren(ziel, datei) {
       vorhanden.name = s.name;
       vorhanden.art = s.art;
       vorhanden.cardIds = uebersetzeIds(s.cardIds);
-      /* vorhanden.gesperrt bleibt: was der Lernende geöffnet hat, bleibt offen */
       return vorhanden;
     }
-    return normSet({ id: frisch(), quelleId: q, name: s.name, art: s.art, gesperrt: s.gesperrt, cardIds: uebersetzeIds(s.cardIds) });
+    return normSet({ id: frisch(), quelleId: q, name: s.name, art: s.art, cardIds: uebersetzeIds(s.cardIds) });
   });
   const behalteneCardIds = new Set(neueListe.map(c => c.id));
   eigene.forEach(s => { s.cardIds = s.cardIds.filter(id => behalteneCardIds.has(id)); });
@@ -2934,14 +2970,7 @@ function setArtAendern(id, art) {
   if (!setBearbeitbar(set)) { hinweisGefuehrt("Die Art ändern"); return; }
   if (set.art === art) return;
   set.art = art;
-  /* Wer eine Lektion zur Kategorie macht, macht sie damit auch auf: das
-     Schloss gibt es nur an Lektionen, ein zurueckbleibendes gesperrt=true
-     wuerde die Karten sonst unsichtbar festhalten. */
-  if (art !== "lektion") set.gesperrt = false;
-  patchDoc({
-    [pfadSet(currentBereich().id, set.id) + ".art"]: art,
-    [pfadSet(currentBereich().id, set.id) + ".gesperrt"]: !!set.gesperrt
-  });
+  patchDoc({ [pfadSet(currentBereich().id, set.id) + ".art"]: art });
   render();
 }
 async function renameSet(id) {
@@ -3928,8 +3957,7 @@ function renderDurchsicht(set) {
     if (neu) {
       html += '<button class="lern-haken" data-action="lern-haken" data-id="' + esc(c.id) + '">Gesehen</button>';
     } else {
-      html += '<span class="badge" title="' + (c.stufe === 0 ? "Steht für heute in der Abfrage" : "Läuft schon im Wiederholungsplan") + '">' +
-        (c.stufe === 0 ? "✓ gesehen" : "✓ Stufe " + c.stufe) + '</span>';
+      html += zustandBadge(c);
     }
     html += '</div>';
     html += '</div>';
@@ -3979,9 +4007,12 @@ function renderFaden(b, due) {
      ERSTE Abfrage - sie "Wiederholung" zu nennen waere falsch, man hat sie
      ja noch nie gewusst. Unterschieden am Hoechststand. */
   if (wiederholungen.length > 0) {
-    const erstmalig = wiederholungen.filter(c => (c.maxStufe || 0) === 0).length;
+    /* Wortwahl aus demselben Wortschatz: Karten, die gerade erst durchgesehen
+       wurden, sind "gesehen" - sie zu "Wiederholungen" zu erklaeren waere
+       falsch, man hat sie ja noch nie gewusst. */
+    const erstmalig = wiederholungen.filter(c => kartenZustand(c).id === "gesehen").length;
     const wort = erstmalig === wiederholungen.length
-      ? (wiederholungen.length === 1 ? 'Karte in der ersten Abfrage' : 'Karten in der ersten Abfrage')
+      ? (wiederholungen.length === 1 ? 'gesehene Karte zum Abfragen' : 'gesehene Karten zum Abfragen')
       : (wiederholungen.length === 1 ? 'Wiederholung' : 'Wiederholungen');
     html += '<p class="due-info"><strong>' + wiederholungen.length + '</strong> ' + wort +
       ' aus „' + esc(akt.name) + '"</p>';
@@ -4050,7 +4081,7 @@ function renderLernen() {
     html += '<p class="hint">🎉 Für heute nichts mehr fällig in „' + esc(b.name) + '". Schau morgen wieder rein!</p>';
   } else {
     html += '<p class="due-info">Heute fällig: <strong>' + due.length + '</strong> von ' + cards.length + ' Karten' +
-      (neuImStapel > 0 ? ' <span class="badge">' + neuImStapel + ' neu</span>' : '') + '</p>';
+      (neuImStapel > 0 ? ' <span class="badge zustand-neu">' + neuImStapel + ' neu</span>' : '') + '</p>';
     html += '<button data-action="start-session">Lernsession starten (' + due.length + ')</button>';
   }
   /* E7: Bewusst drei feste Stufen statt eines Zahlenfeldes - es gibt nichts
@@ -4085,23 +4116,10 @@ function renderLernen() {
 /* E4/D10: der Fortschritts-Tab.
    Ohne sichtbaren Fortschritt fehlt der Grund weiterzumachen - und die
    Vorschau warnt vor einem 300er-Tag, bevor er da ist. */
-function renderFortschritt() {
-  const cards = statsCards();
-  const nurBereich = ui.statsScope === "bereich";
+/* Was heute noch zu tun ist - der einzige Teil des Tabs, der jeden Tag von
+   vorn beginnt und abschliessbar ist. */
+function fortschrittHeute(cards) {
   let html = "";
-
-  html += '<div class="pills" style="margin-bottom:12px">';
-  html += '<button class="pill' + (nurBereich ? "" : " active") + '" data-action="stats-scope" data-scope="alle">Alle Bereiche</button>';
-  html += '<button class="pill' + (nurBereich ? " active" : "") + '" data-action="stats-scope" data-scope="bereich">Nur „' + esc(currentBereich().name) + '"</button>';
-  html += '</div>';
-
-  html += '<div class="panel">';
-  if (cards.length === 0) {
-    html += '<p class="hint">Noch keine Karten – sobald du welche anlegst und bewertest, steht hier dein Fortschritt.</p>';
-    html += '</div>';
-    return html;
-  }
-
   /* --- 1. Heute: das Einzige, was jeden Tag von vorn beginnt --- */
   const t = todayStr();
   /* 2.10.1: Neue Karten zaehlen hier mit. Vorher standen nur Wiederholungen
@@ -4131,7 +4149,7 @@ function renderFortschritt() {
     html += '<button class="secondary" data-action="streak-fortsetzen">Serie fortsetzen</button>';
     html += '</div>';
   }
-
+  
   html += '<div class="stat-block">';
   html += '<h3>Heute</h3>';
   html += '<div class="heute-bar" role="img" aria-label="' + getan + ' von ' + ziel + ' erledigt"><span style="width:' + anteil + '%"></span></div>';
@@ -4141,7 +4159,12 @@ function renderFortschritt() {
       : '<strong>' + getan + '</strong> Antwort' + (getan === 1 ? '' : 'en') + (offenHeute > 0 ? ', noch ' + offenHeute + ' Karte' + (offenHeute === 1 ? '' : 'n') + ' offen' : ' – fertig ✓')) +
     (heute.n > 0 ? ' · ' + heute.n + ' zum ersten Mal gesehen' : '') + '</p>';
   html += '</div>';
+  return html;
+}
 
+/* Die Bewegung: zwoelf Wochen als Kalenderraster. */
+function fortschrittWochen() {
+  let html = "";
   /* --- 2. Die letzten Wochen: die Bewegung, die dem Tab vorher fehlte ---
      Ein Kalenderraster sagt in einer Sekunde, ob man dranbleibt - dafür
      braucht es keine Beschriftung und keine Erklärung. */
@@ -4158,7 +4181,12 @@ function renderFortschritt() {
     html += '<button class="tiny-link" data-action="verlauf-reset" style="margin-top:8px">Verlauf zurücksetzen</button>';
   }
   html += '</div>';
+  return html;
+}
 
+/* Der Stand: eine Zahl, die nie zurueckgeht, darunter die Verteilung. */
+function fortschrittStoff(cards) {
+  let html = "";
   /* --- 3. Der Stoff: eine Zahl, die nie zurückgeht --- */
   const gesessen = cards.filter(c => (c.maxStufe || 0) >= LEKTION_STUFE).length;
   const gruppen = stufenVerteilung(cards);
@@ -4189,7 +4217,13 @@ function renderFortschritt() {
   });
   html += '</div>';
   html += '</div>';
+  return html;
+}
 
+/* Nur wenn es Lektionen gibt. Ein Ziel wirkt, wenn es nah ist - 21 Karten
+   in einer Lektion sind eines, 133 im Bereich nicht. */
+function fortschrittLektionen(nurBereich) {
+  let html = "";
   /* --- 4. Lektionen: nur, wenn es welche gibt ---
      Der Ziel-Gradient-Effekt greift bei einem NAHEN Ziel. 21 Karten in einer
      Lektion sind eines, 133 Karten im Bereich nicht. Wer keine Lektionen hat
@@ -4221,8 +4255,36 @@ function renderFortschritt() {
     html += '</div>';
     html += '</div>';
   }
+  return html;
+}
 
-  /* --- E6: verbrannte Karten --- */
+/* Der Fortschritts-Tab. Er reiht nur noch seine Bloecke aneinander; jeder
+   steht fuer sich und laesst sich einzeln lesen und aendern. Vorher war das
+   eine Funktion von 188 Zeilen, in die vier Veroeffentlichungen nacheinander
+   etwas hineingeschrieben hatten. */
+function renderFortschritt() {
+  const cards = statsCards();
+  const nurBereich = ui.statsScope === "bereich";
+  let html = "";
+
+  html += '<div class="pills" style="margin-bottom:12px">';
+  html += '<button class="pill' + (nurBereich ? "" : " active") + '" data-action="stats-scope" data-scope="alle">Alle Bereiche</button>';
+  html += '<button class="pill' + (nurBereich ? " active" : "") + '" data-action="stats-scope" data-scope="bereich">Nur „' + esc(currentBereich().name) + '"</button>';
+  html += '</div>';
+
+  html += '<div class="panel">';
+  if (cards.length === 0) {
+    html += '<p class="hint">Noch keine Karten – sobald du welche anlegst und bewertest, steht hier dein Fortschritt.</p>';
+    html += '</div>';
+    return html;
+  }
+
+    html += fortschrittHeute(cards);
+  html += fortschrittWochen();
+  html += fortschrittStoff(cards);
+  html += fortschrittLektionen(nurBereich);
+
+/* --- E6: verbrannte Karten --- */
   const leeches = verbrannteKarten();
   if (leeches.length > 0) {
     html += '<div class="stat-block">';
@@ -4866,7 +4928,7 @@ function kartenListeInhalt() {
     html += '</div>';
     if (fremd) html += '<span class="badge" title="Diese Karte liegt in einem anderen Bereich">' + esc(fremd.name) + '</span>';
     if (kartenZu && !ui.selectMode) html += '<span class="badge" title="Noch in keiner freigeschalteten Lektion">🔒</span>';
-    html += '<span class="badge">Stufe ' + c.stufe + '</span>';
+    html += zustandBadge(c);
     /* E6: In der Liste sichtbar machen, damit beim Durchsehen sofort
        auffaellt, welche Karte umformuliert gehoert. */
     if (istVerbrannt(c)) html += '<span class="leech-badge" title="' + c.rueckfaelle + '-mal wieder vergessen – umformulieren oder aufteilen">🔥 ' + c.rueckfaelle + '×</span>';
@@ -5019,7 +5081,7 @@ function setBlock(s, b, frei, gefuehrt) {
         html += '<div class="words"><div class="wort arabic" lang="ar" dir="rtl">' + esc(c.wort) + '</div>';
         html += '<div class="uebersetzung">' + esc(c.uebersetzung) + '</div></div>';
         if (kartenZu) html += '<span class="badge" title="Noch in keiner freigeschalteten Lektion">🔒</span>';
-        html += '<span class="badge">Stufe ' + c.stufe + '</span>';
+        html += zustandBadge(c);
         if (eigenerBesitz) html += '<button class="ghost" data-action="remove-from-set" data-set="' + esc(s.id) + '" data-id="' + esc(c.id) + '" title="Aus dieser Speicherkarte entfernen (Karte bleibt im Bereich)" aria-label="Aus dieser Speicherkarte entfernen">✕</button>';
         html += '</div>';
       }
