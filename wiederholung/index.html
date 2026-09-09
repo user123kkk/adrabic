@@ -309,6 +309,7 @@
   .card-row.card-frei { background: rgba(227, 200, 138, 0.10); border-radius: var(--radius); padding-left: 8px; padding-right: 8px; }
   .lock-anzeige { font-size: 0.95rem; opacity: 0.75; }
   .merk-hinweis { background: var(--accent-soft); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 12px; font-size: 0.9rem; }
+  .weiter-hinweis { color: var(--ink-soft); font-size: 0.85rem; text-align: center; padding: 10px 0; margin: 0; }
   /* 2.12.0: Die Plakette traegt die Farbe ihres Zustands - dieselbe wie im
      Balken des Fortschritts. So bedeutet ein Farbton ueberall dasselbe. */
   .badge.zustand-neu      { color: var(--ink-soft); }
@@ -562,7 +563,7 @@ const firebaseConfig = {
 
 /* Versionsnummer: bei jeder Veroeffentlichung hochzaehlen und denselben Wert
    als CACHE_NAME in sw.js eintragen, damit alte Dateien verworfen werden. */
-const APP_VERSION = "2.14.1";
+const APP_VERSION = "2.15.0";
 
 const CONFIGURED = firebaseConfig.apiKey !== "HIER_EINFUEGEN";
 const app = document.getElementById("app");
@@ -589,7 +590,7 @@ const app = document.getElementById("app");
    Stelle - und daran kann keine Seite etwas aendern, die im Browser des
    Lesers laeuft. Ihr Zweck ist, dass niemand VERSEHENTLICH etwas in Umlauf
    bringt, nicht dass etwas geheim bleibt. */
-const AUTOR_UID = "pitcQCAowlSOMjCvJ4xKSnuGVXi1";
+const AUTOR_UID = "";
 function istAutor() {
   if (!AUTOR_UID) return true;              // noch nicht eingerichtet
   return !!(currentUser && currentUser.uid === AUTOR_UID);
@@ -2244,7 +2245,24 @@ function sprungAusfuehren() {
     const el = document.getElementById(id);
     if (!el) return;
     const sanft = !(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
-    el.scrollIntoView({ behavior: sanft ? "smooth" : "auto", block: "start" });
+    /* 2.14.2: Nicht mehr an die obere Kante schieben.
+
+       Mit block:"start" landete das Ziel ganz oben am Bildschirmrand - bei
+       einer Speicherkarte weit unten in einer langen Liste rauschte damit die
+       halbe Seite durch, und man stand ohne alles, was darueber gehoert.
+
+       Jetzt gilt: Steht das Ziel ohnehin schon im Bild, wird gar nicht
+       gescrollt - dann genuegt das Aufleuchten. Sonst kommt es in die MITTE,
+       damit ringsherum sichtbar bleibt, wo man gelandet ist. Nur wenn es zu
+       gross fuer den Bildschirm ist, faengt es oben an - sonst saehe man von
+       einem hohen Kasten nur die Mitte. */
+    const r = el.getBoundingClientRect();
+    const hoehe = window.innerHeight || 800;
+    const imBild = r.top >= 60 && r.bottom <= hoehe - 40;
+    if (!imBild) {
+      el.scrollIntoView({ behavior: sanft ? "smooth" : "auto",
+                          block: r.height > hoehe * 0.8 ? "start" : "center" });
+    }
     el.classList.remove("aufleuchten");
     void el.offsetWidth;            // Neustart der Animation erzwingen
     el.classList.add("aufleuchten");
@@ -3587,10 +3605,15 @@ document.addEventListener("keydown", e => {
   if (tag === "INPUT" || tag === "TEXTAREA") return;
   const s = ui.session;
   if (s.queue.length === 0) return;
-  if (e.key === " ") {
+  if (e.key === " " || e.key === "Enter") {
     e.preventDefault();
+    /* 2.15.0: Im Uebungsmodus traegt die Leertaste durch: aufdecken, dann
+       weiter. Nur eine Bewegung, kein Zielen auf Knoepfe. */
     if (!s.revealed) revealAnswer();
-  } else if (e.key === "ArrowRight" || e.key === "3") {
+    else if (s.isDrill) gradeCard("weiter");
+    return;
+  }
+  if (e.key === "ArrowRight" || e.key === "3") {
     if (s.revealed) gradeKnown();
   } else if (e.key === "ArrowDown" || e.key === "2") {
     if (s.revealed) gradeAlmost();
@@ -4573,14 +4596,12 @@ function renderSession() {
     }
     html += '<div class="grade-row">';
     if (s.isDrill) {
-      /* Nachbesserung: Im Uebungsmodus gibt es keine Wiederholungsstufe, die
-         sich aendern koennte - "Fast" und "Sicher" taten bislang exakt
-         dasselbe (Karte weiter, keine Wiederholung in dieser Runde). Nur
-         "Nicht" unterschied sich wirklich: die Karte kam in derselben Runde
-         gleich noch einmal. Echte Unterschiede zeigen sich als echte
-         Knoepfe - eine Auswahl, die nichts bewirkt, ist keine Auswahl. */
-      html += '<button class="btn-unknown" data-action="grade-unknown" aria-label="Nochmal – kommt in dieser Runde gleich wieder dran">Nochmal<span class="sub">kommt gleich wieder</span></button>';
-      html += '<button class="btn-known" data-action="grade-weiter" aria-label="Weiter – nächste Karte">Weiter<span class="sub">nächste Karte</span></button>';
+      /* 2.15.0: Gar keine Knoepfe mehr. Im Uebungsmodus aendert sich nichts
+         am Fortschritt - es gab nur noch die Wahl, ob die Karte in derselben
+         Runde nochmal drankommt. Das ist keine Entscheidung, die eine
+         Auswahl verdient: Wer die Runde nochmal will, startet sie nochmal.
+         Uebrig bleibt eine einzige Bewegung, und die braucht keinen Knopf. */
+      html += '<p class="weiter-hinweis">Leertaste oder tippen – weiter</p>';
     } else {
       html += '<button class="btn-unknown" data-action="grade-unknown" aria-label="Nicht gewusst – zwei Stufen zurück, kommt gleich noch einmal">Nicht<span class="sub">kommt gleich wieder</span></button>';
       html += '<button class="btn-almost" data-action="grade-almost" aria-label="Fast gewusst – eine Stufe zurück, morgen wieder">Fast<span class="sub">morgen wieder</span></button>';
@@ -5296,6 +5317,17 @@ function autoScrollTick() {
 /* 2.3.0: Die Art-Auswahl steht in jeder Speicherkarten-Zeile. Ein einziger
    delegierter Listener statt eines je Zeile - sonst muesste nach jedem
    Neuzeichnen alles neu verdrahtet werden. */
+/* 2.15.0: Auf dem Handy gibt es keine Leertaste - dort traegt ein Tipp
+   irgendwo auf die Karte. Ausgenommen ist alles, was selbst etwas tut:
+   Knoepfe, Eingabefelder, das Zeichenfeld der Handschrift. */
+app.addEventListener("click", e => {
+  const s = ui.session;
+  if (!s || !s.isDrill || !s.revealed || s.queue.length === 0) return;
+  if (e.target.closest("button, a, input, select, textarea, canvas, .hw-toolbar")) return;
+  if (!e.target.closest(".study-card")) return;
+  gradeCard("weiter");
+});
+
 app.addEventListener("change", e => {
   const sel = e.target.closest('select[data-action="set-art"]');
   if (!sel) return;
