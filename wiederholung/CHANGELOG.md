@@ -1,3 +1,24 @@
+## 2.13.1 – 9. September 2026
+
+### Behoben
+
+- **Ein alter Bereich konnte die Serie zerreißen, ohne dass jemand etwas
+  falsch gemacht hat.** Die Serie zählt über alle Bereiche. Es genügte
+  deshalb, ein älteres „Backup · alles" einzuspielen: Dessen Karten sind alle
+  seit Wochen überfällig, und die Serie war sofort auf null – für eine
+  Handlung, die mit dem Lernen nichts zu tun hatte.
+
+  Ab jetzt gilt: Was **länger als 14 Tage überfällig** ist, ist
+  liegengeblieben. Es bricht die Serie nicht und blockiert sie nicht. Wer
+  einen Bereich seit Wochen nicht angefasst hat, wird davon nicht länger in
+  Geiselhaft genommen. Sobald er ihn wieder anfasst, zählt er ganz normal mit,
+  denn dann sind seine Karten nicht mehr so lange überfällig.
+
+  Eine Karte, die drei Tage liegen blieb, reißt die Serie weiterhin – daran
+  ändert sich nichts.
+
+---
+
 ## 2.13.0 – 8. September 2026 — „Anfang statt Null"
 
 ### Geändert
