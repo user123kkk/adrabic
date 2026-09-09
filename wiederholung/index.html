@@ -561,7 +561,7 @@ const firebaseConfig = {
 
 /* Versionsnummer: bei jeder Veroeffentlichung hochzaehlen und denselben Wert
    als CACHE_NAME in sw.js eintragen, damit alte Dateien verworfen werden. */
-const APP_VERSION = "2.13.0";
+const APP_VERSION = "2.13.1";
 
 const CONFIGURED = firebaseConfig.apiKey !== "HIER_EINFUEGEN";
 const app = document.getElementById("app");
@@ -588,7 +588,7 @@ const app = document.getElementById("app");
    Stelle - und daran kann keine Seite etwas aendern, die im Browser des
    Lesers laeuft. Ihr Zweck ist, dass niemand VERSEHENTLICH etwas in Umlauf
    bringt, nicht dass etwas geheim bleibt. */
-const AUTOR_UID = "pitcQCAowlSOMjCvJ4xKSnuGVXi1";
+const AUTOR_UID = "";
 function istAutor() {
   if (!AUTOR_UID) return true;              // noch nicht eingerichtet
   return !!(currentUser && currentUser.uid === AUTOR_UID);
@@ -881,6 +881,21 @@ const SET_ARTEN_ANZEIGE = ["lektion", "kategorie", "eigen"];
    bei den Intervallen (1,8 hoch Stufe-1): einmal gelernt, am naechsten Tag
    wiedererkannt. Eine Lektion braucht also mindestens zwei Tage. */
 const LEKTION_STUFE = 2;
+/* ---------- 2.13.1: liegengebliebene Karten ----------
+   Die Serie zaehlt ueber ALLE Bereiche. Damit konnte ein einziger Bereich mit
+   wochenalten Karten sie sofort zerreissen - und zwar ohne dass jemand etwas
+   falsch gemacht haette: Es genuegte, ein altes Backup einzuspielen, und die
+   Serie war weg, weil dessen Karten alle seit Wochen ueberfaellig waren.
+
+   Deshalb: Was laenger als so viele Tage ueberfaellig ist, gilt als
+   liegengeblieben. Es bricht die Serie nicht und blockiert sie nicht. Wer
+   einen Bereich seit Wochen nicht angefasst hat, wird davon nicht laenger in
+   Geiselhaft genommen; sobald er ihn wieder anfasst, zaehlt er ganz normal
+   mit, denn dann sind seine Karten nicht mehr so lange ueberfaellig. */
+const LIEGENGEBLIEBEN_TAGE = 14;
+function istLiegengeblieben(c) {
+  return !istNeueKarte(c) && c.nextReview < dateInDays(-LIEGENGEBLIEBEN_TAGE);
+}
 const SET_ART_ZEICHEN = { kategorie: "\u{1F4DA}", lektion: "\u{1F4D6}", eigen: "\u2B50" };
 const SET_ART_TITEL = { kategorie: "Kategorien", lektion: "Lektionen", eigen: "Eigene" };
 const SET_ART_ERKLAERUNG = {
@@ -1845,7 +1860,8 @@ function evaluateStreakForNewDay() {
   // (Tage ganz ohne fällige Karten zählen nicht als verpasst.)
   const hadOverdue = bereiche.some(b => {
     const frei = freieIdsFor(b);
-    return b.karten.some(c => !istNeueKarte(c) && c.nextReview < t && (frei === null || frei.has(c.id)));
+    return b.karten.some(c => !istNeueKarte(c) && c.nextReview < t && !istLiegengeblieben(c) &&
+      (frei === null || frei.has(c.id)));
   });
   const geaendert = ["lastEvaluatedDate"];
   if (hadOverdue && streak.lastCompletedDate !== t) {
@@ -1887,7 +1903,8 @@ function bereicheMitOffenem() {
     .map(b => {
       const frei = freieIdsFor(b);
       const offen = b.karten.filter(c =>
-        !istNeueKarte(c) && c.nextReview <= t && (frei === null || frei.has(c.id))).length;
+        !istNeueKarte(c) && c.nextReview <= t && !istLiegengeblieben(c) &&
+        (frei === null || frei.has(c.id))).length;
       return { bereich: b, offen: offen };
     })
     .filter(x => x.offen > 0);
