@@ -1,3 +1,75 @@
+## 2.14.1 – 9. September 2026
+
+### Geändert
+
+- **„Merken" ist jetzt ein Schalter.** Ein zweiter Tipp nimmt die Karte wieder
+  heraus. Vorher kam an dieser Stelle ein Hinweis „liegt schon drin" – eine
+  Sackgasse: Er sagte einem, was man ohnehin sah, und ließ einen nichts tun.
+  Wer sich vertippt, kann es jetzt zurücknehmen, ohne den Tab zu wechseln.
+
+- **Der Knopf sagt, wohin die Karte gelegt wurde.** Statt „⭐ gemerkt" steht
+  dort „⭐ in „Schwierige Wörter"" – man weiß danach, wo sie liegt.
+
+### Neu
+
+- **Ein Hinweis auf die gemerkten Karten der Runde**, mit einem Knopf, der
+  direkt zur Speicherkarte führt: Verwalten-Tab, aufgeklappt, kurz
+  aufleuchtend – dasselbe Muster wie überall sonst im Tool.
+
+  Gezählt wird, was man in **dieser Runde** gemerkt hat, nicht der ganze
+  Bestand der Speicherkarte.
+
+  Der Hinweis hängt ausdrücklich **nicht** am Abschluss-Bildschirm: Wer mitten
+  im Lernen den Tab wechselt, beendet damit die Sitzung und hätte ihn nie
+  gesehen. Er wartet stattdessen im Lernen-Tab, bis er benutzt wurde – egal ob
+  die Sitzung durchgezogen, abgebrochen oder verlassen wurde.
+
+---
+
+## 2.14.0 – 9. September 2026 — „Die Serie gehört dir"
+
+### Geändert
+
+- **Die Serie wird aus dem Tagesprotokoll gerechnet, nicht mehr gespeichert.**
+
+  Bis 2.13.1 war sie ein Zähler im Nutzerdokument, und ob er weiterlief oder
+  auf null sprang, entschied der Zustand der **Karten**: Lag irgendwo etwas
+  Überfälliges, war sie weg. Damit hing eine Zahl, die man sich über Wochen
+  erarbeitet, an Daten, die sich jederzeit unter ihr verändern können – ein
+  Import, ein zweites Gerät, ein alter Bereich, der wieder auftaucht. Sie ist
+  mehrfach aus genau diesem Grund verschwunden, ohne dass jemand etwas falsch
+  gemacht hätte.
+
+  Jede Absicherung davor – Joker, „Serie fortsetzen", liegengebliebene Karten –
+  war eine Reaktion auf einen Verlust, der schon passiert war. Das war die
+  falsche Reihenfolge.
+
+  Jetzt kommt die Serie aus dem Tagesprotokoll: Es hält fest, an welchen Tagen
+  gelernt wurde. Das ist Geschichte und ändert sich nie rückwirkend. **Kein
+  Import, kein zweites Gerät und kein alter Bereich kann sie mehr anfassen.**
+
+- **Die Regel in einem Satz:** Ein Tag zählt, wenn an ihm gelernt wurde. Ein
+  einzelner ausgelassener Tag unterbricht nicht – Krankheit, Reise, ein voller
+  Tag. Der zweite beendet sie.
+
+  Die alte Regel („eine Lücke je sieben Tage") ließ sich beim Rückwärtszählen
+  gar nicht sauber prüfen und stimmte deshalb nicht immer mit sich selbst
+  überein.
+
+- **Die Serie verschwindet nicht mehr mitten am Tag.** Solange heute noch
+  nichts gelernt wurde, zählt die Kette ab gestern – der Stand von gestern
+  bleibt also den ganzen Tag stehen, statt morgens auf null zu springen und
+  abends wiederzukommen.
+
+- **Beim Umstieg verliert niemand etwas.** Die bisherige Zahl wird zum
+  „Sockel": dem Stand, der galt, bevor das Protokoll ihn tragen konnte. Alles
+  danach kommt aus dem Protokoll.
+
+- Der Zustand der Karten spielt für die Serie keine Rolle mehr. Überfälliges
+  wird weiterhin im Lernen-Tab angezeigt – es kann nur nichts mehr zerreißen.
+
+---
+
 ## 2.13.1 – 9. September 2026
 
 ### Behoben
