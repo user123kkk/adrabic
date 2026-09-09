@@ -308,6 +308,7 @@
      anfassen" ohne Erklaerung lesbar ist. */
   .card-row.card-frei { background: rgba(227, 200, 138, 0.10); border-radius: var(--radius); padding-left: 8px; padding-right: 8px; }
   .lock-anzeige { font-size: 0.95rem; opacity: 0.75; }
+  .merk-hinweis { background: var(--accent-soft); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 12px; font-size: 0.9rem; }
   /* 2.12.0: Die Plakette traegt die Farbe ihres Zustands - dieselbe wie im
      Balken des Fortschritts. So bedeutet ein Farbton ueberall dasselbe. */
   .badge.zustand-neu      { color: var(--ink-soft); }
@@ -561,7 +562,7 @@ const firebaseConfig = {
 
 /* Versionsnummer: bei jeder Veroeffentlichung hochzaehlen und denselben Wert
    als CACHE_NAME in sw.js eintragen, damit alte Dateien verworfen werden. */
-const APP_VERSION = "2.13.1";
+const APP_VERSION = "2.14.1";
 
 const CONFIGURED = firebaseConfig.apiKey !== "HIER_EINFUEGEN";
 const app = document.getElementById("app");
@@ -588,7 +589,7 @@ const app = document.getElementById("app");
    Stelle - und daran kann keine Seite etwas aendern, die im Browser des
    Lesers laeuft. Ihr Zweck ist, dass niemand VERSEHENTLICH etwas in Umlauf
    bringt, nicht dass etwas geheim bleibt. */
-const AUTOR_UID = "pitcQCAowlSOMjCvJ4xKSnuGVXi1";
+const AUTOR_UID = "";
 function istAutor() {
   if (!AUTOR_UID) return true;              // noch nicht eingerichtet
   return !!(currentUser && currentUser.uid === AUTOR_UID);
@@ -1114,6 +1115,10 @@ function normStreak(s) {
        innerhalb von zwei Tagen zuruecknehmen laesst. */
     gerissenAm: /^\d{4}-\d{2}-\d{2}$/.test(s.gerissenAm) ? s.gerissenAm : null,
     vorher: Number.isInteger(s.vorher) && s.vorher >= 0 ? s.vorher : 0,
+    /* 2.14.0: Sockel = die Serie, die bestand, bevor das Tagesprotokoll sie
+       tragen konnte. Alles danach wird aus dem Protokoll gerechnet. */
+    sockel: Number.isInteger(s.sockel) && s.sockel >= 0 ? s.sockel : null,
+    sockelBis: /^\d{4}-\d{2}-\d{2}$/.test(s.sockelBis) ? s.sockelBis : null,
     count: Number.isInteger(s.count) && s.count >= 0 ? s.count : 0,
     lastCompletedDate: /^\d{4}-\d{2}-\d{2}$/.test(s.lastCompletedDate) ? s.lastCompletedDate : null,
     lastEvaluatedDate: /^\d{4}-\d{2}-\d{2}$/.test(s.lastEvaluatedDate) ? s.lastEvaluatedDate : null
@@ -1216,6 +1221,11 @@ let ui = {
      Steht hier statt in einer eigenen Variablen weiter unten, damit die
      Reihenfolge im Skript keine Rolle spielt. */
   lernFokusNach: null,
+  /* 2.14.1: Die Karten, die man sich in DIESER Runde gemerkt hat. Sie stehen
+     absichtlich nicht in ui.session: Wer mitten im Lernen den Tab wechselt,
+     beendet damit die Sitzung - der Hinweis am Ende waere dann fuer immer
+     verloren. So wartet er im Lernen-Tab, bis er benutzt wurde. */
+  gemerktRunde: new Set(),
   /* 2.10.0: Ziel eines Sprungs. Wer eine Aktion ausloest, die woanders auf
      der Seite etwas veraendert, soll dorthin mitgenommen werden - genau das
      Muster, das der Adrabic-Trainer bei der Checkliste benutzt. */
@@ -1483,6 +1493,7 @@ async function initFirebase() {
         streak = normStreak(data.streak);
         verlauf = normVerlauf(data.verlauf);
         verlaufAufraeumen(data.verlauf);
+        serieSockelSichern();
         if (data.schemaVersion === SCHEMA_VERSION) {
           ui.umzug = null;
           sammlungenStarten();
@@ -1779,11 +1790,10 @@ async function streakFortsetzen() {
     " und ist am " + fmtDatum(streak.gerissenAm) + " gerissen. Auf diesen Stand zurücksetzen?",
     { title: "Serie fortsetzen?", okLabel: "Fortsetzen" });
   if (!ok) return;
-  streak.count = streak.vorher;
-  streak.beste = Math.max(streak.beste || 0, streak.count);
+  serieSockelSetzen(streak.vorher);
   streak.gerissenAm = null;
   streak.vorher = 0;
-  persistStreak(["count", "beste", "gerissenAm", "vorher"]);
+  persistStreak(["gerissenAm", "vorher"]);
   render();
 }
 /* ---------- 2.10.2: nur schreiben, was sich geaendert hat ----------
@@ -1864,7 +1874,11 @@ function evaluateStreakForNewDay() {
       (frei === null || frei.has(c.id)));
   });
   const geaendert = ["lastEvaluatedDate"];
-  if (hadOverdue && streak.lastCompletedDate !== t) {
+  /* 2.14.0: Der Zustand der Karten entscheidet nicht mehr ueber die Serie.
+     Ueberfaelliges wird weiterhin im Lernen-Tab angezeigt, aber es kann
+     nichts mehr zerreissen. Der Block bleibt als Bauplan stehen, damit
+     nachvollziehbar ist, was hier frueher passierte. */
+  if (false && hadOverdue && streak.lastCompletedDate !== t) {
     /* 2.8.0: Ein Ausfalltag reisst die Serie nicht sofort. Serien wirken,
        weil man ungern verliert - genau deshalb hoeren viele nach dem ersten
        gerissenen Tag ganz auf. Eine Kulanz alle sieben Tage faengt Krankheit
@@ -1883,15 +1897,63 @@ function evaluateStreakForNewDay() {
   streak.lastEvaluatedDate = t;
   persistStreak(geaendert);
 }
-function checkStreakOnSessionComplete() {
-  if (bereiche === null) return;
+/* ---------- 2.14.0: Die Serie wird gerechnet, nicht gespeichert ----------
+   Bis 2.13.1 war die Serie ein Zaehler im Nutzerdokument, und ob er weiterlief
+   oder auf null sprang, entschied der Zustand der KARTEN: Lag irgendwo etwas
+   Ueberfaelliges, war sie weg. Damit hing eine Zahl, die man sich ueber
+   Wochen erarbeitet, an Daten, die sich jederzeit unter ihr veraendern - ein
+   Import, ein zweites Geraet, ein alter Bereich, der wieder auftaucht. Sie
+   ist mehrfach aus genau diesem Grund verschwunden, ohne dass jemand etwas
+   falsch gemacht haette. Jede Absicherung davor (Joker, "Serie fortsetzen",
+   liegengebliebene Karten) war eine Reaktion auf einen Verlust, der schon
+   passiert war.
+
+   Jetzt kommt sie aus dem Tagesprotokoll: Es haelt fest, an welchen Tagen
+   gelernt wurde. Das ist Geschichte und aendert sich nie rueckwirkend - kein
+   Import und kein zweites Geraet kann sie mehr anfassen. Was frueher galt,
+   traegt der Sockel: die Zahl, die beim Umstieg bestand.
+
+   Ein Tag zaehlt, wenn an ihm gelernt wurde. Eine Luecke wird ueberbrueckt,
+   wenn seit der letzten mindestens sieben gezaehlte Tage liegen. */
+function serieAktuell() {
   const t = todayStr();
-  if (streak.lastCompletedDate === t) return; // heute schon gezählt
-  if (bereicheMitOffenem().length > 0) return; // woanders ist noch etwas fällig
-  streak.count += 1;
-  streak.beste = Math.max(streak.beste || 0, streak.count);
-  streak.lastCompletedDate = t;
-  persistStreak(["count", "beste", "lastCompletedDate"]);
+  const sockel = Number.isInteger(streak.sockel) ? streak.sockel : 0;
+  const sockelBis = streak.sockelBis;
+  let tage = 0, luecke = false;
+  /* Heute zaehlt nur, wenn heute schon gelernt wurde - sonst beginnt die Kette
+     bei gestern, damit die Serie nicht mitten am Tag verschwindet. */
+  for (let i = verlauf[t] ? 0 : 1; i < 400; i++) {
+    const d = dateInDays(-i);
+    if (sockelBis && d <= sockelBis) return tage + sockel;
+    if (verlauf[d]) { tage++; continue; }
+    /* Ein einzelner ausgelassener Tag unterbricht die Serie nicht - Krankheit,
+       Reise, ein voller Tag. Der zweite beendet sie. Eine Regel, die sich in
+       einem Satz sagen laesst; die alte ("eine Luecke je sieben Tage") liess
+       sich beim Rueckwaertszaehlen gar nicht sauber pruefen. */
+    if (tage > 0 && !luecke) { luecke = true; continue; }
+    break;
+  }
+  return tage;
+}
+/* Beim ersten Start unter 2.14.0 wird die bisherige Zahl zum Sockel, damit
+   beim Umstieg niemand etwas verliert. */
+function serieSockelSichern() {
+  if (streak.sockel !== null) return;
+  streak.sockel = streak.count || 0;
+  streak.sockelBis = todayStr();
+  persistStreak(["sockel", "sockelBis"]);
+}
+function serieSockelSetzen(n) {
+  streak.sockel = Math.max(0, n);
+  streak.sockelBis = todayStr();
+  streak.beste = Math.max(streak.beste || 0, streak.sockel);
+  persistStreak(["sockel", "sockelBis", "beste"]);
+}
+function checkStreakOnSessionComplete() {
+  /* Hochgezaehlt wird nicht mehr - die Serie ergibt sich aus dem Protokoll.
+     Hier wird nur noch der Rekord nachgezogen. */
+  const jetzt = serieAktuell();
+  if (jetzt > (streak.beste || 0)) { streak.beste = jetzt; persistStreak(["beste"]); }
 }
 /* Alle Bereiche, in denen heute noch eine WIEDERHOLUNG offen ist – Grundlage
    für die Streak-Prüfung UND für die Anzeige „Noch offen: …" auf dem
@@ -2923,11 +2985,18 @@ async function karteMerken(id) {
     (b.sets = b.sets || []).push(set);
     neu = true;
   }
-  if (set.cardIds.indexOf(id) !== -1) {
-    await dlgAlert('„' + card.wort + '" liegt schon in „' + MERK_SET_NAME + '".', "Schon gemerkt");
-    return;
+  /* 2.14.1: Zweiter Tipp nimmt es wieder heraus. Vorher kam an dieser Stelle
+     ein Hinweis "liegt schon drin" - eine Sackgasse: Er sagte einem, was man
+     ohnehin sah, und liess einen nichts tun. Wer sich vertippt, soll es
+     zuruecknehmen koennen, ohne den Tab zu wechseln. */
+  const drin = set.cardIds.indexOf(id);
+  if (drin !== -1) {
+    set.cardIds.splice(drin, 1);
+    ui.gemerktRunde.delete(id);
+  } else {
+    set.cardIds.push(id);
+    ui.gemerktRunde.add(id);
   }
-  set.cardIds.push(id);
   patchDoc(neu
     ? { [pfadSet(b.id, set.id)]: setFelder(set, b.sets.length - 1) }
     : { [pfadSet(b.id, set.id) + ".cardIds"]: set.cardIds });
@@ -3364,6 +3433,7 @@ function startSession() {
      Betraf genau den Knopf "Abfrage starten" am Ende des Durchgehens. */
   ui.lernSetId = null;
   ui.lernLetzte = null;
+  ui.gemerktRunde = new Set();
   ui.session = { queue: shuffled(due.map(c => c.id)), total: due.length, revealed: false, extraOpen: true, lastAction: null, isDrill: false, bereichId: currentBereich().id };
   render();
 }
@@ -4067,6 +4137,32 @@ function fmtDatum(iso) {
   return p[2] + "." + p[1] + ".";
 }
 
+/* 2.14.1: Der Hinweis auf die gemerkten Karten. Er steht sowohl auf dem
+   Abschluss-Bildschirm als auch im Lernen-Tab - wer die Sitzung abbricht oder
+   den Tab wechselt, soll ihn trotzdem bekommen. */
+function gemerktHinweis() {
+  const n = ui.gemerktRunde.size;
+  if (n === 0) return "";
+  return '<div class="merk-hinweis">⭐ Du hast dir ' + n + ' Karte' + (n === 1 ? '' : 'n') +
+    ' gemerkt.<br><button class="secondary" data-action="merk-oeffnen" style="margin-top:8px">In „' +
+    esc(MERK_SET_NAME) + '" ansehen</button></div>';
+}
+/* Bringt einen dorthin, wo die gemerkten Karten liegen: Verwalten-Tab,
+   Speicherkarte aufgeklappt, und sie leuchtet kurz auf - dasselbe Muster wie
+   ueberall sonst im Tool. */
+function merkSetOeffnen() {
+  const set = (currentBereich().sets || []).find(x => x.art === "eigen" && x.name === MERK_SET_NAME);
+  ui.gemerktRunde = new Set();
+  if (!set) { render(); return; }
+  ui.session = null;
+  ui.lernSetId = null;
+  ui.tab = "verwalten";
+  ui.setsOffen = true;
+  ui.openSetId = set.id;
+  springeZu("set-" + set.id);
+  render();
+}
+
 function renderLernen() {
   const lset = lernSet();
   if (lset) return renderDurchsicht(lset);
@@ -4074,8 +4170,10 @@ function renderLernen() {
   const cards = currentCards();
   const due = dueCards();
   let html = "";
-  if (streak.count > 0) {
-    html += '<p class="hint" style="margin-bottom:10px">🔥 <strong>' + streak.count + '</strong> Tag' + (streak.count === 1 ? "" : "e") + ' am Stück</p>';
+  html += gemerktHinweis();
+  const serieHeute = serieAktuell();
+  if (serieHeute > 0) {
+    html += '<p class="hint" style="margin-bottom:10px">🔥 <strong>' + serieHeute + '</strong> Tag' + (serieHeute === 1 ? "" : "e") + ' am Stück</p>';
   }
   const neuImStapel = due.filter(istNeueKarte).length;
   const b = currentBereich();
@@ -4157,7 +4255,8 @@ function fortschrittHeute(cards) {
      und nicht wie ein Anfang. Wer noch keine Serie hat, bekommt deshalb keine
      Null, sondern die naechste Handlung. Und "beste Serie" erscheint erst,
      wenn es eine gibt - eine zweite 0 daneben macht es nur schlimmer. */
-  if (streak.count === 0) {
+  const serie = serieAktuell();
+  if (serie === 0) {
     html += '<div class="serie-karte">';
     html += '<div class="serie-zahl"><strong>' + (offenHeute === 0 && getan > 0 ? "✓" : "1") + '</strong></div>';
     html += '<div class="serie-text">' +
@@ -4168,9 +4267,8 @@ function fortschrittHeute(cards) {
     html += '</div>';
   } else {
     html += '<div class="serie-karte">';
-    html += '<div class="serie-zahl"><strong>' + streak.count + '</strong><span class="arab-ziffer" lang="ar" dir="rtl">' + arabZahl(streak.count) + '</span></div>';
-    html += '<div class="serie-text">Tag' + (streak.count === 1 ? '' : 'e') + ' am Stück' +
-      (streak.jokerAm ? '<br><span class="serie-klein">ein Ausfalltag überbrückt</span>' : '') + '</div>';
+    html += '<div class="serie-zahl"><strong>' + serie + '</strong><span class="arab-ziffer" lang="ar" dir="rtl">' + arabZahl(serie) + '</span></div>';
+    html += '<div class="serie-text">Tag' + (serie === 1 ? '' : 'e') + ' am Stück</div>';
     if (streak.beste > 0) html += '<div class="serie-beste">beste Serie<br><strong>' + streak.beste + '</strong></div>';
     html += '</div>';
   }
@@ -4409,6 +4507,7 @@ function renderSession() {
     if (s.lastAction) {
       html += '<div style="margin-top:14px"><button class="ghost" data-action="undo-grade">↶ Letzte Bewertung rückgängig machen</button></div>';
     }
+    html += gemerktHinweis();
     html += '<div style="margin-top:16px"><button data-action="end-session">Zurück</button></div></div>';
     return html;
   }
@@ -4466,8 +4565,11 @@ function renderSession() {
        schwer ist. Im Uebungsmodus nicht - dort geht es nicht um Fortschritt. */
     if (!s.isDrill) {
       const gemerkt = (currentBereich().sets || []).some(x => x.art === "eigen" && x.name === MERK_SET_NAME && x.cardIds.indexOf(card.id) !== -1);
-      html += '<div style="margin-top:10px"><button class="ghost" data-action="karte-merken" data-id="' + esc(card.id) + '" title="In „' + esc(MERK_SET_NAME) + '" ablegen, um sie später gezielt zu üben">' +
-        (gemerkt ? "⭐ gemerkt" : "☆ Merken") + '</button></div>';
+      /* 2.14.1: Der Knopf sagt jetzt, WOHIN die Karte gelegt wurde. Vorher
+         hiess er nur "gemerkt" und man wusste nicht, wo sie gelandet ist. */
+      html += '<div style="margin-top:10px"><button class="ghost" data-action="karte-merken" data-id="' + esc(card.id) + '" title="' +
+        (gemerkt ? 'Wieder herausnehmen' : 'In „' + esc(MERK_SET_NAME) + '" ablegen, um sie später gezielt zu üben') + '">' +
+        (gemerkt ? '⭐ in „' + esc(MERK_SET_NAME) + '"' : "☆ Merken") + '</button></div>';
     }
     html += '<div class="grade-row">';
     if (s.isDrill) {
@@ -5083,7 +5185,7 @@ function setBlock(s, b, frei, gefuehrt) {
   const cards = setCards(s);
   const open = ui.openSetId === s.id && !zu;
   const eigenerBesitz = setBearbeitbar(s, b);
-  let html = '<div class="set-block' + (zu ? " set-locked" : "") + '" data-setid="' + esc(s.id) + '">';
+  let html = '<div class="set-block' + (zu ? " set-locked" : "") + '" id="set-' + esc(s.id) + '" data-setid="' + esc(s.id) + '">';
   html += '<div class="set-row">';
   if (eigenerBesitz) html += '<span class="drag-handle" title="Ziehen zum Sortieren" aria-hidden="true">⠿</span>';
   /* 2.7.0: Nur noch Anzeige. Freigeschaltet wird durch Lernen, nicht durch
@@ -5650,6 +5752,7 @@ app.addEventListener("click", e => {
     case "streak-fortsetzen": streakFortsetzen(); break;
     case "verlauf-reset": verlaufZuruecksetzen(); break;
     case "karte-merken": karteMerken(btn.dataset.id); break;
+    case "merk-oeffnen": merkSetOeffnen(); break;
     case "import-trigger": {
       const el = document.getElementById("import-file-input");
       if (el) el.click();
