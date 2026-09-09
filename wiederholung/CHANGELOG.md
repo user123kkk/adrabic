@@ -1,3 +1,48 @@
+## 2.15.0 – 9. September 2026
+
+### Geändert
+
+- **Der Übungsmodus hat keine Bewertungsknöpfe mehr.** Dort ändert sich nichts
+  am Fortschritt – übrig blieb nur die Wahl, ob die Karte in derselben Runde
+  gleich noch einmal drankommt. Das ist keine Entscheidung, die eine Auswahl
+  verdient: Wer die Runde nochmal will, startet sie nochmal.
+
+  Übrig bleibt eine einzige Bewegung, und die braucht keinen Knopf:
+
+  - **Leertaste** deckt auf und trägt danach weiter – zweimal dieselbe Taste,
+    kein Zielen.
+  - **Auf dem Handy ein Tipp irgendwo auf die Karte.** Ausgenommen ist alles,
+    was selbst etwas tut: Knöpfe, Eingabefelder, das Zeichenfeld der
+    Handschrift.
+
+  Unter der Karte steht der Hinweis „Leertaste oder tippen – weiter", damit
+  niemand raten muss.
+
+  Im echten Lernen bleiben die drei Knöpfe unverändert – dort bedeutet jeder
+  etwas anderes.
+
+---
+
+## 2.14.2 – 9. September 2026
+
+### Behoben
+
+- **Sprünge katapultierten quer über die Seite.** Das Ziel wurde an die obere
+  Bildschirmkante geschoben. Bei einer Speicherkarte weit unten in einer
+  langen Liste rauschte damit die halbe Seite durch, und man stand dort ohne
+  alles, was darüber gehört – man wusste nicht mehr, wo man ist.
+
+  Das Muster gilt für **alle** Sprünge im Tool und ist jetzt:
+
+  - Steht das Ziel ohnehin schon im Bild, wird **gar nicht gescrollt** – dann
+    genügt das Aufleuchten.
+  - Sonst kommt es in die **Mitte**, damit ringsherum sichtbar bleibt, wo man
+    gelandet ist.
+  - Nur wenn es zu groß für den Bildschirm ist, fängt es oben an – sonst sähe
+    man von einem hohen Kasten nur dessen Mitte.
+
+---
+
 ## 2.14.1 – 9. September 2026
 
 ### Geändert
