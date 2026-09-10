@@ -1,3 +1,20 @@
+## 2.15.1 – 9. September 2026
+
+### Behoben
+
+- **Nicht jeder Bereich ist arabisch.** Die Vorderseite einer Karte wurde
+  immer in der Quran-Schrift und von rechts nach links gesetzt. Für arabische
+  Vokabeln ist das richtig – in einem Bereich wie „Biologie 11" oder mit einem
+  französischen Satz rutschte dadurch der Punkt ans falsche Ende und die
+  Schrift passte nicht.
+
+  Statt einer Einstellung, die jemand pflegen müsste, entscheidet der Text
+  selbst: Steht ein arabischer Buchstabe darin, wird arabisch gesetzt, sonst
+  normal. Das wirkt rückwirkend für jeden vorhandenen Bereich, ohne dass
+  irgendwo etwas eingetragen werden muss.
+
+---
+
 ## 2.15.0 – 9. September 2026
 
 ### Geändert
