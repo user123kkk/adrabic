@@ -15,6 +15,26 @@
      Textfelder kommen dann von selbst in Dunkelfassung statt in Weiss. -->
 <meta name="color-scheme" content="dark">
 <link rel="manifest" href="./manifest.json">
+<script>
+/* 2.20.0: Läuft, BEVOR das erste Bild steht.
+
+   Die gewählte Fassung liegt im Konto und kommt erst mit den Daten aus der
+   Cloud - das dauert einen Moment. Ohne diese Zeilen sähe ein Nutzer mit
+   heller Fassung bei jedem Start zuerst einen schwarzen Bildschirm, der dann
+   umspringt. Das sieht nach einem Fehler aus. Deshalb liegt die Wahl
+   zusätzlich auf dem Gerät selbst; die Cloud bleibt maßgeblich und
+   überschreibt sie, sobald sie da ist. */
+(function () {
+  try {
+    var w = localStorage.getItem("adrabic-thema") || "dunkel";
+    var hell = w === "hell" || (w === "auto" && window.matchMedia &&
+               window.matchMedia("(prefers-color-scheme: light)").matches);
+    document.documentElement.setAttribute("data-thema", hell ? "hell" : "dunkel");
+    var m = document.querySelector('meta[name="theme-color"]');
+    if (m) m.setAttribute("content", hell ? "#f2ece0" : "#0a0a09");
+  } catch (e) {}
+})();
+</script>
 <style>
   /* ============================================================
      2.17.0 – Gestaltung
@@ -39,6 +59,19 @@
      ============================================================ */
 
   :root {
+    /* ---- 2.18.0: zwei Schriftebenen ----
+       Eine Oberfläche und ein Inhalt sind nicht dasselbe. Knöpfe, Reiter,
+       Plaketten und Hinweise sind Werkzeug - sie sollen aussehen wie das
+       Gerät, auf dem sie laufen, und dafür ist die Systemschrift gemacht.
+       Was gelesen und gelernt wird - Überschriften, das Wort auf der Karte,
+       der Name einer Lektion - ist Inhalt. Der steht in einer Serifenschrift,
+       so wie er in einem Buch stünde.
+
+       Umstellen auf eine einzige Schrift: --font-lesen auf var(--font-ui)
+       setzen. Mehr ist dafür nicht nötig. */
+    --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-lesen: ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, "Times New Roman", serif;
+
     /* Grundton: fast schwarz, leicht warm - dieselbe Familie wie die
        Kreisfläche des Lotus. */
     --bg: #0a0a09;
@@ -55,10 +88,17 @@
     --accent-ink: #1a1509;
     --accent-soft: rgba(227, 200, 138, 0.13);
     --accent-line: rgba(227, 200, 138, 0.30);
-    --green: #4fcf8f;
-    --green-soft: rgba(79, 207, 143, 0.14);
-    --red: #e2695c;
-    --red-soft: rgba(226, 105, 92, 0.15);
+    /* 2.18.0: Die beiden Nebenfarben kommen jetzt aus derselben Welt wie das
+       Gold. Ein Neon-Grün und ein Signal-Korall gehören in eine Messanzeige;
+       was hier gemessen wird, ist etwas anderes. Grünspan und Zinnober sind
+       die Farben, mit denen in Handschriften neben Gold gearbeitet wurde -
+       gedeckt, warm, und sie streiten nicht mit dem Gold. */
+    --green: #6aa588;
+    --green-soft: rgba(106, 165, 136, 0.14);
+    --green-line: rgba(106, 165, 136, 0.38);
+    --red: #c96b52;
+    --red-soft: rgba(201, 107, 82, 0.14);
+    --red-line: rgba(201, 107, 82, 0.38);
     --border: #2b2823;
     /* Eine Haarlinie, die heller ist als der Rand - für Kanten, die man
        sehen soll, ohne dass ein Strich entsteht. */
@@ -79,11 +119,71 @@
     /* Ränder, die das Gerät selbst freihält: Kerbe, Kamera, Streifen am
        unteren Rand. Ohne diese Werte klebt der Inhalt im App-Modus unter
        der Uhr. Sie brauchen viewport-fit=cover im Kopf der Seite. */
+    color-scheme: dark;
+    --glow: radial-gradient(115% 80% at 50% -10%, #241f15 0%, #121009 45%, var(--bg) 78%);
+    --mark: rgba(227, 200, 138, 0.24);
+    --frei: rgba(227, 200, 138, 0.08);
+    --spiegel: rgba(227, 200, 138, 0.13);
+    --backdrop: rgba(0, 0, 0, 0.72);
+    --kal1: rgba(227, 200, 138, 0.22);
+    --kal2: rgba(227, 200, 138, 0.45);
+    --kal3: rgba(227, 200, 138, 0.72);
+
     --sat: env(safe-area-inset-top, 0px);
     --sab: env(safe-area-inset-bottom, 0px);
     --sal: env(safe-area-inset-left, 0px);
     --sar: env(safe-area-inset-right, 0px);
   }
+
+  /* ============================================================
+     2.20.0 – die helle Fassung
+
+     Sie ist KEINE Umkehrung der dunklen. Gold auf Weiss ist blass und
+     schlecht lesbar; dasselbe Gold, das auf Schwarz wertvoll wirkt, sieht
+     auf Papier nach vergilbtem Ausdruck aus. Deshalb dreht sich hier nicht
+     die Helligkeit, sondern das Bild: Aus Tinte auf dunklem Grund wird
+     Tinte auf Papier. Der Akzent wird von Blattgold zu Bronze - dieselbe
+     Farbfamilie, aber so dunkel, dass sie auf hellem Grund trägt.
+
+     Gesetzt wird die Fassung über data-thema am <html>-Element. "Automatisch"
+     wird dabei schon im JavaScript aufgelöst, damit die Farben nur an EINER
+     Stelle stehen und nicht doppelt gepflegt werden müssen.
+     ============================================================ */
+  :root[data-thema="hell"] {
+    color-scheme: light;
+    --bg: #f2ece0;
+    --card: #fdfbf6;
+    --card-2: #f6f1e6;
+    --ink: #241f18;
+    --ink-soft: #655d4e;
+    --ink-faint: #8b8273;
+    --accent: #8a6a24;
+    --accent-dark: #6d5217;
+    --accent-ink: #fffdf6;
+    --accent-soft: rgba(138, 106, 36, 0.10);
+    --accent-line: rgba(138, 106, 36, 0.32);
+    --green: #3d7a5c;
+    --green-soft: rgba(61, 122, 92, 0.12);
+    --green-line: rgba(61, 122, 92, 0.38);
+    --red: #a8452e;
+    --red-soft: rgba(168, 69, 46, 0.11);
+    --red-line: rgba(168, 69, 46, 0.36);
+    --border: #ddd3bf;
+    --border-soft: #e7dfcd;
+    --shadow: 0 1px 2px rgba(60, 48, 25, 0.10), 0 8px 24px rgba(60, 48, 25, 0.07);
+    --glow: radial-gradient(115% 80% at 50% -10%, #fbf7ec 0%, #f5efe2 45%, var(--bg) 78%);
+    --mark: rgba(138, 106, 36, 0.20);
+    --frei: rgba(138, 106, 36, 0.07);
+    --spiegel: rgba(138, 106, 36, 0.20);
+    --backdrop: rgba(40, 33, 20, 0.42);
+    --kal1: rgba(138, 106, 36, 0.20);
+    --kal2: rgba(138, 106, 36, 0.42);
+    --kal3: rgba(138, 106, 36, 0.68);
+  }
+  /* Zwei Stellen, an denen die dunkle Fassung mit festen Werten arbeitet und
+     das auf Papier nicht mehr stimmt. */
+  :root[data-thema="hell"] .tab.active { box-shadow: 0 1px 2px rgba(60, 48, 25, 0.12); }
+  :root[data-thema="hell"] .dlg { box-shadow: 0 20px 60px rgba(60, 48, 25, 0.22); }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -96,7 +196,7 @@
   }
 
   body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-family: var(--font-ui);
     background: var(--bg);
     color: var(--ink);
     font-size: 16px;
@@ -132,12 +232,22 @@
      seriös wirkt er erst, wenn man ihn nicht bemerkt. */
   .bg-glow {
     position: fixed; inset: 0; z-index: 0; pointer-events: none;
-    background: radial-gradient(115% 80% at 50% -10%, #241f15 0%, #121009 45%, var(--bg) 78%);
+    background: var(--glow);
   }
 
-  h1 { font-size: 1.45rem; line-height: 1.25; letter-spacing: -0.01em; margin-bottom: var(--s1); }
-  h2 { font-size: 1.08rem; line-height: 1.3; letter-spacing: -0.005em; margin-bottom: var(--s3); }
-  h3 { font-size: 0.98rem; line-height: 1.35; }
+  h1, h2, h3 { font-family: var(--font-lesen); font-weight: 600; }
+  h1 { font-size: 1.5rem; line-height: 1.25; margin-bottom: var(--s1); }
+  h2 { font-size: 1.12rem; line-height: 1.3; margin-bottom: var(--s3); }
+  h3 { font-size: 1rem; line-height: 1.35; }
+  /* Die Lesefläche: alles, was Stoff ist und nicht Bedienung. */
+  .study-word, .study-answer,
+  .card-row .wort, .leech-row .wort, .lern-inhalt .wort,
+  .set-row .set-name, .lekt-name, .dlg h3 {
+    font-family: var(--font-lesen);
+  }
+  /* Arabisch hat seine eigene Schrift - die Serifenregel darf sie nicht
+     überschreiben, egal an welcher Stelle das Wort steht. */
+  .arabic, .arabic * { font-family: 'UthmanicHafs', 'Amiri', 'Amiri Quran', 'Scheherazade New', 'Noto Naskh Arabic', serif !important; }
   .subtitle { color: var(--ink-soft); font-size: 0.95rem; margin-bottom: var(--s6); }
 
   /* ---------- Knöpfe ----------
@@ -398,7 +508,7 @@
 
   /* 2.1.0: Fundstellen der Suche. Kein Standard-Gelb des Browsers - das ist
      auf dunklem Grund grell und macht den Text unlesbar. */
-  mark { background: rgba(227, 200, 138, 0.24); color: var(--ink); border-radius: 3px; padding: 0 2px; }
+  mark { background: var(--mark); color: var(--ink); border-radius: 3px; padding: 0 2px; }
 
   /* 2.1.0: Suchfeld mit Knopf zum Leeren */
   .search-wrap { position: relative; margin-bottom: var(--s3); }
@@ -423,10 +533,28 @@
   }
 
   /* ---------- Abfrage und Übung ---------- */
-  .study-card { text-align: center; padding: var(--s7) var(--s5); }
-  .study-word { font-size: 1.75rem; font-weight: 700; line-height: 1.25; word-break: break-word; margin-bottom: var(--s2); }
+  /* 2.18.0: Die Karte, auf die man schaut, bekommt einen doppelten Rahmen -
+     eine Haarlinie in Gold ein Stück innerhalb der Kante. So wurde in
+     Handschriften der Textspiegel abgesetzt: nicht als Verzierung, sondern
+     damit klar ist, wo der Text steht und wo der Rand anfängt. Es ist der
+     einzige Rahmen dieser Art in der App; er gehört der Karte, sonst nichts. */
+  .study-card {
+    text-align: center;
+    padding: var(--s7) var(--s5);
+    position: relative;
+  }
+  .study-card::before {
+    content: "";
+    position: absolute;
+    inset: 7px;
+    border: 1px solid var(--spiegel);
+    border-radius: 12px;
+    pointer-events: none;
+  }
+  .study-word { font-size: 1.75rem; font-weight: 600; line-height: 1.3; word-break: break-word; margin-bottom: var(--s2); }
   .study-answer {
     font-size: 1.3rem;
+    font-weight: 600;
     color: var(--accent);
     word-break: break-word;
     margin-top: var(--s4);
@@ -460,9 +588,9 @@
     border-width: 1px;
     border-style: solid;
   }
-  .btn-known   { color: var(--green);  border-color: rgba(79, 207, 143, 0.40) !important; }
+  .btn-known   { color: var(--green);  border-color: var(--green-line) !important; }
   .btn-almost  { color: var(--accent); border-color: var(--accent-line) !important; }
-  .btn-unknown { color: var(--red);    border-color: rgba(226, 105, 92, 0.42) !important; }
+  .btn-unknown { color: var(--red);    border-color: var(--red-line) !important; }
   @media (hover: hover) and (pointer: fine) {
     .btn-known:hover   { background: var(--green-soft); }
     .btn-almost:hover  { background: var(--accent-soft); }
@@ -471,8 +599,35 @@
 
   .progress-note { font-size: 0.82rem; color: var(--ink-faint); margin-bottom: var(--s3); letter-spacing: 0.01em; }
 
-  .done-box { text-align: center; padding: var(--s7) var(--s5); }
-  .done-box .emoji { font-size: 2.4rem; margin-bottom: var(--s3); }
+  /* Der Bildschirm nach der letzten Karte ist der einzige Moment, in dem die
+     App etwas feiert. Darüber steht jetzt ein Stern aus zwei gedrehten
+     Quadraten - die einfachste Form der Rosette, rein geometrisch, in Gold
+     und klein. Kein Bild, keine Datei: zwei Vierecke in CSS. */
+  .done-box { text-align: center; padding: var(--s7) var(--s5); position: relative; }
+  /* Kein Bild und keine Datei: zwei gekreuzte Balken, einmal gerade und
+     einmal um 45 Grad gedreht, ergeben den achtstrahligen Stern. Wo die
+     Maskentechnik fehlt, wird nichts gezeichnet statt eines goldenen
+     Klotzes - deshalb steht alles in @supports. */
+  @supports (mask: linear-gradient(#000 0 0)) or (-webkit-mask: linear-gradient(#000 0 0)) {
+    .done-box::before, .done-box::after {
+      content: "";
+      width: 26px; height: 26px;
+      background: var(--accent);
+      opacity: 0.5;
+      -webkit-mask:
+        linear-gradient(#000 0 0) center/8px 26px no-repeat,
+        linear-gradient(#000 0 0) center/26px 8px no-repeat;
+      mask:
+        linear-gradient(#000 0 0) center/8px 26px no-repeat,
+        linear-gradient(#000 0 0) center/26px 8px no-repeat;
+    }
+    .done-box::before { display: block; margin: 0 auto var(--s5); }
+    .done-box::after {
+      position: absolute; top: var(--s7); left: 50%; margin-left: -13px;
+      transform: rotate(45deg); pointer-events: none;
+    }
+  }
+  .done-box .emoji { font-size: 2.2rem; margin-bottom: var(--s3); }
 
   .hint { color: var(--ink-soft); font-size: 0.93rem; padding: var(--s2) 0; }
   .due-info { font-size: 1.02rem; margin-bottom: var(--s4); }
@@ -521,10 +676,14 @@
      ist kein Knopf. */
   .set-gruppe { margin-top: var(--s4); }
   .set-gruppe:first-of-type { margin-top: 6px; }
+  /* Rubriken. In Handschriften stand der Abschnittstitel in roter oder
+     goldener Tinte, damit das Auge die Gliederung findet, ohne zu lesen.
+     Hier: klein, gesperrt, in gedämpftem Gold. */
   .set-gruppe-kopf {
     display: flex; align-items: center; gap: var(--s2);
-    font-size: 0.76rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
-    color: var(--ink-faint); padding-top: var(--s2); border-top: 1px solid var(--border-soft);
+    font-size: 0.74rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--accent-dark); opacity: 0.8;
+    padding-top: var(--s2); border-top: 1px solid var(--border-soft);
   }
   .set-gruppe:first-of-type .set-gruppe-kopf { border-top: none; padding-top: 0; }
   .set-art-wahl { padding: 5px 8px; border-radius: var(--radius-sm); border: 1px solid var(--border); background-color: var(--card-2); color: var(--ink-soft); font: inherit; font-size: 0.76rem; min-height: 32px; }
@@ -538,7 +697,7 @@
   /* Umgekehrt: in einem gefuehrten Satz wird hervorgehoben, was freigeschaltet
      ist - dieselbe Farbe wie bei den Suchtreffern, damit "das darfst du
      anfassen" ohne Erklaerung lesbar ist. */
-  .card-row.card-frei { background: rgba(227, 200, 138, 0.08); border-radius: var(--radius-sm); padding-left: var(--s2); padding-right: var(--s2); }
+  .card-row.card-frei { background: var(--frei); border-radius: var(--radius-sm); padding-left: var(--s2); padding-right: var(--s2); }
   .lock-anzeige { font-size: 0.95rem; opacity: 0.75; }
   .merk-hinweis { background: var(--accent-soft); border: 1px solid var(--accent-line); border-radius: var(--radius); padding: var(--s3) var(--s4); margin-bottom: var(--s3); font-size: 0.88rem; }
   .weiter-hinweis { color: var(--ink-faint); font-size: 0.83rem; text-align: center; padding: var(--s3) 0; margin: 0; letter-spacing: 0.01em; }
@@ -546,15 +705,15 @@
      Balken des Fortschritts. So bedeutet ein Farbton ueberall dasselbe. */
   .badge.zustand-neu      { color: var(--ink-faint); }
   .badge.zustand-gesehen  { color: var(--accent-dark); border-color: rgba(201, 169, 97, 0.30); }
-  .badge.zustand-wackelig { color: var(--red); border-color: rgba(226, 105, 92, 0.30); }
+  .badge.zustand-wackelig { color: var(--red); border-color: var(--red-line); }
   .badge.zustand-solide   { color: var(--accent); border-color: var(--accent-line); }
-  .badge.zustand-fest     { color: var(--green); border-color: rgba(79, 207, 143, 0.30); }
+  .badge.zustand-fest     { color: var(--green); border-color: var(--green-line); }
 
   /* 2.16.0: Rahmen statt Hintergrund. Der Kasten, auf den gesprungen wird, hat
      fast immer selbst einen Hintergrund - die alte Animation endete auf
      "transparent" und LOESCHTE ihn dabei kurz, statt aufzufallen. */
   @keyframes aufleuchten {
-    0%   { box-shadow: 0 0 0 2px var(--accent), var(--shadow); }
+    0%   { box-shadow: 0 0 0 2px var(--accent-dark), var(--shadow); }
     100% { box-shadow: 0 0 0 2px rgba(0, 0, 0, 0), var(--shadow); }
   }
   .aufleuchten { animation: aufleuchten 1.4s ease-out; }
@@ -589,9 +748,9 @@
   .kal-tag.s0 { background: var(--card-2); }
   /* Vier Stufen in der Markenfarbe statt in Gruen - der Kalender ist das
      groesste Element im Tab und traegt deshalb den Akzent. */
-  .kal-tag.s1 { background: rgba(227, 200, 138, 0.22); }
-  .kal-tag.s2 { background: rgba(227, 200, 138, 0.45); }
-  .kal-tag.s3 { background: rgba(227, 200, 138, 0.72); }
+  .kal-tag.s1 { background: var(--kal1); }
+  .kal-tag.s2 { background: var(--kal2); }
+  .kal-tag.s3 { background: var(--kal3); }
   .kal-tag.s4 { background: var(--accent); }
   .kal-tag.heute { outline: 1px solid var(--accent); outline-offset: 1px; }
   .lekt-leiste { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--s2); margin-top: var(--s2); }
@@ -628,7 +787,7 @@
   .lern-inhalt .uebersetzung { color: var(--ink-soft); font-size: 0.9rem; margin-top: 2px; word-break: break-word; }
   .lern-notiz-knopf { background: transparent; border-color: transparent; color: var(--ink-faint); font-size: 0.78rem; font-weight: 500; padding: 6px 0; min-height: 32px; }
   .lern-tat { flex-shrink: 0; }
-  .lern-haken { background: transparent; border: 1px solid rgba(79, 207, 143, 0.40); color: var(--green); font-size: 0.84rem; padding: 8px 14px; min-height: 38px; }
+  .lern-haken { background: transparent; border: 1px solid var(--green-line); color: var(--green); font-size: 0.84rem; padding: 8px 14px; min-height: 38px; }
   @media (hover: hover) and (pointer: fine) {
     .lern-notiz-knopf:hover { background: transparent; color: var(--accent); }
     .lern-haken:hover { background: var(--green-soft); }
@@ -669,7 +828,7 @@
      die Karte zu ändern. */
   .leech-banner {
     background: var(--red-soft);
-    border: 1px solid rgba(226, 105, 92, 0.30);
+    border: 1px solid var(--red-line);
     color: var(--red);
     border-radius: var(--radius);
     padding: var(--s3) var(--s4);
@@ -679,7 +838,7 @@
   }
   .leech-badge {
     background: transparent;
-    border: 1px solid rgba(226, 105, 92, 0.32);
+    border: 1px solid var(--red-line);
     color: var(--red);
     border-radius: 999px;
     padding: 3px 9px;
@@ -717,7 +876,7 @@
      gar nichts und niemand wusste, warum. */
   .dlg-backdrop {
     position: fixed; inset: 0; z-index: 100;
-    background: rgba(0, 0, 0, 0.72);
+    background: var(--backdrop);
     -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
     display: flex; align-items: center; justify-content: center;
     padding: var(--s5);
@@ -737,7 +896,7 @@
   .dlg-actions { display: flex; gap: var(--s2); justify-content: flex-end; margin-top: var(--s5); flex-wrap: wrap; }
   .dlg-actions button.danger { background: var(--red); color: #fff; border-color: var(--red); }
   @media (hover: hover) and (pointer: fine) {
-    .dlg-actions button.danger:hover { background: #c9564a; }
+    .dlg-actions button.danger:hover { background: #b25c45; }
   }
 
   /* E7 (1.8.0): Schriftgroesse fuer Arabisch. Der Faktor haengt an #app.
@@ -862,7 +1021,7 @@ const firebaseConfig = {
 
 /* Versionsnummer: bei jeder Veroeffentlichung hochzaehlen und denselben Wert
    als CACHE_NAME in sw.js eintragen, damit alte Dateien verworfen werden. */
-const APP_VERSION = "2.17.0";
+const APP_VERSION = "2.20.0";
 
 const CONFIGURED = firebaseConfig.apiKey !== "HIER_EINFUEGEN";
 const app = document.getElementById("app");
@@ -1530,9 +1689,14 @@ function normSettings(s) {
      und war damit geraetelokal - auf einem neuen Handy hiess es immer "noch
      nie gesichert", was aussieht, als waeren die Daten weg. */
   const b = s && /^\d{4}-\d{2}-\d{2}$/.test(s.lastBackup) ? s.lastBackup : null;
+  /* 2.20.0: Voreinstellung ist DUNKEL, nicht "automatisch". Wer die App seit
+     Monaten dunkel kennt, soll sie nach einem Update nicht plötzlich weiss
+     vorfinden, nur weil das Handy gerade hell steht. */
+  const th = s && THEMEN.some(x => x.id === s.thema) ? s.thema : "dunkel";
   return {
     arabGroesse: g,
-    lastBackup: b
+    lastBackup: b,
+    thema: th
   };
 }
 
@@ -1567,7 +1731,53 @@ let bereiche = null;         // Array [{name, karten:[]}] – null solange Cloud
 let cloudDocExists = false;
 let syncError = null;
 let streak = normStreak(null); // { count, lastCompletedDate, lastEvaluatedDate } – nur echte Lernsessions zählen, Üben nicht
-let settings = normSettings(null); // { arabGroesse, lastBackup }
+/* Muss VOR dem ersten Aufruf von normSettings stehen - die Funktion prüft
+   den gespeicherten Wert gegen diese Liste. */
+const THEMEN = [
+  { id: "dunkel", label: "Dunkel" },
+  { id: "hell", label: "Hell" },
+  { id: "auto", label: "Automatisch" }
+];
+let settings = normSettings(null); // { arabGroesse, lastBackup, thema }
+
+/* ---------- 2.20.0: hell und dunkel ----------
+   "Automatisch" wird hier aufgelöst und nicht im Stil-Block. Der Grund ist
+   Pflege: Sonst stünden dieselben zwanzig Farben zweimal da - einmal für
+   data-thema="hell" und einmal in einer Medienabfrage für "automatisch" -
+   und die zweite Fassung wäre die, die man beim nächsten Mal vergisst.
+
+   Mitgesetzt wird theme-color im Kopf der Seite. Danach richtet sich auf dem
+   Handy die Leiste um die App herum: Bliebe sie schwarz, während die App
+   hell ist, sähe die helle Fassung aus wie ein Fehler. */
+let systemHell = null;
+try {
+  systemHell = window.matchMedia("(prefers-color-scheme: light)");
+  if (systemHell.addEventListener) {
+    systemHell.addEventListener("change", () => { if (settings.thema === "auto") themaAnwenden(); });
+  }
+} catch (e) { systemHell = null; }
+function themaAufgeloest() {
+  if (settings.thema === "hell") return "hell";
+  if (settings.thema === "dunkel") return "dunkel";
+  return systemHell && systemHell.matches ? "hell" : "dunkel";
+}
+function themaAnwenden() {
+  const t = themaAufgeloest();
+  document.documentElement.setAttribute("data-thema", t);
+  /* Dieselbe Wahl noch einmal auf dem Gerät - gelesen wird sie vom kleinen
+     Skript im Kopf der Seite, damit beim Start nichts umspringt. */
+  try { localStorage.setItem("adrabic-thema", settings.thema); } catch (e) {}
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute("content", t === "hell" ? "#f2ece0" : "#0a0a09");
+}
+function setThema(id) {
+  if (!THEMEN.some(x => x.id === id)) return;
+  settings.thema = id;
+  themaAnwenden();
+  persistSettings();
+  render();
+}
+themaAnwenden();
 
 let ui = {
   authMode: "login",         // "login" | "register" | "reset"
@@ -1612,6 +1822,9 @@ let ui = {
      Muster, das der Adrabic-Trainer bei der Checkliste benutzt. */
   springZu: null,
   springOben: false,
+  /* 2.19.0: Einstellungen sind ein eigener Bildschirm, kein vierter Reiter.
+     Ein Reiter ist ein Ort, an den man oft geht; hierher geht man selten. */
+  einstellungen: false,
   drillOpen: false,           // Auswahl für Übungsmodus sichtbar?
   drillSource: "stufen",      // "stufen" oder die ID einer Speicherkarte
   openSetId: null,            // Speicherkarte, deren Kartenliste aufgeklappt ist
@@ -1848,6 +2061,7 @@ async function initFirebase() {
     ui.editId = null;
     ui.askImport = false;
     ui.umzug = null;
+    ui.einstellungen = false;
     if (user) {
       displayName = user.displayName || (user.email ? user.email.split("@")[0] : "Lernende:r");
       userDocRef = fb.doc(db, "users", user.uid);
@@ -1873,6 +2087,7 @@ async function initFirebase() {
         try { sessionStorage.removeItem(TOKEN_ERNEUERT_KEY); } catch (e) {}
         if (typeof data.name === "string" && data.name) displayName = data.name;
         settings = normSettings(data.settings);
+        themaAnwenden();          // 2.20.0: gilt auch auf einem neuen Gerät sofort
         streak = normStreak(data.streak);
         const wolkenVerlauf = normVerlauf(data.verlauf);
         verlauf = verlaufZusammen(verlauf, wolkenVerlauf);
@@ -3105,6 +3320,10 @@ function importBackupFile(file) {
       await dlgAlert("Diese Datei ist keine gültige Lernkarten-Backup-Datei.", "Import nicht möglich");
       return;
     }
+    /* 2.19.0: Eingespielt wird aus den Einstellungen heraus - das Ergebnis
+       steht aber in den Bereichen. Ohne diese Zeile bliebe man auf dem
+       Einstellungs-Bildschirm stehen und saehe von 120 neuen Karten nichts. */
+    ui.einstellungen = false;
     const imported = normBereiche(data.bereiche);
 
     /* 2.5.0: Erst pruefen, was davon Nachschub für einen schon vorhandenen
@@ -4252,8 +4471,15 @@ function renderMain() {
 
      Zurueck geht es ueber den Knopf IM Modus (Uebung beenden, Session
      abbrechen, Fertig) - den gibt es in jedem von ihnen. */
-  const imModus = ui.tab === "lernen" && !!(ui.session || ui.lernSetId);
-  if (imModus) {
+  const imModus = ui.tab === "lernen" && !!(ui.session || ui.lernSetId) && !ui.einstellungen;
+  if (ui.einstellungen) {
+    /* Eigener Bildschirm: keine Bereichsreihe, keine Reiter. Nur der Weg
+       zurück - wie in den Einstellungen jeder App. */
+    html += '<div class="lern-kopf" style="margin-bottom:var(--s5)">';
+    html += '<h1 style="margin:0">Einstellungen</h1>';
+    html += '<div><button class="secondary" data-action="einstellungen-zu">Fertig</button></div>';
+    html += '</div>';
+  } else if (imModus) {
     if (schreibFehler) {
       html += '<p class="hint" style="margin:8px 0 12px; color:var(--red)">⚠ <strong>Nicht gespeichert:</strong> ' +
         'Änderungen kommen gerade nicht in der Cloud an (' + esc(schreibFehler) + ').</p>';
@@ -4267,18 +4493,13 @@ function renderMain() {
         'Änderungen kommen gerade nicht in der Cloud an (' + esc(schreibFehler) + '). ' +
         'Lade ein Backup herunter, bevor du weiterlernst.</p>';
     }
+    /* 2.19.0: Ein Knopf statt fünf. Abmelden, drei Backups und der Import
+       standen alle gleichzeitig über dem Lernstoff - fünf Handlungen, die man
+       im Monat vielleicht einmal braucht, auf dem Bildschirm, den man täglich
+       sieht. Sie sind jetzt hinter dem Zahnrad, auf einem eigenen
+       Bildschirm. */
     html += '<div>';
-    html += '<button class="ghost" data-action="logout">Abmelden</button>';
-    /* 2.3.0: Vier Knoepfe statt drei, und alle heissen jetzt nach dem, was sie
-       tun. "Backup" und "exportieren" bezeichneten vorher dasselbe und sahen
-       nach zwei verschiedenen Funktionen aus. */
-    html += '<button class="tiny-link" data-action="export-backup" title="Lädt alle Bereiche mit allen Karten herunter">💾 Backup · alles</button>';
-    html += '<button class="tiny-link" data-action="export-backup-current" title="Lädt nur den gerade geöffneten Bereich &quot;' + esc(currentBereich().name) + '&quot; herunter">💾 Backup · nur „' + esc(currentBereich().name) + '"</button>';
-    if (istAutor() && !istGefuehrt(currentBereich())) {
-      html += '<button class="tiny-link" data-action="export-weitergabe" title="Erzeugt aus diesem Bereich einen Kartensatz zum Weitergeben: alles auf Stufe 0, alle Lektionen bis auf die erste gesperrt">💾 Backup · zum Weitergeben</button>';
-    }
-    html += '<button class="tiny-link" data-action="import-trigger" title="Karten aus einer Backup-Datei einspielen">📥 Import</button>';
-    html += '<input type="file" id="import-file-input" accept="application/json" style="display:none">';
+    html += '<button class="ghost" data-action="einstellungen" aria-label="Einstellungen" title="Einstellungen, Backup und Import">⚙︎ Einstellungen</button>';
     html += '</div>';
     html += '</div>';
 
@@ -4313,9 +4534,18 @@ function renderMain() {
   }
 
 
-  html += ui.tab === "lernen" ? renderLernen()
-        : ui.tab === "fortschritt" ? renderFortschritt()
-        : renderVerwalten();
+  if (ui.einstellungen) {
+    html += renderEinstellungen();
+  } else {
+    html += ui.tab === "lernen" ? renderLernen()
+          : ui.tab === "fortschritt" ? renderFortschritt()
+          : renderVerwalten();
+  }
+  /* Das versteckte Dateifeld für den Import. Es steht ausserhalb aller
+     Bildschirme, weil zwei Knöpfe es benutzen: der in den Einstellungen und
+     der auf dem leeren Startbildschirm. Zwei Felder mit derselben Kennung
+     wären ein Fehler, den niemand sieht - der zweite Knopf täte dann nichts. */
+  html += '<input type="file" id="import-file-input" accept="application/json" style="display:none">';
   html += '<p style="text-align:center; font-size:0.72rem; color:var(--ink-soft); opacity:0.6; margin:18px 0 8px">Version ' + APP_VERSION + '</p>';
 
   /* Vor dem Neuaufbau merken, in welchem Feld der Cursor stand - sonst springt
@@ -4629,6 +4859,95 @@ function merkSetOeffnen() {
   render();
 }
 
+/* ---------- 2.19.0: der Einstellungs-Bildschirm ----------
+   Gesammelt ist hier alles, was man selten tut und einmal einstellt. Die
+   Ordnung folgt der Frage, WORAN man dreht: erst wie es aussieht, dann die
+   eigenen Daten, dann das Konto. Jeder Abschnitt sagt in einem Satz, was
+   er bewirkt - gerade Backup und Import sind Handlungen, die man nicht
+   rückgängig macht. */
+function renderEinstellungen() {
+  let html = "";
+
+  /* --- Darstellung --- */
+  html += '<div class="panel">';
+  html += '<h2>Darstellung</h2>';
+  html += '<p class="hint" style="padding-top:0">Dunkel ist die Fassung, für die diese App gebaut ist. Hell ist keine Umkehrung davon, sondern eine eigene: Tinte auf Papier statt Gold auf Schwarz. „Automatisch" folgt der Einstellung des Geräts.</p>';
+  html += '<div class="seg-row" style="margin-top:var(--s2); margin-bottom:var(--s5)">';
+  html += '<span class="seg" role="group" aria-label="Helligkeit">';
+  for (const th of THEMEN) {
+    html += '<button class="' + (settings.thema === th.id ? "active" : "") +
+      '" data-action="set-thema" data-id="' + th.id + '"' +
+      (settings.thema === th.id ? ' aria-pressed="true"' : ' aria-pressed="false"') +
+      '>' + th.label + '</button>';
+  }
+  html += '</span>';
+  if (settings.thema === "auto") {
+    html += '<span class="hint" style="padding:0">gerade ' + (themaAufgeloest() === "hell" ? "hell" : "dunkel") + '</span>';
+  }
+  html += '</div>';
+  /* E7: Bewusst drei feste Stufen statt eines Zahlenfeldes - es gibt nichts
+     einzustellen, nur auszuprobieren, was man lesen kann. */
+  html += '<p class="hint" style="padding-top:0">Größe der arabischen Schrift – überall in der App. Die Probe daneben ändert sich mit.</p>';
+  html += '<div class="seg-row" style="margin-top:var(--s2)">';
+  html += '<span class="seg" role="group" aria-label="Schriftgröße für Arabisch">';
+  for (const st of ARAB_STUFEN) {
+    html += '<button class="' + (settings.arabGroesse === st.id ? "active" : "") +
+      '" data-action="set-arab-groesse" data-id="' + st.id + '"' +
+      (settings.arabGroesse === st.id ? ' aria-pressed="true"' : ' aria-pressed="false"') +
+      '>' + st.label + '</button>';
+  }
+  html += '</span>';
+  html += '<span class="arabic" lang="ar" dir="rtl" style="font-size:calc(1.2rem * var(--arab-scale,1))">بِسْمِ ٱللَّٰهِ</span>';
+  html += '</div>';
+  html += '</div>';
+
+  /* --- Sichern --- */
+  const b = currentBereich();
+  const alter = daysSinceLastBackup();
+  html += '<div class="panel">';
+  html += '<h2>Sichern</h2>';
+  html += '<p class="hint" style="padding-top:0">Ein Backup ist eine Datei auf deinem Gerät. Sie hängt an nichts – geht das Konto verloren, ist sie das Einzige, was bleibt.</p>';
+  html += '<p class="hint" style="padding-top:0; color:' + (alter === null || alter >= 14 ? 'var(--accent)' : 'var(--ink-faint)') + '">' +
+    (alter === null ? "Du hast noch nie ein Backup heruntergeladen."
+     : alter === 0 ? "Zuletzt gesichert: heute."
+     : "Zuletzt gesichert vor " + alter + " Tag" + (alter === 1 ? "" : "en") + ".") + '</p>';
+  html += '<div class="form-actions" style="margin-top:var(--s3)">';
+  html += '<button data-action="export-backup">💾 Alles sichern</button>';
+  html += '<button class="secondary" data-action="export-backup-current">Nur „' + esc(b.name) + '"</button>';
+  html += '</div>';
+  if (istAutor() && !istGefuehrt(b)) {
+    html += '<p class="hint" style="padding-top:var(--s4)">Zum Weitergeben: derselbe Bereich, aber alles auf Stufe 0 und alle Lektionen bis auf die erste zu. Für deinen eigenen Stand ändert sich nichts.</p>';
+    html += '<button class="secondary" data-action="export-weitergabe">📤 Kartensatz zum Weitergeben</button>';
+  }
+  html += '</div>';
+
+  /* --- Einspielen --- */
+  html += '<div class="panel">';
+  html += '<h2>Einspielen</h2>';
+  html += '<p class="hint" style="padding-top:0">Eine Backup-Datei oder einen Kartensatz laden. Gehört die Datei zu einem Satz, den du schon hast, wird er ergänzt – dein Lernstand bleibt.</p>';
+  html += '<button class="secondary" data-action="import-trigger">📥 Datei auswählen</button>';
+  html += '</div>';
+
+  /* --- Aufzeichnung --- */
+  const tage = Object.keys(verlauf).length;
+  html += '<div class="panel">';
+  html += '<h2>Aufzeichnung</h2>';
+  html += '<p class="hint" style="padding-top:0">Das Tagesprotokoll trägt Kalender, Wochenzahlen und die Serie – aufgezeichnet sind ' +
+    tage + ' Tag' + (tage === 1 ? "" : "e") + '. Löschen betrifft nur die Anzeige: Karten, Stufen und Fälligkeiten bleiben unberührt.</p>';
+  html += '<button class="secondary" data-action="verlauf-reset"' + (tage === 0 ? " disabled" : "") + '>Verlauf zurücksetzen</button>';
+  html += '</div>';
+
+  /* --- Konto --- */
+  html += '<div class="panel">';
+  html += '<h2>Konto</h2>';
+  html += '<p class="hint" style="padding-top:0">Angemeldet als <strong style="color:var(--ink)">' + esc(displayName) + '</strong>' +
+    (currentUser && currentUser.email ? ' · ' + esc(currentUser.email) : '') + '</p>';
+  html += '<button class="secondary" data-action="logout">Abmelden</button>';
+  html += '</div>';
+
+  return html;
+}
+
 function renderLernen() {
   const lset = lernSet();
   if (lset) return renderDurchsicht(lset);
@@ -4665,20 +4984,9 @@ function renderLernen() {
       (neuImStapel > 0 ? ' <span class="badge zustand-neu">' + neuImStapel + ' neu</span>' : '') + '</p>';
     html += '<button data-action="start-session">Lernsession starten (' + due.length + ')</button>';
   }
-  /* E7: Bewusst drei feste Stufen statt eines Zahlenfeldes - es gibt nichts
-     einzustellen, nur auszuprobieren, was man lesen kann. */
-  html += '<div class="seg-row">';
-  html += '<span style="font-size:0.88rem; color:var(--ink-soft)">Arabische Schrift</span>';
-  html += '<span class="seg" role="group" aria-label="Schriftgröße für Arabisch">';
-  for (const st of ARAB_STUFEN) {
-    html += '<button class="' + (settings.arabGroesse === st.id ? "active" : "") +
-      '" data-action="set-arab-groesse" data-id="' + st.id + '"' +
-      (settings.arabGroesse === st.id ? ' aria-pressed="true"' : ' aria-pressed="false"') +
-      '>' + st.label + '</button>';
-  }
-  html += '</span>';
-  html += '<span class="arabic" lang="ar" dir="rtl" style="font-size:calc(1.2rem * var(--arab-scale,1))">بِسْمِ ٱللَّٰهِ</span>';
-  html += '</div>';
+  /* 2.19.0: Die Schriftgröße stand bis hier unter dem Knopf „Lernsession
+     starten". Sie ist aber nichts, was man beim Lernen tut - man stellt sie
+     einmal ein und nie wieder. Sie steht jetzt in den Einstellungen. */
   html += '</div>';
 
   /* A7: Wer drei Bereiche hat und heute nur einen lernt, bekam nie eine Streak
@@ -4790,9 +5098,9 @@ function fortschrittWochen() {
   if (w12.gesamt === 0) {
     html += '<p class="stat-sub" style="padding-top:8px">Noch nichts aufgezeichnet – ab dem ersten gelernten Tag füllt sich das Raster.</p>';
   }
-  if (w12.gesamt > 0) {
-    html += '<button class="tiny-link" data-action="verlauf-reset" style="margin-top:8px">Verlauf zurücksetzen</button>';
-  }
+  /* 2.19.0: „Verlauf zurücksetzen" stand mitten in der Anzeige, die es
+     löscht. Es steht jetzt bei den anderen Daten-Handlungen in den
+     Einstellungen. */
   html += '</div>';
   return html;
 }
@@ -6147,6 +6455,8 @@ app.addEventListener("click", e => {
     case "mode-register": ui.authMode = "register"; ui.authError = null; ui.authInfo = null; render(); break;
     case "mode-reset": ui.authMode = "reset"; ui.authError = null; ui.authInfo = null; render(); break;
     case "logout": doLogout(); break;
+    case "einstellungen": ui.einstellungen = true; window.scrollTo(0, 0); render(); break;
+    case "einstellungen-zu": ui.einstellungen = false; window.scrollTo(0, 0); render(); break;
     case "resend-verification": doResendVerification(); break;
     case "verification-check": pruefeBestaetigung(); break;
     case "import-old": importOldProfile(btn.dataset.name); break;
@@ -6232,6 +6542,7 @@ app.addEventListener("click", e => {
     case "dlg-ok": if (ui.dialog) closeDialog(dialogResult(ui.dialog, true)); break;
     case "dlg-cancel": if (ui.dialog) closeDialog(dialogResult(ui.dialog, false)); break;
     case "set-arab-groesse": setArabGroesse(btn.dataset.id); break;   // E7
+    case "set-thema": setThema(btn.dataset.id); break;
     case "hw-undo": hwStrokes.pop(); render(); break;   // D9
     case "hw-clear": hwStrokes = []; render(); break;
     case "hw-fullscreen": hwFullscreen = !hwFullscreen; render(); break;
