@@ -1,3 +1,129 @@
+## 2.20.0 – 11. September 2026
+
+### Neu
+
+- **Hell und dunkel.** Unter Einstellungen → Darstellung: *Dunkel*, *Hell*,
+  *Automatisch*. Automatisch folgt dem Gerät und zeigt daneben an, was gerade
+  gilt. Die Wahl liegt im Konto und gilt damit auf jedem Gerät.
+
+  Die helle Fassung ist **keine Umkehrung** der dunklen. Gold auf Weiß ist
+  blass und schlecht lesbar – dasselbe Gold, das auf Schwarz wertvoll wirkt,
+  sieht auf Papier nach vergilbtem Ausdruck aus. Deshalb dreht sich nicht die
+  Helligkeit, sondern das Bild: Aus Tinte auf dunklem Grund wird Tinte auf
+  Papier, und der Akzent wird von Blattgold zu Bronze. Dieselbe Farbfamilie,
+  aber so dunkel, dass sie auf hellem Grund trägt. Grünspan und Zinnober
+  wandern mit.
+
+  Voreinstellung bleibt **dunkel**, nicht „automatisch". Wer die App seit
+  Monaten dunkel kennt, soll sie nach einem Update nicht plötzlich weiß
+  vorfinden, nur weil das Handy gerade hell steht.
+
+### Wie es gebaut ist
+
+- **„Automatisch" wird im JavaScript aufgelöst, nicht im Stil-Block.** Sonst
+  stünden dieselben zwanzig Farben zweimal da – einmal für die helle Fassung,
+  einmal in einer Medienabfrage für „automatisch" – und die zweite wäre die,
+  die man beim nächsten Mal vergisst. So gibt es die Farben genau einmal.
+
+- **Die Leiste um die App wechselt mit.** Auf dem Handy richtet sich der
+  Rand außerhalb der App nach `theme-color` im Kopf der Seite. Bliebe der
+  schwarz, während die App hell ist, sähe die helle Fassung aus wie ein
+  Fehler.
+
+- **Kein dunkles Aufblitzen beim Start.** Die Wahl liegt im Konto und kommt
+  erst mit den Daten aus der Cloud. Ohne Gegenmaßnahme sähe man bei heller
+  Fassung erst einen schwarzen Bildschirm, der dann umspringt. Die Wahl liegt
+  deshalb zusätzlich auf dem Gerät und wird von ein paar Zeilen im Kopf der
+  Seite gelesen, bevor das erste Bild steht. Maßgeblich bleibt die Cloud.
+
+---
+
+## 2.19.0 – 11. September 2026
+
+### Neu
+
+- **Ein Bildschirm für Einstellungen.** Über dem Lernstoff standen fünf Knöpfe
+  nebeneinander: Abmelden, drei Backups, Import. Fünf Handlungen, die man im
+  Monat vielleicht einmal braucht, auf dem Bildschirm, den man täglich sieht.
+  An ihrer Stelle steht jetzt ein Zahnrad.
+
+  Dahinter liegt ein eigener Bildschirm – kein vierter Reiter, denn ein Reiter
+  ist ein Ort, an den man oft geht. Die Ordnung folgt der Frage, woran man
+  dreht: erst **Darstellung**, dann **Sichern**, **Einspielen** und
+  **Aufzeichnung**, zuletzt **Konto**. Jeder Abschnitt sagt in einem Satz, was
+  er bewirkt – gerade Backup und Import sind Handlungen, die man nicht
+  rückgängig macht.
+
+  Der Hinweis „Dein letztes Backup ist X Tage her" bleibt vorn stehen. Er ist
+  die einzige dieser Sachen, die man sehen muss, ohne sie zu suchen.
+
+### Geändert
+
+- **Die arabische Schriftgröße steht nicht mehr im Lernen-Tab.** Sie stand dort
+  unter dem Knopf „Lernsession starten" – aber sie ist nichts, was man beim
+  Lernen tut: Man stellt sie einmal ein und danach nie wieder. Sie steht jetzt
+  unter „Darstellung", mit der Leseprobe daneben wie bisher.
+
+- **„Verlauf zurücksetzen" steht nicht mehr mitten in der Anzeige, die es
+  löscht.** Es lag im Fortschritt-Tab direkt unter dem Kalender. Jetzt steht es
+  unter „Aufzeichnung", zusammen mit der Angabe, wie viele Tage aufgezeichnet
+  sind – und ist ausgegraut, solange es nichts zu löschen gibt.
+
+### Behoben
+
+- **Das versteckte Dateifeld für den Import gehört keinem Bildschirm mehr.** Es
+  lag in der Kopfzeile. Der zweite Import-Knopf – der auf dem leeren
+  Startbildschirm, für alle, die gerade eine Kartensatz-Datei bekommen haben –
+  griff damit auf ein Feld zu, das in diesem Moment existierte, aber nach dem
+  Umzug in die Einstellungen nicht mehr existiert hätte. Das Feld steht jetzt
+  außerhalb aller Bildschirme, genau einmal.
+
+---
+
+## 2.18.0 – 11. September 2026
+
+### Geändert
+
+- **Zwei Schriftebenen statt einer.** Eine Oberfläche und ein Inhalt sind nicht
+  dasselbe. Knöpfe, Reiter, Plaketten und Hinweise sind Werkzeug – sie sollen
+  aussehen wie das Gerät, auf dem sie laufen, und dafür ist die Systemschrift
+  gemacht. Was gelesen und gelernt wird, ist Inhalt: Überschriften, das Wort auf
+  der Karte, die Übersetzung, der Name einer Lektion. Das steht jetzt in einer
+  Serifenschrift, so wie es in einem Buch stünde.
+
+  Beides kommt vom Gerät selbst, keine Datei wird nachgeladen. Und es hängt an
+  einer einzigen Zeile: Wer wieder eine Schrift für alles will, setzt oben im
+  Stil-Block `--font-lesen` auf `var(--font-ui)` – mehr ist nicht nötig.
+
+  Arabisch ist davon ausgenommen und bleibt in jeder Lage bei der Quran-Schrift.
+
+- **Grünspan und Zinnober statt Signalfarben.** Die beiden Nebenfarben waren ein
+  Neon-Grün und ein Korallrot – Farben aus einer Messanzeige. Was hier gemessen
+  wird, ist etwas anderes. Jetzt stehen daneben die Farben, mit denen in
+  Handschriften neben Gold gearbeitet wurde: gedeckt, warm, und sie streiten
+  nicht mit dem Gold. Betroffen sind „Sicher" und „Nicht" in der Abfrage, der
+  Haken beim Durchgehen, der Fortschrittsbalken der Lektionen und die Plaketten.
+
+- **Die Abfragekarte bekommt einen Textspiegel.** Eine Haarlinie in Gold, ein
+  Stück innerhalb der Kante. So wurde in Handschriften der Text vom Rand
+  abgesetzt – nicht als Verzierung, sondern damit klar ist, wo der Text steht.
+  Es ist der einzige Rahmen dieser Art in der App; er gehört der Karte, die man
+  gerade ansieht, sonst nichts.
+
+- **Abschnittsköpfe als Rubrik.** Über den drei Arten von Speicherkarten
+  (Kategorien, Lektionen, Eigene) stand eine graue Zeile. Jetzt steht sie klein,
+  gesperrt und in gedämpftem Gold – so wie der Abschnittstitel in einer
+  Handschrift in anderer Tinte stand, damit das Auge die Gliederung findet, ohne
+  zu lesen.
+
+- **Ein Stern nach der letzten Karte.** Der Bildschirm am Ende einer Runde ist
+  der einzige Moment, in dem die App etwas feiert. Darüber steht jetzt der
+  achtstrahlige Stern: zwei gekreuzte Balken, einmal gerade und einmal um 45
+  Grad gedreht. Kein Bild, keine Datei – zwei Vierecke im Stil-Block. Wo der
+  Browser die Technik dafür nicht kennt, wird schlicht nichts gezeichnet.
+
+---
+
 ## 2.17.0 – 11. September 2026
 
 ### Geändert
