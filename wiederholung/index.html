@@ -2,177 +2,382 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- viewport-fit=cover: erst damit liefert env(safe-area-inset-*) echte Werte
+     und der Inhalt rutscht im App-Modus nicht unter Uhr und Kerbe. -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Adrabic-Wiederholung</title>
 <meta name="apple-mobile-web-app-title" content="Adrabic-Wiederholung">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0a0a09">
+<!-- Sagt dem Browser, dass die Seite dunkel ist: Bedienfelder, Rollbalken und
+     Textfelder kommen dann von selbst in Dunkelfassung statt in Weiss. -->
+<meta name="color-scheme" content="dark">
 <link rel="manifest" href="./manifest.json">
 <style>
+  /* ============================================================
+     2.17.0 – Gestaltung
+
+     Drei Regeln, aus denen sich hier alles ableitet:
+
+     1. GOLD IST SELTEN. Vorher trugen Knöpfe, aktive Bereiche, aktive
+        Tabs, Plaketten, Balken und Kalender dieselbe Goldfläche - damit
+        zeigte nichts mehr auf etwas. Jetzt gibt es pro Bildschirm genau
+        EINE gefüllte Goldfläche: die Handlung, die gerade dran ist.
+        Alles andere trägt Gold nur als Schrift, Rand oder Schleier.
+
+     2. JEDE FLÄCHE, DIE MAN ANFASST, IST MINDESTENS 44 PX HOCH. Das ist
+        das Maß, das Apple und Google für einen Fingertipp ansetzen. Vier
+        winzige Textlinks nebeneinander sind der deutlichste Unterschied
+        zwischen "Webseite" und "App".
+
+     3. SCHWEBEN GIBT ES AUF DEM HANDY NICHT. Alle :hover-Regeln stehen
+        jetzt hinter (hover: hover) - sonst bleibt ein Knopf nach dem
+        Tippen hell, bis man woanders hintippt. Stattdessen gibt es eine
+        kurze Rückmeldung beim Drücken (:active).
+     ============================================================ */
+
   :root {
+    /* Grundton: fast schwarz, leicht warm - dieselbe Familie wie die
+       Kreisfläche des Lotus. */
     --bg: #0a0a09;
-    --card: #141311;
-    --ink: #f2f1ea;
-    --ink-soft: #9c9c93;
+    --card: #151412;
+    /* Zweite Ebene innerhalb einer Karte (Kästen im Kasten). Vorher wurde
+       dafür --bg genommen; auf dunklem Grund verschwinden solche Kästen,
+       wenn sie dieselbe Farbe wie der Hintergrund haben. */
+    --card-2: #1d1b18;
+    --ink: #f4f3ec;
+    --ink-soft: #a3a29a;
+    --ink-faint: #75736c;
     --accent: #e3c88a;
     --accent-dark: #c9a961;
-    --accent-ink: #1c1610;
-    --accent-soft: rgba(227, 200, 138, 0.14);
+    --accent-ink: #1a1509;
+    --accent-soft: rgba(227, 200, 138, 0.13);
+    --accent-line: rgba(227, 200, 138, 0.30);
     --green: #4fcf8f;
     --green-soft: rgba(79, 207, 143, 0.14);
     --red: #e2695c;
-    --red-soft: rgba(226, 105, 92, 0.16);
-    --border: #2c2924;
+    --red-soft: rgba(226, 105, 92, 0.15);
+    --border: #2b2823;
+    /* Eine Haarlinie, die heller ist als der Rand - für Kanten, die man
+       sehen soll, ohne dass ein Strich entsteht. */
+    --border-soft: #211f1b;
+
     --radius: 14px;
-    --shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+    --radius-sm: 10px;
+    --radius-lg: 18px;
+    /* Ein Schatten, der trägt statt zu leuchten. Der alte war fast doppelt
+       so weich und ließ jede Karte wie einen Aufkleber wirken. */
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 8px 24px rgba(0, 0, 0, 0.30);
+
+    /* Abstände in einer festen Leiter. Wo vorher 4, 6, 7, 10, 12, 14, 16,
+       18, 20, 22 nebeneinander standen, sind es jetzt Vielfache von 4. */
+    --s1: 4px;  --s2: 8px;  --s3: 12px; --s4: 16px;
+    --s5: 20px; --s6: 24px; --s7: 32px;
+
+    /* Ränder, die das Gerät selbst freihält: Kerbe, Kamera, Streifen am
+       unteren Rand. Ohne diese Werte klebt der Inhalt im App-Modus unter
+       der Uhr. Sie brauchen viewport-fit=cover im Kopf der Seite. */
+    --sat: env(safe-area-inset-top, 0px);
+    --sab: env(safe-area-inset-bottom, 0px);
+    --sal: env(safe-area-inset-left, 0px);
+    --sar: env(safe-area-inset-right, 0px);
   }
+
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html { background: var(--bg); }
+
+  html {
+    background: var(--bg);
+    /* Sonst vergrößert iOS beim Drehen ins Querformat eigenmächtig die
+       Schrift und das Raster verrutscht. */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     background: var(--bg);
     color: var(--ink);
+    font-size: 16px;
     line-height: 1.5;
     min-height: 100vh;
+    min-height: 100dvh;
+    /* Kein Gummiband am Rand: im App-Modus sieht man sonst beim Überziehen
+       den nackten Hintergrund hinter der Seite - das verrät sofort, dass
+       hier eine Webseite läuft. */
+    overscroll-behavior-y: none;
+    -webkit-tap-highlight-color: transparent;
+    /* Zahlen in Statistik und Serie sollen untereinander stehen. */
+    font-variant-numeric: tabular-nums;
   }
-  .container { max-width: 640px; margin: 0 auto; padding: 16px; position: relative; z-index: 1; }
+
+  ::selection { background: var(--accent-soft); color: var(--ink); }
+
+  .container {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: calc(var(--s4) + var(--sat)) calc(var(--s4) + var(--sar))
+             calc(var(--s7) + var(--sab)) calc(var(--s4) + var(--sal));
+    position: relative;
+    z-index: 1;
+  }
 
   /* Lichtebene: position:fixed + inset:0 heisst genau Bildschirmgroesse.
      Damit ist der Verlauf auf jedem Bildschirm gleich hell, unabhaengig davon
      wie lang die Seite ist, und er bleibt beim Scrollen stehen. Lag er auf
      dem body, wurde er ueber die gesamte Inhaltshoehe gezogen und das Licht
-     verschwand nach unten weg. Keine driftenden Leuchtflecken mehr. */
+     verschwand nach unten weg. Keine driftenden Leuchtflecken mehr.
+     2.17.0: deutlich zurückgenommen. Ein sichtbarer Farbverlauf ist Zierde;
+     seriös wirkt er erst, wenn man ihn nicht bemerkt. */
   .bg-glow {
     position: fixed; inset: 0; z-index: 0; pointer-events: none;
-    background: radial-gradient(120% 90% at 50% -5%, #322a19 0%, #17140f 45%, var(--bg) 80%);
+    background: radial-gradient(115% 80% at 50% -10%, #241f15 0%, #121009 45%, var(--bg) 78%);
   }
 
-  h1 { font-size: 1.5rem; margin-bottom: 4px; }
-  h2 { font-size: 1.15rem; margin-bottom: 12px; }
-  .subtitle { color: var(--ink-soft); font-size: 0.95rem; margin-bottom: 24px; }
+  h1 { font-size: 1.45rem; line-height: 1.25; letter-spacing: -0.01em; margin-bottom: var(--s1); }
+  h2 { font-size: 1.08rem; line-height: 1.3; letter-spacing: -0.005em; margin-bottom: var(--s3); }
+  h3 { font-size: 0.98rem; line-height: 1.35; }
+  .subtitle { color: var(--ink-soft); font-size: 0.95rem; margin-bottom: var(--s6); }
 
+  /* ---------- Knöpfe ----------
+     Vier Stufen, mehr gibt es nicht:
+       voll      – die Handlung, die dran ist. Einmal pro Bildschirm.
+       secondary – gleichwertige Alternative daneben (Abbrechen, Zurück).
+       ghost     – Werkzeug am Rand (Umbenennen, Löschen, Auswählen).
+       tiny-link – Verwaltung, die selten gebraucht wird (Backup, Import).
+     Die Stufen unterscheiden sich in der FLÄCHE, nicht in der Größe der
+     Schrift - deshalb bleiben alle gut zu treffen. */
   button {
     font: inherit;
+    font-weight: 600;
     cursor: pointer;
-    border: none;
+    border: 1px solid transparent;
     border-radius: var(--radius);
-    padding: 10px 18px;
+    padding: 11px 18px;
+    min-height: 44px;
     background: var(--accent);
     color: var(--accent-ink);
-    transition: background 0.15s;
+    /* Kein Wartefenster von 300 ms vor dem Tippen, kein Doppeltipp-Zoom. */
+    touch-action: manipulation;
+    -webkit-user-select: none; user-select: none;
+    -webkit-touch-callout: none;
+    transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease, transform 0.06s ease;
   }
-  button:hover { background: var(--accent-dark); }
-  button:disabled { opacity: 0.6; cursor: wait; }
+  button:active { transform: scale(0.985); }
+  button:disabled { opacity: 0.5; cursor: default; transform: none; }
+  /* Tastatur-Bedienung bleibt sichtbar, die Maus bekommt keinen Rahmen. */
+  button:focus { outline: none; }
+  button:focus-visible, a:focus-visible, [tabindex]:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
   button.secondary {
-    background: var(--card);
+    background: var(--card-2);
     color: var(--ink);
-    border: 1px solid var(--border);
+    border-color: var(--border);
   }
-  button.secondary:hover { background: var(--accent-soft); }
   button.ghost {
     background: transparent;
     color: var(--ink-soft);
-    padding: 6px 10px;
-    font-size: 0.85rem;
+    border-color: transparent;
+    padding: 8px 12px;
+    min-height: 40px;
+    font-size: 0.86rem;
+    font-weight: 500;
   }
-  button.ghost:hover { background: var(--accent-soft); color: var(--ink); }
   button.linklike {
     background: none;
+    border-color: transparent;
     color: var(--accent-dark);
-    padding: 4px 6px;
-    font-size: 0.88rem;
+    padding: 8px 8px;
+    min-height: 40px;
+    font-size: 0.9rem;
+    font-weight: 500;
     text-decoration: underline;
+    text-underline-offset: 3px;
   }
-  button.linklike:hover { background: none; color: var(--accent); }
+  /* 2.17.0: aus vier Kleinstlinks werden vier ruhige Chips. Sie stehen im
+     Kopf nebeneinander, tragen keine Fläche und keine Farbe - aber sie sind
+     groß genug, dass man sie trifft, statt danach zu zielen. */
   button.tiny-link {
-    background: none;
-    color: var(--ink-soft);
-    padding: 4px 4px 4px 10px;
-    font-size: 0.72rem;
+    background: transparent;
+    border: 1px solid var(--border-soft);
+    color: var(--ink-faint);
+    padding: 7px 11px;
+    min-height: 36px;
+    border-radius: 999px;
+    font-size: 0.76rem;
+    font-weight: 500;
     text-decoration: none;
-    opacity: 0.7;
   }
-  button.tiny-link:hover { background: none; color: var(--accent-dark); text-decoration: underline; opacity: 1; }
 
+  @media (hover: hover) and (pointer: fine) {
+    button:hover { background: var(--accent-dark); }
+    button.secondary:hover { background: #24211d; border-color: var(--accent-line); }
+    button.ghost:hover { background: var(--accent-soft); color: var(--ink); }
+    button.linklike:hover { background: none; color: var(--accent); }
+    button.tiny-link:hover { color: var(--accent-dark); border-color: var(--accent-line); background: transparent; }
+    button:disabled:hover { background: var(--accent); }
+  }
+
+  /* ---------- Eingabefelder ---------- */
   input[type="text"], input[type="email"], input[type="password"], input[type="number"], textarea {
     font: inherit;
     width: 100%;
-    padding: 10px 12px;
+    /* 16 px verhindert, dass iOS beim Hineintippen in das Feld zoomt. */
+    font-size: 16px;
+    padding: 12px 14px;
+    min-height: 46px;
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    background: var(--card);
+    background: var(--card-2);
     color: var(--ink);
+    -webkit-appearance: none; appearance: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
   }
-  input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
-  label { display: block; font-size: 0.88rem; color: var(--ink-soft); margin-bottom: 4px; margin-top: 12px; }
+  textarea { min-height: 0; line-height: 1.45; }
+  input:focus, textarea:focus, select:focus {
+    outline: none;
+    border-color: var(--accent-dark);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  input::placeholder, textarea::placeholder { color: var(--ink-faint); }
+  label { display: block; font-size: 0.84rem; color: var(--ink-soft); margin-bottom: var(--s1); margin-top: var(--s3); }
+  select {
+    font: inherit; min-height: 40px;
+    background-color: var(--card-2); color: var(--ink);
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    -webkit-appearance: none; appearance: none;
+    background-image: linear-gradient(45deg, transparent 50%, var(--ink-soft) 50%),
+                      linear-gradient(135deg, var(--ink-soft) 50%, transparent 50%);
+    background-position: right 14px center, right 9px center;
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+    padding-right: 30px !important;
+  }
 
+  /* ---------- Flächen ---------- */
   .panel {
     background: var(--card);
-    border-radius: var(--radius);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-lg);
     box-shadow: var(--shadow);
-    padding: 20px;
-    margin-bottom: 16px;
+    padding: var(--s5);
+    margin-bottom: var(--s4);
   }
   .error-box {
     background: var(--red-soft);
     color: var(--red);
     border-radius: var(--radius);
-    padding: 10px 14px;
-    margin-top: 12px;
+    padding: var(--s3) var(--s4);
+    margin-top: var(--s3);
     font-size: 0.92rem;
   }
   .info-box {
     background: var(--green-soft);
     color: var(--green);
     border-radius: var(--radius);
-    padding: 10px 14px;
-    margin-top: 12px;
+    padding: var(--s3) var(--s4);
+    margin-top: var(--s3);
     font-size: 0.92rem;
   }
 
+  /* ---------- Kopfzeile ---------- */
   .topbar {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 16px;
+    margin-bottom: var(--s4);
     flex-wrap: wrap;
-    gap: 8px;
+    gap: var(--s2);
   }
-  .topbar .who { font-size: 0.9rem; color: var(--ink-soft); }
-  .topbar .who strong { color: var(--ink); }
-  .sync-dot { font-size: 0.78rem; color: var(--ink-soft); }
+  .topbar > div:last-child { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .topbar .who { font-size: 0.86rem; color: var(--ink-faint); }
+  .topbar .who strong { color: var(--ink-soft); font-weight: 600; }
+  .sync-dot { font-size: 0.76rem; color: var(--ink-soft); }
 
-  .pills { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  /* ---------- Bereiche ----------
+     Der aktive Bereich trägt keine Goldfläche mehr, sondern Goldschrift auf
+     eigener Fläche. So bleibt die einzige gefüllte Goldfläche der Knopf,
+     mit dem es weitergeht. */
+  .pills { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: var(--s4); }
   .pill {
-    background: var(--card);
+    background: transparent;
     color: var(--ink-soft);
     border: 1px solid var(--border);
     border-radius: 999px;
-    padding: 7px 16px;
-    font-size: 0.92rem;
+    padding: 8px 15px;
+    min-height: 38px;
+    font-size: 0.9rem;
+    font-weight: 500;
   }
-  .pill:hover { background: var(--accent-soft); color: var(--ink); }
-  .pill.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-  .pill.add { border-style: dashed; }
+  .pill.active {
+    background: var(--accent-soft);
+    color: var(--accent);
+    border-color: var(--accent-line);
+    font-weight: 600;
+  }
+  .pill.add { border-style: dashed; color: var(--ink-faint); }
+  @media (hover: hover) and (pointer: fine) {
+    .pill:hover { background: var(--card-2); color: var(--ink); }
+    .pill.active:hover { background: var(--accent-soft); color: var(--accent); }
+  }
 
-  .tabs { display: flex; gap: 0; margin-bottom: 16px; background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); overflow: hidden; }
-  .tab { flex: 1; background: transparent; color: var(--ink-soft); border-radius: 0; padding: 12px; }
-  .tab:hover { background: var(--accent-soft); color: var(--ink); }
-  .tab.active { background: var(--accent); color: var(--accent-ink); }
+  /* ---------- Tabs ----------
+     Aufgebaut wie der Umschalter in iOS und iPadOS: eine ruhige Wanne, in
+     der ein einzelnes Feld erhaben liegt. Vorher war das aktive Feld voll
+     gold - drei Schritte weiter unten auf dem Bildschirm stand dann der
+     ebenso goldene Knopf, und beide sahen gleich wichtig aus. */
+  .tabs {
+    display: flex;
+    gap: 3px;
+    margin-bottom: var(--s4);
+    background: var(--card-2);
+    border-radius: var(--radius);
+    border: 1px solid var(--border-soft);
+    padding: 3px;
+  }
+  .tab {
+    flex: 1;
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--ink-soft);
+    border-radius: 11px;
+    padding: 10px 6px;
+    min-height: 42px;
+    font-size: 0.92rem;
+    font-weight: 500;
+  }
+  .tab.active {
+    background: var(--card);
+    border-color: var(--border);
+    color: var(--accent);
+    font-weight: 600;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .tab:hover { background: transparent; color: var(--ink); }
+    .tab.active:hover { background: var(--card); color: var(--accent); }
+  }
 
+  /* ---------- Kartenliste ---------- */
   .card-row {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 12px 0;
-    border-bottom: 1px solid var(--border);
+    gap: var(--s3);
+    padding: var(--s3) 0;
+    border-bottom: 1px solid var(--border-soft);
   }
   .card-row:last-child { border-bottom: none; }
   .card-row.dragging { opacity: 0.5; background: var(--accent-soft); position: relative; z-index: 5; }
-  .drag-handle { cursor: grab; color: var(--ink-soft); font-size: 1.2rem; padding: 4px; touch-action: none; user-select: none; }
-  .drag-handle:active { cursor: grabbing; }
+  .drag-handle {
+    cursor: grab; color: var(--ink-faint); font-size: 1.15rem;
+    padding: var(--s2) var(--s1); touch-action: none;
+    -webkit-user-select: none; user-select: none;
+  }
+  .drag-handle:active { cursor: grabbing; color: var(--accent-dark); }
   .card-row .words { flex: 1; min-width: 0; }
   /* Die Zeilen im Fortschritt-Tab (.leech-row) sind genauso aufgebaut wie die
      in der Kartenliste und sollen auch genauso aussehen. Standen sie nicht
@@ -184,50 +389,55 @@
      die drei Zeilen lasen sich als ein Block. Jetzt traegt das Wort, dann die
      Uebersetzung in voller Textfarbe, dann die Notiz gedaempft mit Strich am
      Rand wie ein Zitat. */
-  .card-row .uebersetzung, .leech-row .uebersetzung { color: var(--ink); font-size: 0.92rem; word-break: break-word; margin-top: 3px; }
+  .card-row .uebersetzung, .leech-row .uebersetzung { color: var(--ink-soft); font-size: 0.9rem; word-break: break-word; margin-top: 2px; }
   .card-row .extra-note {
-    color: var(--ink-soft); font-size: 0.82rem; font-style: italic;
+    color: var(--ink-faint); font-size: 0.82rem; font-style: italic;
     word-break: break-word; white-space: pre-wrap;
     margin-top: 6px; padding-left: 9px; border-left: 2px solid var(--border);
   }
 
   /* 2.1.0: Fundstellen der Suche. Kein Standard-Gelb des Browsers - das ist
      auf dunklem Grund grell und macht den Text unlesbar. */
-  mark { background: rgba(227, 200, 138, 0.26); color: var(--ink); border-radius: 3px; padding: 0 1px; }
+  mark { background: rgba(227, 200, 138, 0.24); color: var(--ink); border-radius: 3px; padding: 0 2px; }
 
   /* 2.1.0: Suchfeld mit Knopf zum Leeren */
-  .search-wrap { position: relative; margin-bottom: 10px; }
-  .search-wrap input { padding-right: 46px; }
+  .search-wrap { position: relative; margin-bottom: var(--s3); }
+  .search-wrap input { padding-right: 48px; }
   .search-clear {
-    position: absolute; top: 50%; right: 6px; transform: translateY(-50%);
-    background: transparent; color: var(--ink-soft);
-    padding: 7px 11px; font-size: 0.95rem; line-height: 1; border-radius: 10px;
+    position: absolute; top: 50%; right: 5px; transform: translateY(-50%);
+    background: transparent; border-color: transparent; color: var(--ink-soft);
+    padding: 0; width: 38px; height: 38px; min-height: 38px;
+    font-size: 0.95rem; line-height: 1; border-radius: var(--radius-sm);
   }
-  .search-clear:hover { background: var(--accent-soft); color: var(--ink); }
+  .search-clear:active { transform: translateY(-50%) scale(0.94); }
+
   .badge {
-    background: var(--accent-soft);
-    color: var(--accent-dark);
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--ink-soft);
     border-radius: 999px;
-    padding: 3px 10px;
-    font-size: 0.78rem;
+    padding: 3px 9px;
+    font-size: 0.74rem;
     font-weight: 600;
     white-space: nowrap;
   }
 
-  .study-card { text-align: center; padding: 32px 20px; }
-  .study-word { font-size: 1.7rem; font-weight: 700; word-break: break-word; margin-bottom: 8px; }
+  /* ---------- Abfrage und Übung ---------- */
+  .study-card { text-align: center; padding: var(--s7) var(--s5); }
+  .study-word { font-size: 1.75rem; font-weight: 700; line-height: 1.25; word-break: break-word; margin-bottom: var(--s2); }
   .study-answer {
     font-size: 1.3rem;
-    color: var(--accent-dark);
+    color: var(--accent);
     word-break: break-word;
-    margin-top: 16px;
-    padding-top: 16px;
-    border-top: 1px dashed var(--border);
+    margin-top: var(--s4);
+    padding-top: var(--s4);
+    border-top: 1px solid var(--border);
   }
   .study-extra {
-    margin-top: 14px;
-    padding: 12px;
-    background: var(--bg);
+    margin-top: var(--s3);
+    padding: var(--s3) var(--s4);
+    background: var(--card-2);
+    border: 1px solid var(--border-soft);
     border-radius: var(--radius);
     font-size: 0.95rem;
     color: var(--ink-soft);
@@ -238,44 +448,62 @@
   .study-extra a { color: var(--accent-dark); }
   /* Drei Tasten (B2) muessen auch auf einem schmalen Handy nebeneinander passen:
      weniger Innenabstand, kleinere Schrift, Zusatzzeile in Kleinschrift. */
-  .grade-row { display: flex; gap: 8px; margin-top: 22px; scroll-margin-bottom: 18px; }
-  .grade-row button { flex: 1; padding: 12px 4px; font-size: 0.98rem; line-height: 1.2; min-width: 0; }
-  .grade-row .sub { display: block; font-size: 0.66rem; font-weight: 400; opacity: 0.8; margin-top: 3px; }
-  .btn-known { background: var(--green); }
-  .btn-known:hover { background: #2f8f5c; }
-  .btn-almost { background: var(--accent); }
-  .btn-almost:hover { background: var(--accent-dark); }
-  .btn-unknown { background: var(--red); }
-  .btn-unknown:hover { background: #b8483d; }
+  .grade-row { display: flex; gap: var(--s2); margin-top: var(--s5); scroll-margin-bottom: 18px; }
+  .grade-row button { flex: 1; padding: 12px 4px; min-height: 56px; font-size: 0.98rem; line-height: 1.2; min-width: 0; }
+  .grade-row .sub { display: block; font-size: 0.66rem; font-weight: 400; opacity: 0.75; margin-top: 3px; }
+  /* Die drei Bewertungen sind gleichwertig: dieselbe Fläche, unterschieden
+     nur durch die Farbe des Randes und der Schrift. Vorher waren es drei
+     volle Farbflächen nebeneinander - das sah aus wie eine Ampel und war
+     der unruhigste Fleck der ganzen App. */
+  .grade-row button.btn-known, .grade-row button.btn-almost, .grade-row button.btn-unknown {
+    background: var(--card-2);
+    border-width: 1px;
+    border-style: solid;
+  }
+  .btn-known   { color: var(--green);  border-color: rgba(79, 207, 143, 0.40) !important; }
+  .btn-almost  { color: var(--accent); border-color: var(--accent-line) !important; }
+  .btn-unknown { color: var(--red);    border-color: rgba(226, 105, 92, 0.42) !important; }
+  @media (hover: hover) and (pointer: fine) {
+    .btn-known:hover   { background: var(--green-soft); }
+    .btn-almost:hover  { background: var(--accent-soft); }
+    .btn-unknown:hover { background: var(--red-soft); }
+  }
 
-  /* Tageslimit für neue Karten (B3) */
+  .progress-note { font-size: 0.82rem; color: var(--ink-faint); margin-bottom: var(--s3); letter-spacing: 0.01em; }
 
-  .progress-note { font-size: 0.85rem; color: var(--ink-soft); margin-bottom: 10px; }
+  .done-box { text-align: center; padding: var(--s7) var(--s5); }
+  .done-box .emoji { font-size: 2.4rem; margin-bottom: var(--s3); }
 
-  .done-box { text-align: center; padding: 36px 20px; }
-  .done-box .emoji { font-size: 2.5rem; margin-bottom: 10px; }
+  .hint { color: var(--ink-soft); font-size: 0.93rem; padding: var(--s2) 0; }
+  .due-info { font-size: 1.02rem; margin-bottom: var(--s4); }
+  .due-info strong { color: var(--accent); }
 
-  .hint { color: var(--ink-soft); font-size: 0.95rem; padding: 8px 0; }
-  .due-info { font-size: 1.05rem; margin-bottom: 16px; }
-  .due-info strong { color: var(--accent-dark); }
+  .form-actions { margin-top: var(--s4); display: flex; gap: var(--s2); flex-wrap: wrap; }
+  .bereich-manage-row { display: flex; justify-content: space-between; align-items: center; gap: var(--s2); flex-wrap: wrap; margin-bottom: var(--s3); }
+  .bereich-manage-row button.ghost { font-size: 0.82rem; padding: 7px 10px; min-height: 38px; }
 
-  .form-actions { margin-top: 16px; display: flex; gap: 8px; flex-wrap: wrap; }
-  .bereich-manage-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
-  .bereich-manage-row button.ghost { font-size: 0.82rem; padding: 5px 8px; }
-  .drill-picker { background: var(--bg); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 14px; }
-  .drill-picker select { padding: 8px 10px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--card); color: var(--ink); font: inherit; }
-  .drill-banner { background: var(--accent-soft); color: var(--accent-dark); border-radius: var(--radius); padding: 8px 12px; font-size: 0.85rem; margin-bottom: 14px; }
-  .select-actionbar { background: var(--bg); border-radius: var(--radius); padding: 10px 14px; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .select-actionbar select { padding: 7px 10px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--card); color: var(--ink); font: inherit; }
+  .drill-picker { background: var(--card-2); border: 1px solid var(--border-soft); border-radius: var(--radius); padding: var(--s3) var(--s4) var(--s4); margin-bottom: var(--s3); }
+  .drill-picker select, .select-actionbar select, .dlg select {
+    padding: 9px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border);
+    background-color: var(--card); color: var(--ink); font: inherit; font-size: 0.92rem;
+  }
+  .drill-banner { background: var(--accent-soft); border: 1px solid var(--accent-line); color: var(--accent); border-radius: var(--radius); padding: var(--s2) var(--s3); font-size: 0.82rem; margin-bottom: var(--s3); }
+  .select-actionbar { background: var(--card-2); border: 1px solid var(--border-soft); border-radius: var(--radius); padding: var(--s3) var(--s4); margin-bottom: var(--s3); display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }
   .drill-picker select option, .select-actionbar select option { background: var(--card); color: var(--ink); }
-  .card-row input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--accent); flex-shrink: 0; }
+  .card-row input[type="checkbox"] { width: 22px; height: 22px; accent-color: var(--accent); flex-shrink: 0; }
+
+  /* ---------- Speicherkarten ---------- */
   /* 2.2.0: Jede Speicherkarte samt ihrer aufgeklappten Kartenliste steckt in
      einem Block. Gezogen wird der ganze Block - sonst bliebe die Kartenliste
      beim Sortieren an ihrer alten Stelle liegen. */
   .set-block.dragging { opacity: 0.6; }
-  .sets-kopf { display: flex; align-items: center; gap: 8px; width: 100%; padding: 4px 0; background: transparent; color: var(--ink); font-weight: 600; text-align: left; }
-  .sets-kopf:hover { background: transparent; color: var(--accent); }
-  .set-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .sets-kopf {
+    display: flex; align-items: center; gap: var(--s2); width: 100%;
+    padding: var(--s2) 0; min-height: 40px;
+    background: transparent; border-color: transparent;
+    color: var(--ink); font-weight: 600; text-align: left;
+  }
+  .set-row { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; padding: var(--s3) 0; border-bottom: 1px solid var(--border-soft); }
   .set-row:last-child { border-bottom: none; }
   .set-row .set-name { flex: 1; min-width: 0; font-weight: 600; word-break: break-word; }
   /* 2.11.0: Auf dem Handy kaempften Name, Plakette und zwei Knoepfe in einer
@@ -286,77 +514,79 @@
     .set-row .set-name { flex: 1 0 100%; order: -1; }
     .set-row .drag-handle, .set-row .lock-anzeige { order: -2; }
   }
-  .set-cards { background: var(--bg); border-radius: var(--radius); padding: 4px 12px; margin: 0 0 10px; }
-  .set-cards .card-row { padding: 8px 0; }
+  .set-cards { background: var(--card-2); border: 1px solid var(--border-soft); border-radius: var(--radius); padding: var(--s1) var(--s3); margin: 0 0 var(--s3); }
+  .set-cards .card-row { padding: var(--s2) 0; }
   /* 2.3.0: Die drei Arten von Speicherkarten stehen als eigene Abschnitte
      untereinander. Der Abschnittskopf ist bewusst leise - er ordnet nur, er
      ist kein Knopf. */
-  .set-gruppe { margin-top: 14px; }
+  .set-gruppe { margin-top: var(--s4); }
   .set-gruppe:first-of-type { margin-top: 6px; }
-  .set-gruppe-kopf { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; font-weight: 600; color: var(--ink-soft); padding-top: 8px; border-top: 1px solid var(--border); }
+  .set-gruppe-kopf {
+    display: flex; align-items: center; gap: var(--s2);
+    font-size: 0.76rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--ink-faint); padding-top: var(--s2); border-top: 1px solid var(--border-soft);
+  }
   .set-gruppe:first-of-type .set-gruppe-kopf { border-top: none; padding-top: 0; }
-  .set-art-wahl { padding: 4px 6px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--card); color: var(--ink-soft); font: inherit; font-size: 0.78rem; }
+  .set-art-wahl { padding: 5px 8px; border-radius: var(--radius-sm); border: 1px solid var(--border); background-color: var(--card-2); color: var(--ink-soft); font: inherit; font-size: 0.76rem; min-height: 32px; }
   .set-art-wahl option { background: var(--card); color: var(--ink); }
   /* Gesperrt heisst tot: ausgegraut, kein Ueben, kein Aufklappen. Nur das
      Schloss selbst bleibt anfassbar. */
-  .set-block.set-locked .set-name { color: var(--ink-soft); text-decoration: line-through; text-decoration-color: var(--border); }
+  .set-block.set-locked .set-name { color: var(--ink-faint); text-decoration: line-through; text-decoration-color: var(--border); }
   .set-block.set-locked .badge { opacity: 0.5; }
   .card-row.card-locked .words { opacity: 0.42; }
   .card-row.card-locked .badge { opacity: 0.5; }
   /* Umgekehrt: in einem gefuehrten Satz wird hervorgehoben, was freigeschaltet
      ist - dieselbe Farbe wie bei den Suchtreffern, damit "das darfst du
      anfassen" ohne Erklaerung lesbar ist. */
-  .card-row.card-frei { background: rgba(227, 200, 138, 0.10); border-radius: var(--radius); padding-left: 8px; padding-right: 8px; }
+  .card-row.card-frei { background: rgba(227, 200, 138, 0.08); border-radius: var(--radius-sm); padding-left: var(--s2); padding-right: var(--s2); }
   .lock-anzeige { font-size: 0.95rem; opacity: 0.75; }
-  .merk-hinweis { background: var(--accent-soft); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 12px; font-size: 0.9rem; }
-  .weiter-hinweis { color: var(--ink-soft); font-size: 0.85rem; text-align: center; padding: 10px 0; margin: 0; }
+  .merk-hinweis { background: var(--accent-soft); border: 1px solid var(--accent-line); border-radius: var(--radius); padding: var(--s3) var(--s4); margin-bottom: var(--s3); font-size: 0.88rem; }
+  .weiter-hinweis { color: var(--ink-faint); font-size: 0.83rem; text-align: center; padding: var(--s3) 0; margin: 0; letter-spacing: 0.01em; }
   /* 2.12.0: Die Plakette traegt die Farbe ihres Zustands - dieselbe wie im
      Balken des Fortschritts. So bedeutet ein Farbton ueberall dasselbe. */
-  .badge.zustand-neu      { color: var(--ink-soft); }
-  .badge.zustand-gesehen  { color: var(--accent-dark); }
-  .badge.zustand-wackelig { color: var(--red); }
-  .badge.zustand-solide   { color: var(--accent); }
-  .badge.zustand-fest     { color: var(--green); }
-  /* Dasselbe Aufleuchten wie im Adrabic-Trainer: heller Creme-Schleier, der
-     in 1,4 Sekunden verschwindet. */
+  .badge.zustand-neu      { color: var(--ink-faint); }
+  .badge.zustand-gesehen  { color: var(--accent-dark); border-color: rgba(201, 169, 97, 0.30); }
+  .badge.zustand-wackelig { color: var(--red); border-color: rgba(226, 105, 92, 0.30); }
+  .badge.zustand-solide   { color: var(--accent); border-color: var(--accent-line); }
+  .badge.zustand-fest     { color: var(--green); border-color: rgba(79, 207, 143, 0.30); }
+
   /* 2.16.0: Rahmen statt Hintergrund. Der Kasten, auf den gesprungen wird, hat
      fast immer selbst einen Hintergrund - die alte Animation endete auf
-     "transparent" und LOESCHTE ihn dabei kurz, statt aufzufallen. Auf der
-     Sitzungskarte sah das nach nichts aus, weshalb man nicht erkennen konnte,
-     ob ueberhaupt etwas passiert war. */
+     "transparent" und LOESCHTE ihn dabei kurz, statt aufzufallen. */
   @keyframes aufleuchten {
-    0%   { box-shadow: 0 0 0 3px var(--accent), var(--shadow); }
-    100% { box-shadow: 0 0 0 3px rgba(0, 0, 0, 0), var(--shadow); }
+    0%   { box-shadow: 0 0 0 2px var(--accent), var(--shadow); }
+    100% { box-shadow: 0 0 0 2px rgba(0, 0, 0, 0), var(--shadow); }
   }
   .aufleuchten { animation: aufleuchten 1.4s ease-out; }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
-  /* 2.9.0: Handschrift. Dieselbe Palette wie im Adrabic-Trainer, dazu der
-     Creme-Akzent und die arabischen Ziffern als stille Zierde. */
+
+  /* ---------- Serie ---------- */
   .serie-karte {
-    display: flex; align-items: center; gap: 14px;
-    background: linear-gradient(160deg, rgba(227,200,138,0.13), rgba(227,200,138,0.03) 60%);
-    border: 1px solid rgba(227,200,138,0.22);
-    border-radius: var(--radius); padding: 14px 16px; margin-bottom: 14px;
+    display: flex; align-items: center; gap: var(--s4);
+    background: var(--card-2);
+    border: 1px solid var(--accent-line);
+    border-radius: var(--radius-lg); padding: var(--s4); margin-bottom: var(--s3);
   }
   .serie-zahl { display: flex; flex-direction: column; align-items: center; line-height: 1; }
-  .serie-zahl strong { font-size: 2.5rem; color: var(--accent); }
-  .arab-ziffer { font-family: 'UthmanicHafs', 'Amiri', serif; color: var(--accent-dark); opacity: 0.75; font-size: 1rem; margin-top: 4px; }
+  .serie-zahl strong { font-size: 2.4rem; font-weight: 700; color: var(--accent); letter-spacing: -0.02em; }
+  .arab-ziffer { font-family: 'UthmanicHafs', 'Amiri', serif; color: var(--accent-dark); opacity: 0.7; font-size: 1rem; margin-top: var(--s1); }
   .gross-zahl .arab-ziffer { margin-inline-start: 6px; font-size: 1.1rem; vertical-align: middle; }
-  .serie-text { flex: 1; font-size: 0.95rem; color: var(--ink); }
-  .serie-klein { font-size: 0.78rem; color: var(--ink-soft); }
-  .serie-beste { text-align: right; font-size: 0.74rem; color: var(--ink-soft); line-height: 1.5; }
-  .serie-beste strong { font-size: 1.2rem; color: var(--ink); }
-  /* 2.8.0: Fortschritt */
-  .heute-bar { height: 12px; background: var(--bg); border-radius: 999px; overflow: hidden; }
+  .serie-text { flex: 1; font-size: 0.93rem; color: var(--ink); }
+  .serie-klein { font-size: 0.78rem; color: var(--ink-faint); }
+  .serie-beste { text-align: right; font-size: 0.72rem; color: var(--ink-faint); line-height: 1.5; }
+  .serie-beste strong { font-size: 1.15rem; color: var(--ink-soft); }
+
+  /* ---------- Fortschritt ---------- */
+  .heute-bar { height: 10px; background: var(--card-2); border-radius: 999px; overflow: hidden; }
   .heute-bar span { display: block; height: 100%; background: linear-gradient(90deg, var(--accent-dark), var(--accent)); transition: width 0.3s ease; }
-  .gross-zahl { margin: 4px 0 2px; line-height: 1.3; }
-  .gross-zahl strong { font-size: 1.9rem; color: var(--accent); }
+  .gross-zahl { margin: var(--s1) 0 2px; line-height: 1.3; }
+  .gross-zahl strong { font-size: 1.85rem; font-weight: 700; color: var(--accent); letter-spacing: -0.02em; }
   .gross-zahl span { color: var(--ink-soft); font-size: 0.9rem; }
   /* Kalenderraster: spaltenweise gefuellt, sieben Zeilen = Wochentage. */
-  .kal { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, 1fr); gap: 3px; margin-top: 8px; overflow-x: auto; padding-bottom: 4px; }
-  .kal-tag { width: 11px; height: 11px; border-radius: 2px; background: var(--bg); }
+  .kal { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, 1fr); gap: 3px; margin-top: var(--s2); overflow-x: auto; padding-bottom: var(--s1); }
+  .kal-tag { width: 11px; height: 11px; border-radius: 3px; background: var(--card-2); }
   .kal-tag.sx { background: transparent; }
-  .kal-tag.s0 { background: var(--bg); }
+  .kal-tag.s0 { background: var(--card-2); }
   /* Vier Stufen in der Markenfarbe statt in Gruen - der Kalender ist das
      groesste Element im Tab und traegt deshalb den Akzent. */
   .kal-tag.s1 { background: rgba(227, 200, 138, 0.22); }
@@ -364,68 +594,72 @@
   .kal-tag.s3 { background: rgba(227, 200, 138, 0.72); }
   .kal-tag.s4 { background: var(--accent); }
   .kal-tag.heute { outline: 1px solid var(--accent); outline-offset: 1px; }
-  .lekt-leiste { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-top: 8px; }
-  .lekt-kachel { background: var(--bg); border-radius: var(--radius); padding: 8px 10px; }
-  .lekt-kachel.zu { opacity: 0.45; }
-  .lekt-kachel.dran { outline: 1px solid var(--accent); }
+  .lekt-leiste { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--s2); margin-top: var(--s2); }
+  .lekt-kachel { background: var(--card-2); border: 1px solid var(--border-soft); border-radius: var(--radius); padding: var(--s2) var(--s3); }
+  .lekt-kachel.zu { opacity: 0.42; }
+  .lekt-kachel.dran { border-color: var(--accent-line); }
   .lekt-name { font-size: 0.82rem; margin-bottom: 6px; }
-  .lekt-bar { height: 5px; background: var(--card); border-radius: 999px; overflow: hidden; }
+  .lekt-bar { height: 5px; background: var(--border); border-radius: 999px; overflow: hidden; }
   .lekt-bar span { display: block; height: 100%; background: var(--accent); }
   .lekt-kachel.sitzt .lekt-bar span { background: var(--green); }
-  .lekt-zahl { font-size: 0.74rem; color: var(--ink-soft); margin-top: 4px; }
-  /* 2.4.0: Modus „Lernen". Eine Liste zum Mitlesen, keine Abfrage - deshalb
-     keine grossen Bewertungsflaechen, sondern ruhige Zeilen mit einer
-     einzigen Handlung rechts. */
-  .lern-kopf { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
-  .lern-kopf > div:last-child { display: flex; gap: 8px; flex-wrap: wrap; }
-  .lern-balken { height: 6px; background: var(--bg); border-radius: 999px; overflow: hidden; margin-top: 12px; }
+  .lekt-zahl { font-size: 0.74rem; color: var(--ink-faint); margin-top: var(--s1); }
+
+  /* ---------- Modus „Lernen" ----------
+     2.4.0: Eine Liste zum Mitlesen, keine Abfrage - deshalb keine grossen
+     Bewertungsflaechen, sondern ruhige Zeilen mit einer einzigen Handlung
+     rechts. */
+  .lern-kopf { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--s3); flex-wrap: wrap; }
+  .lern-kopf > div:last-child { display: flex; gap: var(--s2); flex-wrap: wrap; }
+  .lern-balken { height: 6px; background: var(--card-2); border-radius: 999px; overflow: hidden; margin-top: var(--s3); }
   .lern-balken span { display: block; height: 100%; background: var(--green); transition: width 0.25s ease; }
   /* Ein Raster statt einer Spalte: auf dem Handy eine Karte pro Zeile, auf
      einem breiten Bildschirm zwei nebeneinander. Ohne zweite Ansicht, ohne
      Zoomstufen - die Breite entscheidet. */
-  .lern-raster { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
+  .lern-raster { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--s2); }
   .lern-karte {
-    display: flex; gap: 10px; align-items: flex-start;
-    background: var(--card); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 12px 14px;
+    display: flex; gap: var(--s3); align-items: flex-start;
+    background: var(--card); border: 1px solid var(--border-soft);
+    border-radius: var(--radius); padding: var(--s3) var(--s4);
   }
-  .lern-karte.ist-gelernt { opacity: 0.55; }
-  .lern-nr { font-size: 0.74rem; color: var(--ink-soft); min-width: 2ch; text-align: right; padding-top: 3px; flex-shrink: 0; }
+  .lern-karte.ist-gelernt { opacity: 0.5; }
+  .lern-nr { font-size: 0.72rem; color: var(--ink-faint); min-width: 2ch; text-align: right; padding-top: 3px; flex-shrink: 0; }
   .lern-inhalt { flex: 1; min-width: 0; }
   .lern-inhalt .wort { font-weight: 600; word-break: break-word; }
-  .lern-inhalt .uebersetzung { color: var(--ink); font-size: 0.92rem; margin-top: 3px; word-break: break-word; }
-  .lern-notiz-knopf { background: transparent; color: var(--ink-soft); font-size: 0.78rem; padding: 4px 0; margin-top: 4px; }
-  .lern-notiz-knopf:hover { background: transparent; color: var(--accent); }
+  .lern-inhalt .uebersetzung { color: var(--ink-soft); font-size: 0.9rem; margin-top: 2px; word-break: break-word; }
+  .lern-notiz-knopf { background: transparent; border-color: transparent; color: var(--ink-faint); font-size: 0.78rem; font-weight: 500; padding: 6px 0; min-height: 32px; }
   .lern-tat { flex-shrink: 0; }
-  .lern-haken { background: var(--green); color: #06251a; font-size: 0.82rem; padding: 7px 12px; }
-  .lern-haken:hover { filter: brightness(1.08); }
-  .satz-banner { background: var(--accent-soft); color: var(--ink); border-radius: var(--radius); padding: 10px 14px; font-size: 0.86rem; margin-bottom: 14px; }
-  .satz-banner strong { color: var(--accent-dark); }
-  /* E4/D10: Fortschritt sichtbar. Balken und Saeulen bestehen bewusst aus
-     einfachen div-Elementen statt aus einer Diagramm-Bibliothek - die App soll
-     eine einzige Datei ohne Build-Schritt bleiben. Alles hier ist reine
-     Anzeige: es wird nichts gespeichert und nichts berechnet, was den
-     Lernfortschritt veraendert. */
-  .stat-kennzahlen { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
-  .stat-kennzahl { flex: 1; min-width: 90px; background: var(--bg); border-radius: var(--radius); padding: 10px 12px; }
-  .stat-kennzahl .zahl { font-size: 1.35rem; font-weight: 700; color: var(--accent-dark); line-height: 1.2; }
-  .stat-kennzahl .was { font-size: 0.75rem; color: var(--ink-soft); }
+  .lern-haken { background: transparent; border: 1px solid rgba(79, 207, 143, 0.40); color: var(--green); font-size: 0.84rem; padding: 8px 14px; min-height: 38px; }
+  @media (hover: hover) and (pointer: fine) {
+    .lern-notiz-knopf:hover { background: transparent; color: var(--accent); }
+    .lern-haken:hover { background: var(--green-soft); }
+  }
+  .satz-banner { background: var(--card-2); border: 1px solid var(--border-soft); color: var(--ink-soft); border-radius: var(--radius); padding: var(--s3) var(--s4); font-size: 0.86rem; margin-bottom: var(--s3); }
+  .satz-banner strong { color: var(--accent); }
 
-  .stat-block { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border); }
+  /* ---------- Statistik ----------
+     E4/D10: Balken und Saeulen bestehen bewusst aus einfachen div-Elementen
+     statt aus einer Diagramm-Bibliothek - die App soll eine einzige Datei
+     ohne Build-Schritt bleiben. */
+  .stat-kennzahlen { display: flex; flex-wrap: wrap; gap: var(--s2); margin-bottom: var(--s5); }
+  .stat-kennzahl { flex: 1; min-width: 92px; background: var(--card-2); border: 1px solid var(--border-soft); border-radius: var(--radius); padding: var(--s3); }
+  .stat-kennzahl .zahl { font-size: 1.3rem; font-weight: 700; color: var(--ink); line-height: 1.2; letter-spacing: -0.01em; }
+  .stat-kennzahl .was { font-size: 0.74rem; color: var(--ink-faint); margin-top: 2px; }
+
+  .stat-block { margin-top: var(--s6); padding-top: var(--s5); border-top: 1px solid var(--border-soft); }
   .stat-block h3 { font-size: 0.98rem; font-weight: 600; margin-bottom: 2px; }
-  .stat-block .stat-sub { font-size: 0.78rem; color: var(--ink-soft); margin-bottom: 12px; }
+  .stat-block .stat-sub { font-size: 0.78rem; color: var(--ink-faint); margin-bottom: var(--s3); }
 
-  .stat-bar { display: flex; height: 18px; border-radius: 999px; overflow: hidden; background: var(--border); }
+  .stat-bar { display: flex; height: 16px; border-radius: 999px; overflow: hidden; background: var(--border); }
   .stat-seg { height: 100%; }
-  .stat-legend { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 12px; font-size: 0.82rem; color: var(--ink-soft); }
+  .stat-legend { display: flex; flex-wrap: wrap; gap: var(--s2) var(--s5); margin-top: var(--s3); font-size: 0.8rem; color: var(--ink-soft); }
   .stat-legend .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
   .stat-legend strong { color: var(--ink); }
 
   .spark { display: flex; align-items: flex-end; gap: 3px; height: 92px; }
-  .spark-fill { flex: 1; background: var(--accent-soft); border: 1px solid var(--accent-dark); border-top-left-radius: 4px; border-top-right-radius: 4px; min-height: 2px; }
-  .spark-fill.leer { background: transparent; border-color: var(--border); }
+  .spark-fill { flex: 1; background: var(--accent-soft); border: 1px solid var(--accent-line); border-top-left-radius: 4px; border-top-right-radius: 4px; min-height: 2px; }
+  .spark-fill.leer { background: transparent; border-color: var(--border-soft); }
   .spark-fill.heute { background: var(--accent); border-color: var(--accent); }
-  .spark-reihe { display: flex; gap: 3px; font-size: 0.7rem; color: var(--ink-soft); }
+  .spark-reihe { display: flex; gap: 3px; font-size: 0.68rem; color: var(--ink-faint); }
   .spark-reihe span { flex: 1; text-align: center; }
   .spark-reihe.oben { margin-bottom: 5px; }
   .spark-reihe.unten { margin-top: 6px; }
@@ -435,29 +669,31 @@
      die Karte zu ändern. */
   .leech-banner {
     background: var(--red-soft);
+    border: 1px solid rgba(226, 105, 92, 0.30);
     color: var(--red);
     border-radius: var(--radius);
-    padding: 10px 14px;
+    padding: var(--s3) var(--s4);
     font-size: 0.85rem;
-    margin-top: 14px;
+    margin-top: var(--s3);
     text-align: left;
   }
   .leech-badge {
-    background: var(--red-soft);
+    background: transparent;
+    border: 1px solid rgba(226, 105, 92, 0.32);
     color: var(--red);
     border-radius: 999px;
-    padding: 3px 10px;
-    font-size: 0.78rem;
+    padding: 3px 9px;
+    font-size: 0.74rem;
     font-weight: 600;
     white-space: nowrap;
   }
-  .leech-row { display: flex; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .leech-row { display: flex; align-items: center; gap: var(--s2); padding: var(--s3) 0; border-bottom: 1px solid var(--border-soft); }
   .leech-row:last-of-type { border-bottom: none; }
   .leech-row .words { flex: 1; min-width: 0; }
 
   .setup-steps { font-size: 0.92rem; color: var(--ink-soft); }
-  .setup-steps li { margin: 8px 0 8px 18px; }
-  code { background: var(--bg); padding: 2px 6px; border-radius: 6px; font-size: 0.85em; }
+  .setup-steps li { margin: var(--s2) 0 var(--s2) 18px; }
+  code { background: var(--card-2); border: 1px solid var(--border-soft); padding: 2px 6px; border-radius: 6px; font-size: 0.85em; word-break: break-all; }
 
   @font-face {
     font-family: 'UthmanicHafs';
@@ -469,8 +705,11 @@
     font-family: 'UthmanicHafs', 'Amiri', 'Amiri Quran', 'Scheherazade New', 'Noto Naskh Arabic', serif;
     direction: rtl;
     unicode-bidi: plaintext;
+    /* Arabische Schrift trägt hohe Oberlängen und tiefe Unterlängen. Mit der
+       Zeilenhöhe des Fließtextes schneiden sich die Zeilen. */
+    line-height: 1.9;
   }
-  input.arabic { text-align: right; }
+  input.arabic { text-align: right; line-height: 1.6; }
 
   /* D2 (1.8.0): eigene Dialoge statt alert/confirm/prompt. Die System-Kaesten
      sind auf dem Handy fremd, zeigen statt eines Titels die Seiten-Adresse,
@@ -478,71 +717,123 @@
      gar nichts und niemand wusste, warum. */
   .dlg-backdrop {
     position: fixed; inset: 0; z-index: 100;
-    background: rgba(0, 0, 0, 0.6);
+    background: rgba(0, 0, 0, 0.72);
+    -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
     display: flex; align-items: center; justify-content: center;
-    padding: 20px;
+    padding: var(--s5);
+    padding-top: calc(var(--s5) + var(--sat));
+    padding-bottom: calc(var(--s5) + var(--sab));
   }
   .dlg {
     background: var(--card); color: var(--ink);
-    border: 1px solid var(--border); border-radius: var(--radius);
-    box-shadow: var(--shadow);
-    padding: 20px 20px 16px; width: 100%; max-width: 420px; text-align: left;
+    border: 1px solid var(--border); border-radius: var(--radius-lg);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+    padding: var(--s5) var(--s5) var(--s4); width: 100%; max-width: 420px; text-align: left;
+    max-height: 100%; overflow-y: auto;
   }
-  .dlg h3 { font-size: 1.02rem; margin-bottom: 8px; }
+  .dlg h3 { font-size: 1.02rem; margin-bottom: var(--s2); }
   .dlg .dlg-text { color: var(--ink-soft); font-size: 0.94rem; white-space: pre-wrap; word-break: break-word; }
-  .dlg input { margin-top: 12px; }
-  .dlg-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; flex-wrap: wrap; }
-  .dlg-actions button.danger { background: var(--red); color: #fff; }
-  .dlg-actions button.danger:hover { background: var(--red); opacity: 0.85; }
+  .dlg input { margin-top: var(--s3); }
+  .dlg-actions { display: flex; gap: var(--s2); justify-content: flex-end; margin-top: var(--s5); flex-wrap: wrap; }
+  .dlg-actions button.danger { background: var(--red); color: #fff; border-color: var(--red); }
+  @media (hover: hover) and (pointer: fine) {
+    .dlg-actions button.danger:hover { background: #c9564a; }
+  }
 
   /* E7 (1.8.0): Schriftgroesse fuer Arabisch. Der Faktor haengt an #app.
      Die Grundgroessen stehen bewusst an jeder Stelle einzeln - ein
      schlichtes calc(1em * f) in .arabic wuerde sich auf die ELTERN-Groesse
      beziehen und die 1,7 rem der Lernkarte verschlucken. */
-  .study-word.arabic { font-size: calc(1.7rem * var(--arab-scale, 1)); }
+  .study-word.arabic { font-size: calc(1.75rem * var(--arab-scale, 1)); }
   .study-answer.arabic { font-size: calc(1.3rem * var(--arab-scale, 1)); }
   .card-row .wort.arabic, .leech-row .wort.arabic { font-size: calc(1rem * var(--arab-scale, 1)); }
-  input.arabic { font-size: calc(1rem * var(--arab-scale, 1)); }
+  input.arabic { font-size: calc(16px * var(--arab-scale, 1)); }
 
   /* Dreiteiliger Umschalter, benutzt von E7 (Schriftgroesse) und D7 (Suche) */
-  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .seg { display: inline-flex; gap: 2px; border: 1px solid var(--border-soft); background: var(--card-2); border-radius: var(--radius); padding: 2px; }
   .seg button {
-    border-radius: 0; padding: 7px 13px; font-size: 0.84rem;
-    background: transparent; color: var(--ink-soft);
+    border-radius: var(--radius-sm); padding: 8px 13px; min-height: 36px;
+    font-size: 0.83rem; font-weight: 500;
+    background: transparent; border-color: transparent; color: var(--ink-soft);
   }
-  .seg button:hover { background: var(--accent-soft); color: var(--ink); }
-  .seg button.active { background: var(--accent-soft); color: var(--accent-dark); font-weight: 600; }
-  .seg-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+  .seg button.active { background: var(--card); border-color: var(--border); color: var(--accent); font-weight: 600; }
+  .seg-row { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; margin-top: var(--s3); }
+  @media (hover: hover) and (pointer: fine) {
+    .seg button:hover { background: transparent; color: var(--ink); }
+    .seg button.active:hover { background: var(--card); color: var(--accent); }
+  }
 
-  .hw-canvas-wrap { background: var(--bg); border-radius: var(--radius); padding: 10px; margin: 18px 0; }
+  /* ---------- Handschrift ---------- */
+  .hw-canvas-wrap { background: var(--card-2); border: 1px solid var(--border-soft); border-radius: var(--radius); padding: var(--s3); margin: var(--s5) 0; }
   .hw-canvas-wrap canvas {
     display: block;
     width: 100%;
     height: 240px;
     touch-action: none;
     background: #fffdf9;
-    border-radius: 10px;
+    border-radius: var(--radius-sm);
     border: 1px solid var(--border);
   }
   .hw-canvas-wrap.fullscreen {
     position: fixed;
     inset: 12px;
+    top: calc(12px + var(--sat));
     z-index: 50;
     box-shadow: var(--shadow);
     display: flex;
     flex-direction: column;
+    padding-top: calc(var(--s3) + var(--sat));
+    padding-bottom: calc(var(--s3) + var(--sab));
   }
   .hw-canvas-wrap.fullscreen canvas { flex: 1; height: auto; }
-  .hw-toolbar { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; justify-content: center; }
+  .hw-toolbar { display: flex; gap: var(--s2); margin-top: var(--s3); flex-wrap: wrap; justify-content: center; }
 
+  /* ============================================================
+     Bildschirmgrößen
+
+     Drei Stufen statt einer. Die App lief bisher auf jedem Gerät in
+     derselben 640-Pixel-Spalte: auf dem iPad stand sie damit als
+     schmaler Streifen in einer leeren Fläche - der sicherste Weg,
+     wie eine Webseite auszusehen.
+     ============================================================ */
+
+  /* Kleines Handy */
   @media (max-width: 480px) {
-    .container { padding: 12px; }
-    .panel { padding: 16px; }
+    .container { padding-left: calc(12px + var(--sal)); padding-right: calc(12px + var(--sar)); }
+    .panel { padding: var(--s4); }
+    .study-card { padding: var(--s6) var(--s4); }
     .study-word { font-size: 1.4rem; }
     .study-word.arabic { font-size: calc(1.4rem * var(--arab-scale, 1)); }
     /* Seit 1.7.0 gibt es drei Tabs statt zwei - "Fortschritt" ist das
        laengste Wort und braucht auf einem 360-px-Handy weniger Polster. */
-    .tab { padding: 12px 4px; font-size: 0.9rem; }
+    .tab { padding: 10px 4px; font-size: 0.88rem; }
+    .topbar { gap: var(--s1); }
+  }
+
+  /* Tablet und Rechner: mehr Breite, etwas größere Schrift, mehr Luft.
+     Die Karte in der Abfrage wächst am stärksten - sie ist auf einem iPad
+     das, was man ansieht, während alles andere nur danebensteht. */
+  @media (min-width: 768px) {
+    body { font-size: 17px; }
+    .container { max-width: 720px; padding-left: calc(var(--s6) + var(--sal)); padding-right: calc(var(--s6) + var(--sar)); }
+    .panel { padding: var(--s6); }
+    h1 { font-size: 1.7rem; }
+    h2 { font-size: 1.15rem; }
+    .study-card { padding: 56px var(--s7); }
+    .study-word { font-size: 2.1rem; }
+    .study-word.arabic { font-size: calc(2.1rem * var(--arab-scale, 1)); }
+    .study-answer { font-size: 1.5rem; }
+    .study-answer.arabic { font-size: calc(1.5rem * var(--arab-scale, 1)); }
+    .grade-row { gap: var(--s3); }
+    .grade-row button { min-height: 64px; font-size: 1.05rem; }
+    .tab { font-size: 0.98rem; min-height: 46px; }
+    .hw-canvas-wrap canvas { height: 320px; }
+  }
+
+  /* Großes iPad und Desktop */
+  @media (min-width: 1100px) {
+    .container { max-width: 780px; }
+    .lern-raster { grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); }
   }
 </style>
 </head>
@@ -571,7 +862,7 @@ const firebaseConfig = {
 
 /* Versionsnummer: bei jeder Veroeffentlichung hochzaehlen und denselben Wert
    als CACHE_NAME in sw.js eintragen, damit alte Dateien verworfen werden. */
-const APP_VERSION = "2.16.0";
+const APP_VERSION = "2.17.0";
 
 const CONFIGURED = firebaseConfig.apiKey !== "HIER_EINFUEGEN";
 const app = document.getElementById("app");
