@@ -1,3 +1,96 @@
+## 2.16.0 – 11. September 2026
+
+### Geändert
+
+- **Im Modus verschwindet die Navigation.** Über der Karte standen bisher drei
+  Reihen: die Kopfzeile mit den vier Backup-Knöpfen, die Bereichsreihe und die
+  Tabs. Auf dem Handy ist das der halbe erste Bildschirm – Platz, der der Karte
+  fehlt, und drei Gelegenheiten, eine laufende Runde aus Versehen abzubrechen.
+
+  Während Üben, Abfrage und Durchsicht ist all das jetzt weg. Sichtbar bleibt
+  eine einzige Ausnahme: die Warnung, dass gerade nicht gespeichert wird – die
+  darf kein Modus verstecken. Zurück geht es über den Knopf im Modus selbst
+  („Übung beenden", „Session abbrechen", „Fertig"); den gibt es in jedem von
+  ihnen.
+
+- **Im Übungsmodus deckt dieselbe Bewegung auf, die danach weiterträgt.** Seit
+  2.15.0 trägt Leertaste bzw. ein Tipp auf die Karte durch die Runde – nur zum
+  Aufdecken musste man vorher trotzdem einen Knopf treffen. Ein Knopf
+  dazwischen heißt: erst zielen, dann tippen, und bei der nächsten Karte wieder
+  zielen. Der Knopf ist weg, unter der Karte steht stattdessen „Leertaste oder
+  tippen – Antwort zeigen".
+
+  Im echten Lernen bleibt er. Dort folgt nach dem Aufdecken eine echte
+  Entscheidung (Nicht / Fast / Sicher), und wer dafür ohnehin zielen muss, soll
+  nicht aus Versehen aufdecken. Beim handschriftlichen Üben bleibt „Fertig" –
+  sonst verrät ein Fehlgriff neben das Zeichenfeld die Lösung, bevor man sie
+  geschrieben hat.
+
+### Behoben
+
+- **Beim Start eines Modus wird zuverlässig nach oben gesprungen.** Bisher galt
+  die Regel „nur springen, wenn das Ziel gerade nicht im Bild steht" – gedacht
+  für Sprünge innerhalb einer Seite. Bei einem Moduswechsel ist diese Frage
+  sinnlos: Der ganze Bildschirm wird ausgetauscht, an derselben Stelle steht
+  danach etwas anderes. Genau daher kam „mal werde ich hochkatapultiert, mal
+  nicht".
+
+  Üben, Abfrage und Durchsicht springen jetzt immer an den Seitenanfang, egal
+  wo man vorher stand.
+
+- **„🔁 Üben" in einer Speicherkarte sah aus, als täte es nichts.** Der
+  Auswahlkasten („Was üben?") öffnet sich ganz oben in der Werkzeugleiste, der
+  Knopf dafür steht aber in der Speicherkarte – oft mehrere Bildschirme weiter
+  unten. Der Kasten ging also auf, nur eben außerhalb des Bildes. Jetzt springt
+  die Seite mit.
+
+- **Das Aufleuchten war praktisch unsichtbar.** Die Animation ging von hell auf
+  „transparent" – auf einem Kasten, der selbst einen Hintergrund hat, löschte
+  sie ihn für einen Moment, statt aufzufallen. Jetzt leuchtet ein Rahmen auf.
+
+- **Beim Durchgehen wurde man nach unten hin nach oben geworfen.** Der Blick
+  wandert nach dem Abhaken zur nächsten offenen Karte. Stand dahinter nichts
+  Offenes mehr, hieß die Regel bisher „dann nimm die erste offene Karte
+  überhaupt" – und wer unten die letzten Karten abhakte, landete wieder ganz
+  am Anfang.
+
+  Jetzt bleibt der Blick in diesem Fall stehen. Nach oben geht es nur noch,
+  wenn alles abgehakt ist – dort steht dann „Durchgearbeitet" mit dem Knopf zur
+  Abfrage.
+
+- **Die Serie konnte um genau eins fallen, ohne dass etwas passiert war.** Seit
+  2.14.0 wird sie aus dem Tagesprotokoll gerechnet; ein Import kann sie deshalb
+  gar nicht anfassen. Eine Ebene tiefer konnte er es doch: Jeder Datenabgleich
+  mit der Cloud **ersetzte das Protokoll vollständig**. Der heutige Eintrag
+  ging aber gebündelt erst zwei Sekunden später hinaus – kam in diesem Fenster
+  ein Abgleich, und ein Import löst einen aus, war der heutige Tag weg. Ein Tag
+  weniger im Protokoll ist ein Tag weniger in der Serie.
+
+  Das Protokoll stammt aus einer Zeit, in der nichts daran hing; der Kommentar
+  im Code sagte wörtlich, ein verlorener Eintrag sei kein Schaden. Seit 2.14.0
+  stimmt das nicht mehr. Drei Änderungen:
+
+  - Der **erste Eintrag eines Tages** geht sofort hinaus. Er entscheidet, ob
+    der Tag für die Serie zählt; alles Weitere ändert nur noch Balken und wird
+    wie bisher gebündelt geschrieben.
+  - Cloudstand und eigenes Protokoll werden **zusammengelegt statt ersetzt** –
+    je Tag die größere Zahl, und nur für Tage, die dieses Gerät selbst gezählt
+    hat. Was nur hier steht, wird danach hochgeschickt. „Verlauf zurücksetzen"
+    bleibt dadurch trotzdem ein echtes Löschen.
+  - **Schreibfehler werden nicht mehr verschluckt.** Fehlt das Nutzerdokument
+    noch, wird es angelegt und der Tag erneut geschrieben – wie bei Serie und
+    Einstellungen. Sonst wäre der erste Lerntag eines neuen Kontos still
+    verloren, und mit ihm der Anfang der Serie.
+
+- **Ein ausgelassener Tag zeigte den ganzen nächsten Tag eine 0.** Die Kulanz
+  („ein einzelner ausgelassener Tag unterbricht die Serie nicht") hing daran,
+  dass schon mindestens ein Tag gezählt war. Wer gestern ausließ und heute noch
+  nicht gelernt hatte, sah deshalb eine 0 – und nach der ersten Karte stand die
+  alte Zahl wieder da. Die Kulanz gilt jetzt auch für den ersten geprüften Tag.
+  Zwei ausgelassene Tage beenden die Serie nach wie vor.
+
+---
+
 ## 2.15.1 – 9. September 2026
 
 ### Behoben
