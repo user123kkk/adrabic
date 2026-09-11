@@ -1,3 +1,97 @@
+## 2.21.4 – 11. September 2026
+
+### Geändert
+
+- **Herkunft/Kategorien-Anzeige nur noch bei Karten aus „Schwierige
+  Wörter".** In 2.21.3 stand die Zeile unter jeder Karte, die irgendwo
+  mehr als eine Speicherkarte hatte – das war mehr, als gebraucht wird.
+  Jetzt erscheint sie nur noch bei Karten, die auch in „Schwierige Wörter"
+  liegen: genau dort, wo die Herkunft interessiert.
+
+---
+
+## 2.21.3 – 11. September 2026
+
+### Neu
+
+- **Herkunft und Kategorien einer Karte sichtbar.** Eine Karte kann schon
+  immer in beliebig vielen Speicherkarten gleichzeitig stehen – in ihrer
+  Lektion UND in mehreren Kategorien (z. B. „Nomen" und „Weiblich")
+  gleichzeitig. Bisher stand davon nirgends etwas, man musste sich durch
+  die Speicherkarten klicken, um es herauszufinden. Jetzt steht unter jeder
+  Karte klein „📖 Lektion 2 · 📚 Nomen · 📚 Weiblich" – in der Kartenliste im
+  Verwalten-Tab, beim Aufklappen einer Speicherkarte (dort ohne die
+  Speicherkarte, in der man ohnehin schon steht) und beim Wiederholen
+  selbst, direkt nach dem Aufdecken.
+
+---
+
+## 2.21.2 – 11. September 2026
+
+### Geändert
+
+- **Kartenzahl aus der Speicherkarten-Mehrfachauswahl entfernt.** Zeilen wie
+  „Verben (2)" oder „Lektion 1–3 Wiederholung (16)" wurden bei längeren
+  Namen unnötig breit. Die Zahl steht ohnehin schon an der Speicherkarte
+  selbst weiter unten im Verwalten-Tab; die Gesamtzahl der ausgewählten
+  Karten steht weiterhin unter der Liste.
+
+---
+
+## 2.21.1 – 11. September 2026
+
+### Behoben
+
+- **Tippen im Übungsmodus wirkungslos, wenn man unterhalb der Karte tippt.**
+  Auf dem Handy ist die Karte oft nicht bildschirmfüllend – darunter blieb
+  ein leerer Streifen, in dem ein Tipp nichts auslöste, obwohl während der
+  Übungsrunde ohnehin nur die Karte zu sehen ist (Kopfzeile und Reiter sind
+  ausgeblendet). Jetzt zählt der ganze sichtbare Bereich, nicht nur das
+  Kartenpanel selbst.
+
+- **„Katapult"-Gefühl beim Aufdecken aus dem Vollbild im Handschriftmodus.**
+  Der Sprung von der fixierten Zeichenfläche zurück in den normalen
+  Textfluss und die anschließende sanfte Scroll-Bewegung liefen bisher im
+  selben Moment ab und wirkten wie ein Ruck. Der Sprung bekommt jetzt einen
+  kurzen Moment, fertig zu werden, bevor die sanfte Bewegung anfängt.
+
+- **„Daten werden geladen…" ohne jede Handhabe bei langsamer Verbindung.**
+  Steht der Bildschirm länger als 9 Sekunden, erscheint jetzt ein Hinweis
+  auf die Internetverbindung samt „Neu laden"-Knopf, statt nur zu warten.
+
+---
+
+## 2.21.0 – 11. September 2026
+
+### Neu
+
+- **„Merken" jetzt auch im Übungsmodus.** Der Knopf gab es bisher nur beim
+  normalen Abfragen – im Übungsmodus fehlte er, weil es dort „nicht um
+  Fortschritt geht". Genau dort fällt aber oft erst auf, welche Wörter
+  hängen bleiben, etwa beim Durchgehen aller Stufen 1–7 auf einmal. „Merken"
+  ändert ohnehin nur die Speicherkarte „Schwierige Wörter", nie Stufe oder
+  Fälligkeit – der Ausschluss hatte also keinen Grund mehr.
+
+- **Mehrere Speicherkarten zusammen üben.** Bei „🔁 Üben" lässt sich jetzt
+  zwischen *Nach Stufen* und *Speicherkarten* wählen; im zweiten Fall stehen
+  alle Speicherkarten als Kästchen da, mehrere lassen sich gleichzeitig
+  anhaken (z. B. „Nomen" und „Weiblich"). Die Übungsrunde enthält dann alle
+  Karten aus beiden zusammen – eine Karte, die in mehreren angehakten
+  Speicherkarten liegt, taucht dabei nur einmal auf.
+
+### Wie es gebaut ist
+
+- Das bisherige `startDrillFromSet` (eine Speicherkarte) ist durch
+  `startDrillFromSets` (mehrere) ersetzt; die Karten aller angehakten
+  Speicherkarten laufen durch ein `Map` nach Karten-ID, damit Dopplungen
+  herausfallen.
+- Das `<select id="drill-source">` ist einem Radiopaar (*Nach Stufen* /
+  *Speicherkarten*) plus Checkboxen pro Speicherkarte gewichen – ein
+  einzelnes Dropdown konnte nicht mehr sowohl den Modus als auch eine
+  Mehrfachauswahl abbilden.
+
+---
+
 ## 2.20.0 – 11. September 2026
 
 ### Neu
