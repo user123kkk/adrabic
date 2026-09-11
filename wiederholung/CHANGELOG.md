@@ -1,3 +1,76 @@
+## 2.17.0 – 11. September 2026
+
+### Geändert
+
+- **Die App sieht aus wie eine App.** Bisher war das eine Webseite, die im
+  App-Modus lief. Der Unterschied steckte in lauter Kleinigkeiten, die einzeln
+  niemand benennt und die zusammen den Eindruck machen. Drei Regeln, aus denen
+  sich der Rest ergibt:
+
+  **1. Gold ist selten.** Knöpfe, aktive Bereiche, aktive Tabs, Plaketten,
+  Balken und Kalender trugen dieselbe Goldfläche – damit zeigte nichts mehr
+  auf etwas. Jetzt gibt es pro Bildschirm genau eine gefüllte Goldfläche: die
+  Handlung, die gerade dran ist. Alles andere trägt Gold nur als Schrift, Rand
+  oder Schleier. Betroffen sind vor allem die Tabs (jetzt ein Umschalter wie in
+  iOS, mit einem erhabenen Feld statt einer Goldfüllung), die Bereichsreihe und
+  die drei Bewertungsknöpfe: gleiche Fläche, unterschieden nur durch Randfarbe
+  und Schriftfarbe. Drei volle Farbflächen nebeneinander sahen aus wie eine
+  Ampel und waren der unruhigste Fleck der App.
+
+  **2. Alles Anfassbare ist mindestens 44 Pixel hoch.** Das ist das Maß, das
+  Apple und Google für einen Fingertipp ansetzen. Vier winzige Textlinks
+  nebeneinander in der Kopfzeile waren der deutlichste Hinweis darauf, dass hier
+  keine App läuft – aus ihnen sind ruhige Chips geworden: keine Fläche, keine
+  Farbe, aber groß genug, dass man sie trifft, statt auf sie zu zielen.
+
+  **3. Schweben gibt es auf dem Handy nicht.** Alle Hover-Regeln stehen jetzt
+  hinter einer Abfrage nach einer echten Maus. Vorher blieb ein Knopf nach dem
+  Tippen hell, bis man woanders hintippte. Stattdessen gibt es beim Drücken eine
+  kurze Rückmeldung.
+
+  Dazu kommen: eine feste Abstandsleiter (Vielfache von 4 statt 4/6/7/10/12/14/
+  16/18/20/22 nebeneinander), eine zweite Flächenebene für Kästen im Kasten
+  (vorher hatten die dieselbe Farbe wie der Hintergrund und verschwanden),
+  ruhigere Schatten mit Haarlinie statt Leuchten, Zahlen mit fester Breite in
+  Statistik und Serie, und mehr Zeilenhöhe für arabische Schrift – deren Ober-
+  und Unterlängen schnitten sich vorher zwischen zwei Zeilen.
+
+- **Der Bildschirm entscheidet mit.** Die App lief auf jedem Gerät in derselben
+  640-Pixel-Spalte: auf dem iPad stand sie als schmaler Streifen in einer leeren
+  Fläche. Jetzt gibt es drei Stufen – schmales Handy, Tablet ab 768 Pixel
+  (breiter, größere Schrift, deutlich größere Abfragekarte, höheres Zeichenfeld
+  für die Handschrift), großes iPad und Rechner ab 1100 Pixel.
+
+### Behoben
+
+- **Im App-Modus klebte der Inhalt unter der Uhr.** Die Seite lief mit
+  durchsichtiger Statusleiste, hielt sich dafür aber keinen Platz frei – oben
+  lag die Kopfzeile unter Uhr und Kerbe, unten unter dem Streifen zum
+  Schließen. Der Kopf der Seite trägt jetzt `viewport-fit=cover`, und die
+  Ränder, die das Gerät für sich beansprucht, werden ausgerechnet und
+  freigehalten. Dasselbe gilt für Dialoge und das Vollbild der Handschrift.
+
+- **Beim Tippen in ein Eingabefeld zoomte iOS hinein.** Das passiert immer,
+  wenn ein Feld kleiner als 16 Pixel gesetzt ist – danach steht die ganze Seite
+  vergrößert und muss von Hand zurückgeschoben werden. Alle Felder stehen jetzt
+  auf 16 Pixel.
+
+- **Am oberen und unteren Rand schaute der nackte Hintergrund hervor.** Beim
+  Überziehen zog die ganze Seite mit (Gummiband-Effekt) – der sicherste Hinweis
+  darauf, dass unter der App ein Browser sitzt. Ist abgestellt.
+
+- **Zwischen Tippen und Reaktion lag eine Verzögerung.** Browser warten auf
+  Berührungsflächen rund 300 Millisekunden, ob ein Doppeltipp zum Zoomen folgt.
+  Bei Knöpfen ist das jetzt abgeschaltet; außerdem ist der graue Kasten weg, den
+  Android beim Tippen über den Knopf legt.
+
+- **Auswahlfelder waren an manchen Stellen hell.** Sie hatten keine eigene
+  Farbe und fielen auf die Voreinstellung des Browsers zurück. Jetzt trägt die
+  Seite `color-scheme: dark`, und jedes Auswahlfeld hat einen eigenen Pfeil in
+  der Farbe der App.
+
+---
+
 ## 2.16.0 – 11. September 2026
 
 ### Geändert
